@@ -1,0 +1,5095 @@
+From e35a698de3b1455818df2443400ec8ac4c2a868d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 29 Oct 2026 21:00:11 +0000
+Subject: [PATCH 01/21] ASP port: Actions Semi gs702c backend, tuning, and
+ renderer instrumentation
+
+Carries the Arcade Stick Pro work that has been living uncommitted in the
+working tree: the asp video backend, the makefiles, the audio and input glue,
+the asp_tuning.txt loader, and the timing/frame-hash instrumentation inside the
+Konami mixer.
+
+On a branch, not master: master here tracks finalburnneo/FBNeo upstream and
+these patches are ours, so they must not go near it. Nothing is pushed.
+
+Build constraints this target imposes: -march=armv7-a -mtune=cortex-a7, never
+-mcpu=cortex-a7, because the part has no hardware divide and the idiv count must
+come out at 0.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ makefile.asp                     |  637 +++++++++++++
+ makefile.aspdisp                 |   25 +
+ src/burn/drv/konami/konamigx.cpp | 1520 +++++++++++++++---------------
+ src/burn/drv/konami/konamiic.cpp |   87 +-
+ src/burner/pi/main_pi.cpp        |  365 +++++++
+ src/burner/pi/run_pi.cpp         |  344 +++++++
+ src/burner/sdl/config.cpp        |    9 +
+ src/intf/audio/sdl/aud_sdl.cpp   |  587 +++++++-----
+ src/intf/input/pi/inp_pi.cpp     |  327 ++++++-
+ src/intf/video/asp/asp_fbout.h   |  619 ++++++++++++
+ src/intf/video/asp/vid_asp.cpp   |  211 +++++
+ src/intf/video/vid_interface.cpp |   10 +-
+ 12 files changed, 3750 insertions(+), 991 deletions(-)
+ create mode 100644 makefile.asp
+ create mode 100644 makefile.aspdisp
+ create mode 100644 src/intf/video/asp/asp_fbout.h
+ create mode 100644 src/intf/video/asp/vid_asp.cpp
+
+diff --git a/makefile.asp b/makefile.asp
+new file mode 100644
+index 0000000..3e45754
+--- /dev/null
++++ b/makefile.asp
+@@ -0,0 +1,637 @@
++# Makefile for FBNeo, for use on Raspberry Pi
++#
++# The first pass makes sure all intermediary targets are present. The second pass updates
++# any targets, if necessary. (Intermediary) targets which have their own unique rules
++# are generated as required.
++
++unexport
++
++#
++#	Flags. Uncomment any of these declarations to enable their function.
++#
++
++# Check for changes in header files
++ifndef	SKIPDEPEND
++DEPEND = 1
++endif
++
++
++#
++#	Declare variables
++#
++
++# Specify the name of the executable file, without ".exe"
++NAME = fbneo
++
++BUILD_X86_ASM=
++INCLUDE_AVI_RECORDING=
++BUILD_A68K=
++UNICODE=
++
++
++#
++#	Specify paths/files
++#
++
++objdir	= obj/
++srcdir	= src/
++
++include makefile.burn_rules
++
++#
++#	Drop the console drivers.
++#
++#	This build only ever serves the arcade pages: emuinfo.txt points the "fba"
++#	entry here, while the Mega Drive, SNES and NES pages each run their own
++#	emulator (md_emu.dge, sfc_emu.dge, fc_emu.dge) and the Neo Geo page stays
++#	on the stock fba029743. So FBNeo's console drivers are never reachable,
++#	and they are the largest objects in the build: d_spectrum 3.7MB, d_gba
++#	3.6MB, d_nes 3.0MB, d_megadrive 2.8MB, d_snes 2.6MB, d_msx 1.9MB.
++#
++#	Removing them is not only tidiness. The bridge that copies files to the
++#	card refuses anything over 30MB, and the device has 262MB of RAM with a
++#	driver scan at startup that touches every driver's name. Smaller is
++#	better on both counts.
++#
++#	Anything removed here must be checked against the 212 romsets the arcade
++#	pages actually list; dep/generated/driverlist.h is the authority on what
++#	ended up in the build.
++#	Note: d_sms.o has to stay - smsrender.cpp needs SMSPalette from it.
++ASP_DROP := d_spectrum.o spectrum.o \
++		d_gba.o gba.o \
++		d_nes.o nes.o \
++		d_megadrive.o d_mdarcbl.o \
++		d_snes.o \
++		d_msx.o \
++		d_coleco.o \
++		d_pce.o \
++		d_sg1000.o \
++		d_channelf.o \
++		d_ngp.o
++
++drvsrc := $(filter-out $(ASP_DROP),$(drvsrc))
++# Platform-specific
++alldir += burner burner/pi burner/sdl dep/libs/libspng dep/libs/lib7z \
++		dep/libs/zlib intf intf/video intf/video/scalers intf/video/asp \
++		intf/audio intf/audio/sdl intf/input intf/input/pi intf/cd \
++		intf/perfcount intf/perfcount/pi dep/generated \
++		dep/pi/gles
++
++depobj += cdlist.o \
++		\
++		conc.o cong.o dat.o gamc.o gami.o image.o ioapi.o misc.o \
++		sshot.o state.o statec.o unzip.o zipfn.o \
++		\
++		adler32.o compress.o crc32.o deflate.o gzclose.o gzlib.o \
++		gzread.o gzwrite.o infback.o inffast.o inflate.o inftrees.o \
++		trees.o uncompr.o zutil.o \
++		\
++		spng.o \
++		\
++		aud_dsp.o aud_interface.o cd_interface.o cd_chd.o inp_interface.o \
++		interface.o lowpass2.o  vid_interface.o vid_softfx.o \
++		vid_support.o \
++		\
++		2xpm.o 2xsai.o ddt3x.o epx.o hq2xs.o hq2xs_16.o xbr.o xbr32.o \
++		\
++		inp_pi.o aud_sdl.o support_paths.o \
++		ips_manager.o scrn.o config.o \
++		main_pi.o run_pi.o stringset.o bzip.o drv.o media.o inpdipsw.o \
++		matrix.o vid_asp.o inputbuf.o replay.o cd_img.o romdata.o crt.o
++
++
++ifdef INCLUDE_7Z_SUPPORT
++	depobj	+= un7z.o 7zArcIn.o 7zBuf.o 7zBuf2.o 7zCrc.o 7zCrcOpt.o \
++		7zDec.o 7zFile.o 7zStream.o Alloc.o Bcj2.o Bra.o Bra86.o BraIA64.o \
++		CpuArch.o Delta.o LzmaDec.o Lzma2Dec.o Ppmd7.o Ppmd7Dec.o \
++		Sha256.o Xz.o XzCrc64.o XzCrc64Opt.o XzDec.o \
++		Sha256Opt.o MtDec.o MtCoder.o Lzma2DecMt.o Threads.o
++endif
++
++autobj += $(depobj)
++
++ifdef BUILD_X86_ASM
++autobj += eagle_fm.o 2xsaimmx.o hq2x32.o hq3x32.o hq4x32.o superscale.o
++endif
++# End platform-specific
++
++
++
++
++incdir = $(foreach dir,$(alldir),-I$(srcdir)$(dir)) -I$(objdir)dep/generated \
++		  -I$(srcdir)dep/pi/include -I$(srcdir)intf/input/sdl \
++		  -I$(ASPSYSROOT)/include -I$(ASPSYSROOT)/include/SDL -I$(ASPHDRS)
++
++lib	= -static -L$(ASPSYSROOT)/lib -lstdc++ -lSDL -lpthread -lm -lz -ldl
++
++autdep	= $(depobj:.o=.d)
++drvdep	= $(drvsrc:.o=.d)
++
++ifdef	BUILD_A68K
++a68k.o	= $(objdir)cpu/a68k/a68k.o
++endif
++
++driverlist.h = $(srcdir)dep/generated/driverlist.h
++ctv.h	= $(srcdir)dep/generated/ctv.h
++toa_gp9001_func.h = $(srcdir)dep/generated/toa_gp9001_func.h
++neo_sprite_func.h = $(srcdir)dep/generated/neo_sprite_func.h
++cave_tile_func.h = $(srcdir)dep/generated/cave_tile_func.h
++cave_sprite_func.h = $(srcdir)dep/generated/cave_sprite_func.h
++psikyo_tile_func.h = $(srcdir)dep/generated/psikyo_tile_func.h
++pgm_sprite.h = $(srcdir)dep/generated/pgm_sprite.h
++build_details.h = $(srcdir)dep/generated/build_details.h
++
++allobj	= $(objdir)cpu/m68k/m68kcpu.o $(objdir)cpu/m68k/m68kops.o \
++	  $(foreach file,$(autobj:.o=.c), \
++		$(foreach dir,$(alldir),$(subst $(srcdir),$(objdir), \
++		$(firstword $(subst .c,.o,$(wildcard $(srcdir)$(dir)/$(file))))))) \
++	  $(foreach file,$(autobj:.o=.cpp), \
++		$(foreach dir,$(alldir),$(subst $(srcdir),$(objdir), \
++		$(firstword $(subst .cpp,.o,$(wildcard $(srcdir)$(dir)/$(file))))))) \
++	  $(foreach file,$(autobj:.o=.asm), \
++		$(foreach dir,$(alldir),$(subst $(srcdir),$(objdir), \
++		$(firstword $(subst .asm,.o,$(wildcard $(srcdir)$(dir)/$(file))))))) \
++	  $(foreach file,$(autobj:.o=.rc), \
++		$(foreach dir,$(alldir),$(subst $(srcdir),$(objdir), \
++		$(firstword $(subst .rc,.o,$(wildcard $(srcdir)$(dir)/$(file)))))))
++
++ifdef BUILD_A68K
++allobj += $(a68k.o)
++endif
++
++alldep	= $(foreach file,$(autobj:.o=.c), \
++		$(foreach dir,$(alldir),$(subst $(srcdir),$(objdir), \
++		$(firstword $(subst .c,.d,$(wildcard $(srcdir)$(dir)/$(file))))))) \
++	  $(foreach file,$(autobj:.o=.cpp), \
++		$(foreach dir,$(alldir),$(subst $(srcdir),$(objdir), \
++		$(firstword $(subst .cpp,.d,$(wildcard $(srcdir)$(dir)/$(file))))))) \
++	  $(foreach file,$(autobj:.o=.rc), \
++		$(foreach dir,$(alldir),$(subst $(srcdir),$(objdir), \
++		$(firstword $(subst .rc,.d,$(wildcard $(srcdir)$(dir)/$(file)))))))
++
++autdrv := $(drvsrc:.cpp=.o)
++
++#
++#
++#	Specify compiler/linker/assembler
++#
++#
++
++CC	= $(CROSS)gcc
++CXX	= $(CROSS)g++
++
++# FBNeo compiles three small generators and then RUNS them to produce headers
++# (ctv.h, pgm_sprite.h, m68kops.c/h). Built with the cross compiler those are
++# ARM binaries, and the build host cannot execute them - which is exactly the
++# "Error 126" this makefile hit. They are self-contained, stdio only, so they
++# build for the host with no flags beyond -O2.
++#	Do NOT use -mcpu=cortex-a7 here. It tells GCC the chip has the ARMv7
++#	integer divide extension, and GCC then emits sdiv/udiv - 1573 of them in
++#	one build. This chip does not have it. Its /proc/cpuinfo Features line
++#	reads
++#	    swp half thumb fastmult vfp edsp neon vfpv3 tls vfpv4
++#	with no idiva or idivt, where a real Cortex-A7 lists both. Every game
++#	crashed with SIGILL at the first divide, from an unmodified binary.
++#
++#	-march=armv7-a -mtune=cortex-a7 is the correct pair: ARMv7 instruction
++#	selection and A7 scheduling, without assuming hardware divide.
++#
++#	Build for the CPU this device actually has.
++#
++#	Everything on this card - the three working emulators and the stock
++#	fba029743 - is compiled -march=armv5te with soft float. The device is a
++#	Cortex-A7 at 1.308GHz reporting "vfp edsp neon vfpv3 vfpv4". So every
++#	binary on it targets a 1998 instruction set and leaves the FPU unused.
++#
++#	The float side is the lesser half. The bigger cost is that at armv5te GCC
++#	must assume an unaligned 16- or 32-bit load traps, so it emits a
++#	multi-instruction sequence for each one. Emulators read words out of byte
++#	arrays constantly - ROM fetches, tile decodes, sprite lists - and ARMv7
++#	does those in a single instruction.
++#
++#	float-abi is softfp, not hard, deliberately: softfp uses the FPU for
++#	arithmetic while keeping the soft-float calling convention, so this still
++#	links against the sysroot's static SDL, which is armv5te soft-float and
++#	would otherwise be ABI-incompatible.
++HOSTCC	?= gcc
++HOSTCXX	?= g++
++LD	= $(CXX)
++AS	= nasm
++
++#LDFLAGS	= -static
++
++CFLAGS = -march=armv7-a -mtune=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=softfp -O3 -fomit-frame-pointer -Wno-write-strings \
++	   -Wall -Wno-long-long -Wno-sign-compare -Wno-uninitialized -Wno-unused \
++	   -Wno-pedantic -Wno-conversion -Wno-attributes -Wno-unused-but-set-variable \
++	   -Wno-unused-parameter -Wno-unused-value \
++	   -include unistd.h -D_GNU_SOURCE \
++	   $(DEF) $(incdir)
++	   
++CXXFLAGS = -march=armv7-a -mtune=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=softfp -O3 -fomit-frame-pointer -Wno-write-strings \
++	   -Wall -W -pedantic -Wno-long-long \
++	   -Wunknown-pragmas -Wundef -Wconversion -Wno-missing-braces \
++	   -Wuninitialized -Wpointer-arith -Winline -Wno-multichar \
++	   -Wno-pedantic -Wno-conversion -Wno-attributes -Wno-unused-but-set-variable \
++	   -Wno-unused-parameter -Wno-unused-value -Wno-narrowing \
++	   $(DEF) $(incdir)
++
++ASFLAGS	=  -O1 -f coff -w-orphan-labels
++
++#       D3DUtils & D3DMath need these
++#       DEF     = -Dsinf=\(float\)sin -Dcosf=\(float\)cos -Dasinf=\(float\)asin -Dacosf=\(float\)acos -Dsqrtf=\(float\)sqrt
++
++# FIXME
++	DEF	:= -DBUILD_SDL -DBUILD_PI -DBUILD_ASP -DUSE_SPEEDHACKS -DFILENAME=$(NAME) -D__fastcall=
++
++ifdef UNICODE
++	DEF	:= $(DEF) -D_UNICODE
++endif
++
++ifdef SPECIALBUILD
++	DEF	:= $(DEF) -DSPECIALBUILD=$(SPECIALBUILD)
++endif
++
++ifdef FASTCALL
++	DEF	:= $(DEF) -DFASTCALL
++endif
++
++ifdef DEBUG
++	DEF	:= $(DEF) -DFBNEO_DEBUG
++endif
++
++ifdef ROM_VERIFY
++	DEF	:= $(DEF) -DROM_VERIFY
++endif
++
++ifdef INCLUDE_7Z_SUPPORT
++	DEF := $(DEF) -DINCLUDE_7Z_SUPPORT
++endif
++
++ifdef INCLUDE_AVI_RECORDING
++	DEF := $(DEF) -DINCLUDE_AVI_RECORDING
++endif
++
++ifdef LSB_FIRST
++	DEF	:= $(DEF) -DLSB_FIRST
++endif
++
++ifdef INCLUDE_LIB_PNGH
++	DEF	:= $(DEF) -DINCLUDE_LIB_PNGH
++endif
++
++ifdef BUILD_A68K
++	DEF	:= $(DEF) -DBUILD_A68K
++endif
++
++ifdef BUILD_X86_ASM
++	DEF := $(DEF) -DBUILD_X86_ASM
++endif
++
++ifdef BUILD_X64_EXE
++	DEF := $(DEF) -DBUILD_X64_EXE -DXBYAK_NO_OP_NAMES -DMIPS3_X64_DRC
++endif
++
++ifdef	SYMBOL
++
++	CFLAGS   += -ggdb3
++	CXXFLAGS += -ggdb3
++	ASFLAGS  += -g
++	DEF	 := $(DEF) -D_DEBUG
++
++ifdef PROFILE
++	CFLAGS	 += -pg
++	CXXFLAGS += -pg
++else
++	CFLAGS	 += -fomit-frame-pointer
++	CXXFLAGS += -fomit-frame-pointer
++endif
++
++else
++	LDFLAGS	 += -s
++endif
++
++# For zlib
++DEF := $(DEF) -DNO_VIZ -D_LARGEFILE64_SOURCE=0 -D_FILE_OFFSET_BITS=64 -DCHDR_SYSTEM_ZLIB
++
++# For lib7z
++ifdef INCLUDE_7Z_SUPPORT
++DEF := $(DEF) -D_7ZIP_PPMD_SUPPPORT -D_7ZIP_ST
++endif
++
++#
++#
++#	Specify paths
++#
++#
++
++vpath %.asm	$(foreach dir,$(alldir),$(srcdir)$(dir)/ )
++vpath %.cpp	$(foreach dir,$(alldir),$(srcdir)$(dir)/ )
++vpath %.c	$(foreach dir,$(alldir),$(srcdir)$(dir)/ )
++vpath %.h	$(foreach dir,$(alldir),$(srcdir)$(dir)/ )
++vpath %.rc	$(foreach dir,$(alldir),$(srcdir)$(dir)/ )
++
++vpath %.o 	$(foreach dir,$(alldir),$(objdir)$(dir)/ )
++vpath %.d 	$(foreach dir,$(alldir),$(objdir)$(dir)/ )
++
++#
++#
++#	Rules
++#
++#
++
++.PHONY:	all init cleandep touch clean
++
++ifeq ($(MAKELEVEL),1)
++ifdef DEPEND
++
++all:	init $(drvdep) $(autdep) $(autobj) $(autdrv)
++	@$(MAKE) -f makefile.asp -s
++
++else
++
++all:	init $(autobj) $(autdrv)
++	@$(MAKE) -f makefile.asp -s
++
++endif
++else
++
++all:	$(NAME)
++
++endif
++
++#
++#
++#	Rule for linking the executable
++#
++#
++
++ifeq ($(MAKELEVEL),2)
++
++$(objdir)drivers.o:		$(autdrv)
++	@echo Linking drivers...
++	@$(LD) -r -nostdlib -o $@ $^
++
++$(NAME):	$(allobj) $(objdir)drivers.o
++	@echo
++	@echo Linking executable... $(NAME)
++	@$(LD) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(lib)
++
++ifdef	DEBUG
++
++#	Don't compress when making a debug build
++
++else
++ifdef	COMPRESS
++	@upx --best $@
++endif
++endif
++endif
++
++ifeq ($(MAKELEVEL),1)
++ifdef FORCE_UPDATE
++$(build_details.h): FORCE
++endif
++endif
++
++#
++#	Generate the gamelist
++#
++
++burn.o burn.d:	driverlist.h
++
++$(driverlist.h): $(drvsrc) $(srcdir)dep/scripts/gamelist.pl
++ifdef	PERL
++	@$(srcdir)dep/scripts/gamelist.pl -o $@ -l gamelist.txt \
++		$(filter %.cpp,$(foreach file,$(drvsrc:.o=.cpp),$(foreach dir,$(alldir), \
++		$(firstword $(wildcard $(srcdir)$(dir)/$(file))))))
++else
++ifeq ($(MAKELEVEL),2)
++	@echo
++	@echo Warning: Perl is not available on this system.
++	@echo $@ cannot be updated or created!
++	@echo
++endif
++endif
++
++#
++# Verify if driverlist.h needs to be updated
++#
++
++#ifeq ($(MAKELEVEL),1)
++#ifdef FORCE_UPDATE
++#$(driverlist.h): FORCE
++#endif
++#endif
++
++
++#
++#	Compile 68000 cores
++#
++
++# A68K
++
++ifdef	BUILD_A68K
++$(a68k.o):	fba_make68k.c
++	@echo Compiling A68K MC68000 core...
++	@$(CC) -mconsole $(CFLAGS) $(LDFLAGS) -DWIN32 -Wno-unused -Wno-conversion -Wno-missing-prototypes \
++		-s $< -o $(subst $(srcdir),$(objdir),$(<D))/$(<F:.c=.exe)
++	@$(subst $(srcdir),$(objdir),$(<D))/$(<F:.c=.exe) $(@:.o=.asm) \
++		$(@D)/a68k_tab.asm 00 $(ppro)
++	@echo Assembling A68K MC68000 core...
++	@$(AS) $(ASFLAGS) $(@:.o=.asm) -o $@
++endif
++
++# Musashi
++
++$(objdir)cpu/m68k/m68kcpu.o: $(srcdir)cpu/m68k/m68kcpu.c $(objdir)dep/generated/m68kops.h $(srcdir)cpu/m68k/m68k.h $(srcdir)cpu/m68k/m68kconf.h
++	@echo Compiling Musashi MC680x0 core \(m68kcpu.c\)...
++	@$(CC) $(CFLAGS) -c $(srcdir)cpu/m68k/m68kcpu.c -o $(objdir)cpu/m68k/m68kcpu.o
++
++$(objdir)cpu/m68k/m68kops.o: $(objdir)cpu/m68k/m68kmake $(objdir)dep/generated/m68kops.h $(objdir)dep/generated/m68kops.c $(srcdir)cpu/m68k/m68k.h $(srcdir)cpu/m68k/m68kconf.h
++	@echo Compiling Musashi MC680x0 core \(m68kops.c\)...
++	@$(CC) $(CFLAGS) -c $(objdir)dep/generated/m68kops.c -o $(objdir)cpu/m68k/m68kops.o
++
++$(objdir)dep/generated/m68kops.h $(objdir)dep/generated/m68kops.c: $(objdir)cpu/m68k/m68kmake $(srcdir)cpu/m68k/m68k_in.c
++	$(objdir)cpu/m68k/m68kmake $(objdir)dep/generated/ $(srcdir)cpu/m68k/m68k_in.c
++
++$(objdir)cpu/m68k/m68kmake: $(srcdir)cpu/m68k/m68kmake.c
++	@echo Compiling Musashi MC680x0 core \(m68kmake.c\)...
++	@$(HOSTCC) -O2 $(srcdir)cpu/m68k/m68kmake.c -o $(objdir)cpu/m68k/m68kmake
++
++
++#
++#	Extra rules for generated header file ctv.h, needed by ctv.cpp
++#
++
++ctv.d ctv.o:	$(ctv.h)
++
++$(ctv.h):	ctv_make.cpp
++	@echo Generating $(srcdir)dep/generated/$(@F)...
++	@$(HOSTCXX) -O2 $< \
++		-o $(subst $(srcdir),$(objdir),$(<D))/$(<F:.cpp=.exe)
++	@$(subst $(srcdir),$(objdir),$(<D))/$(<F:.cpp=.exe) >$@
++
++#
++#	Extra rules for generated header file toa_gp9001_func.h, needed by toa_gp9001.cpp
++#
++
++toa_bcu2.d toa_bcu2.o toa_gp9001.d toa_gp9001.o: $(toa_gp9001_func.h)
++
++$(toa_gp9001_func.h):	$(srcdir)dep/scripts/toa_gp9001_func.pl
++	@$(srcdir)dep/scripts/toa_gp9001_func.pl -o $(toa_gp9001_func.h)
++
++#
++#	Extra rules for generated header file neo_sprite_func.h, needed by neo_sprite.cpp
++#
++
++neo_sprite.d neo_sprite.o: $(neo_sprite_func.h)
++
++$(neo_sprite_func.h):	$(srcdir)dep/scripts/neo_sprite_func.pl
++	@$(srcdir)dep/scripts/neo_sprite_func.pl -o $(neo_sprite_func.h)
++
++#
++#	Extra rules for generated header file cave_tile_func.h, needed by cave_tile.cpp
++#
++
++cave_tile.d cave_tile.o: $(cave_tile_func.h)
++
++$(cave_tile_func.h):	$(srcdir)dep/scripts/cave_tile_func.pl
++	@$(srcdir)dep/scripts/cave_tile_func.pl -o $(cave_tile_func.h)
++
++#
++#	Extra rules for generated header file cave_sprite_func.h, needed by cave_sprite.cpp
++#
++
++cave_sprite.d cave_sprite.o: $(cave_sprite_func.h)
++
++$(cave_sprite_func.h):	$(srcdir)dep/scripts/cave_sprite_func.pl
++	@$(srcdir)dep/scripts/cave_sprite_func.pl -o $(cave_sprite_func.h)
++
++#
++#	Extra rules for generated header file psikyo_tile_func.h / psikyo_sprite_func.h, needed by psikyo_tile.cpp / psikyo_sprite.cpp
++#
++
++psikyo_tile.d psikyo_tile.o psikyosprite.d psikyo_sprite.o: $(psikyo_tile_func.h)
++
++$(psikyo_tile_func.h):	$(srcdir)dep/scripts/psikyo_tile_func.pl
++	$(srcdir)dep/scripts/psikyo_tile_func.pl -o $(psikyo_tile_func.h)
++
++#
++#	Extra rules for generated header file pgm_sprite.h, needed by pgm_draw.cpp
++#
++
++pgm_draw.d pgm_draw.o:	$(pgm_sprite.h)
++
++$(pgm_sprite.h):	pgm_sprite_create.cpp
++	@echo Generating $(srcdir)dep/generated/$(@F)...
++	@$(HOSTCXX) -O2 $< \
++		-o $(subst $(srcdir),$(objdir),$(<D))/$(<F:.cpp=.exe)
++	@$(subst $(srcdir),$(objdir),$(<D))/$(<F:.cpp=.exe) >$@
++
++
++ifeq ($(MAKELEVEL),2)
++ifdef DEPEND
++
++include	$(alldep)
++
++endif
++endif
++
++
++#
++#	Generic rules for C/C++ files
++#
++# Note: require init to complete before assembling anything (see "| init" below)
++# to avoid parallization issues on fresh builds.
++#
++
++ifeq ($(MAKELEVEL),1)
++
++%.o:	%.cpp
++	@echo Compiling $<...
++	@$(CC) $(CXXFLAGS) -c $< -o $(subst $(srcdir),$(objdir),$(<D))/$(@F)
++
++%.o:	%.c
++	@echo Compiling $<...
++	@$(CC) $(CFLAGS) -c $< -o $(subst $(srcdir),$(objdir),$(<D))/$(@F)
++
++%.o:	%.asm | init
++	@echo Assembling $<...
++	@$(AS) $(ASFLAGS) $< -o $(subst $(srcdir),$(objdir),$(<D))/$(@F)
++
++else
++
++%.o:	%.c
++	@echo Compiling $<...
++	@$(CC) $(CFLAGS) -c $< -o $@
++
++%.o:	%.asm | init
++	@echo Assembling $<...
++	@$(AS) $(ASFLAGS) $< -o $@
++
++%.o:
++	@echo Compiling $<...
++	@$(CC) $(CXXFLAGS) -c $< -o $@
++
++endif
++
++#
++#	Generate dependencies for C/C++ files
++#
++
++ifdef DEPEND
++
++%.d:	%.c
++	@echo Generating depend file for $<...
++	@$(CC) -MM -MT "$(subst $(srcdir),$(objdir),$(<D))/$(*F).o $(subst $(srcdir),$(objdir),$(<D))/$(@F)" -x c++ $(CXXFLAGS) $< >$(subst $(srcdir),$(objdir),$(<D))/$(@F)
++
++%.d:	%.cpp
++	@echo Generating depend file for $<...
++	@$(CC) -MM -MT "$(subst $(srcdir),$(objdir),$(<D))/$(*F).o $(subst $(srcdir),$(objdir),$(<D))/$(@F)" -x c++ $(CXXFLAGS) $< >$(subst $(srcdir),$(objdir),$(<D))/$(@F)
++
++%.d:	%.rc
++	@echo Generating depend file for $<...
++	@$(CC) -MM -MT "$(subst $(srcdir),$(objdir),$(<D))/$(*F).o $(subst $(srcdir),$(objdir),$(<D))/$(@F)" -x c++ $(CXXFLAGS) $< >$(subst $(srcdir),$(objdir),$(<D))/$(@F)
++
++endif
++
++#
++#	Phony targets
++#
++
++init:
++
++ifdef	DEBUG
++	@echo Making debug build...
++else
++	@echo Making normal build...
++endif
++	@echo
++	@mkdir -p $(foreach dir, $(alldir),$(objdir)$(dir))
++	@mkdir -p $(srcdir)dep/generated
++
++cleandep:
++	@echo Removing depend files from $(objdir)...
++	-@for dir in $(alldir); do rm -f $(objdir)$$dir/*.d; done
++
++touch:
++	@echo Marking all targets for $(NAME) as uptodate...
++	-@touch $(NAME).exe
++	-@touch -c -r $(NAME).exe $(srcdir)/dep/generated/*
++	-@for dir in $(alldir); do touch -c  -r $(NAME).exe $(objdir)$$dir/*; done
++
++clean:
++	@echo Removing build files...
++	-@rm -fr $(objdir) $(ctv.h) $(dep)generated gamelist.txt $(NAME)
++
++ifdef	PERL
++	@echo Removing all files generated with perl scripts...
++	-@rm -f -r $(app_gnuc.rc) $(driverlist)
++endif
++
++
++#
++#	Rule to force recompilation of any target that depends on it
++#
++
++FORCE:
+diff --git a/makefile.aspdisp b/makefile.aspdisp
+new file mode 100644
+index 0000000..ff8ac21
+--- /dev/null
++++ b/makefile.aspdisp
+@@ -0,0 +1,25 @@
++#	Dispatcher for the Arcade Stick Pro build.
++#
++#	makefile.asp is written to run at MAKELEVEL 1, like every other FBNeo
++#	platform makefile - the repo's root makefile normally provides that level.
++#	This does the same job without carrying the root makefile's x86 defaults.
++
++export
++
++CROSS      ?= arm-linux-gnueabi-
++ASPSYSROOT ?= /home/claude/aspwork/sysroot
++ASPHDRS    ?= /home/claude/aspwork
++
++#	Flags the root makefile would normally supply. Only the two that apply to
++#	this target are set; the rest of the root makefile is x86 (BUILD_X86_ASM,
++#	FASTCALL) or Windows (AVI recording, 7-zip, Unicode) and is left out.
++#
++#	LSB_FIRST is not optional. Without it FBNeo compiles its ROM and tile word
++#	handling for a big-endian host, and every driver comes out byte-swapped.
++#	PERL is what lets the gamelist script generate driverlist.h at all; without
++#	it the rule silently does nothing and burn.cpp fails to find the header.
++LSB_FIRST  = 1
++PERL       = 1
++
++all:
++	@$(MAKE) -f makefile.asp
+diff --git a/src/burn/drv/konami/konamigx.cpp b/src/burn/drv/konami/konamigx.cpp
+index 0402a4d..f33ea1c 100644
+--- a/src/burn/drv/konami/konamigx.cpp
++++ b/src/burn/drv/konami/konamigx.cpp
+@@ -1,737 +1,783 @@
+-// license:BSD-3-Clause
+-// copyright-holders:R. Belmont, Acho A. Tang, Phil Stroffolino, Olivier Galibert
+-
+-#include "tiles_generic.h"
+-#include "konamiic.h"
+-
+-INT32 konamigx_mystwarr_kludge = 0; // keep layer1 enabled, even if alpha has made it completely invisible
+-
+-static INT32 konamigx_wrport1_0 = 0;
+-
+-//static UINT8 m_sound_ctrl;
+-//static UINT8 m_sound_intck;
+-//static UINT32 m_fantjour_dma[8];
+-//static INT32 m_konamigx_current_frame;
+-static INT32 m_gx_objdma, m_gx_primode;
+-
+-#define GX_MAX_SPRITES 512
+-#define GX_MAX_LAYERS  6
+-#define GX_MAX_OBJECTS (GX_MAX_SPRITES + GX_MAX_LAYERS)
+-
+-static struct GX_OBJ { INT32 order, offs, code, color; } *gx_objpool;
+-static UINT16 *gx_spriteram;
+-
+-static INT32 *K054338_shdRGB;
+-
+-static UINT8 *gx_shdzbuf, *gx_objzbuf;
+-
+-static INT32 k053247_vrcbk[4];
+-static INT32 k053247_opset;
+-static INT32 k053247_coreg;
+-static INT32 k053247_coregshift;
+-
+-static INT32 opri;
+-static INT32 oinprion;
+-static INT32 vcblk[6];
+-static INT32 ocblk;
+-static INT32 vinmix;
+-static INT32 vmixon;
+-static INT32 osinmix;
+-static INT32 osmixon;
+-
+-void konamigx_precache_registers()
+-{
+-	// (see sprite color coding scheme on p.46 & 47)
+-	static const INT32 coregmasks[5] = {0xf,0xe,0xc,0x8,0x0};
+-	static const INT32 coregshifts[5]= {4,5,6,7,8};
+-	INT32 i;
+-
+-	i = K053247ReadRegs(0x8/2);
+-	k053247_vrcbk[0] = (i & 0x000f) << 14;
+-	k053247_vrcbk[1] = (i & 0x0f00) << 6;
+-	i = K053247ReadRegs(0xa/2);
+-	k053247_vrcbk[2] = (i & 0x000f) << 14;
+-	k053247_vrcbk[3] = (i & 0x0f00) << 6;
+-
+-	// COREG == OBJSET2+1C == bit8-11 of OPSET ??? (see p.50 last table, needs p.49 to confirm)
+-	k053247_opset = K053247ReadRegs(0xc/2);
+-
+-	i = k053247_opset & 7; if (i > 4) i = 4;
+-
+-	k053247_coreg = K053247ReadRegs(0xc/2)>>8 & 0xf;
+-	k053247_coreg =(k053247_coreg & coregmasks[i]) << 12;
+-
+-	k053247_coregshift = coregshifts[i];
+-
+-	opri     = K055555ReadRegister(K55_PRIINP_8);
+-	oinprion = K055555ReadRegister(K55_OINPRI_ON);
+-	vcblk[0] = K055555ReadRegister(K55_PALBASE_A);
+-	vcblk[1] = K055555ReadRegister(K55_PALBASE_B);
+-	vcblk[2] = K055555ReadRegister(K55_PALBASE_C);
+-	vcblk[3] = K055555ReadRegister(K55_PALBASE_D);
+-	vcblk[4] = K055555ReadRegister(K55_PALBASE_SUB1);
+-	vcblk[5] = K055555ReadRegister(K55_PALBASE_SUB2);
+-	ocblk    = K055555ReadRegister(K55_PALBASE_OBJ);
+-	vinmix   = K055555ReadRegister(K55_BLEND_ENABLES);
+-	vmixon   = K055555ReadRegister(K55_VINMIX_ON);
+-	osinmix  = K055555ReadRegister(K55_OSBLEND_ENABLES);
+-	osmixon  = K055555ReadRegister(K55_OSBLEND_ON);
+-}
+-
+-void konamigx_mixer_init(INT32 objdma)
+-{
+-	KonamiIC_GX_MixerInUse = 1;
+-
+-	m_gx_objdma = 0;
+-	m_gx_primode = 0;
+-
+-	gx_shdzbuf = (UINT8*)BurnMalloc(512 * 256 * 2);
+-	gx_objzbuf = (UINT8*)BurnMalloc(512 * 256 * 2);
+-
+-	gx_objpool = (struct GX_OBJ*)BurnMalloc(GX_MAX_OBJECTS * sizeof(GX_OBJ));
+-
+-	K054338_export_config(&K054338_shdRGB);
+-
+-	gx_spriteram = (UINT16*)K053247Ram;
+-
+-	if (objdma)
+-	{
+-		gx_spriteram = (UINT16*)BurnMalloc(0x1000); 
+-		m_gx_objdma = 1;
+-	}
+-	else
+-		gx_spriteram = (UINT16*)K053247Ram;
+-
+-//	m_palette->set_shadow_dRGB32(3,-80,-80,-80, 0); // in k054338 -dink
+-	K054338_invert_alpha(1);
+-}
+-
+-void konamigx_mixer_exit()
+-{
+-	BurnFree(gx_shdzbuf);
+-	BurnFree(gx_objzbuf);
+-	if (m_gx_objdma && gx_spriteram) {
+-		BurnFree(gx_spriteram);
+-	}
+-	BurnFree(gx_objpool);
+-	m_gx_objdma = 0;
+-	konamigx_mystwarr_kludge = 0;
+-}
+-
+-void konamigx_scan(INT32 nAction)
+-{
+-	if (nAction & ACB_MEMORY_RAM) {
+-//		ScanVar(gx_shdzbuf, 512 * 256 * 2, "gx shd z buf");    UNNECESSARY
+-//		ScanVar(gx_objzbuf, 512 * 256 * 2, "gx obj z buf");    "" -dink
+-		if (m_gx_objdma && gx_spriteram) {
+-			ScanVar(gx_spriteram, 0x1000, "gx spriteram");
+-		}
+-		ScanVar(gx_objpool, GX_MAX_OBJECTS * sizeof(GX_OBJ), "gx obj pool");
+-	}
+-}
+-
+-static void gx_wipezbuf(INT32 noshadow)
+-{
+-#define GX_ZBUFW	512
+-
+-	INT32 w = (nScreenWidth);
+-	INT32 h = (nScreenHeight);
+-
+-	UINT8 *zptr = gx_objzbuf;
+-	INT32 ecx = h;
+-
+-	do { memset(zptr, -1, w); zptr += GX_ZBUFW; } while (--ecx);
+-
+-	if (!noshadow)
+-	{
+-		zptr = gx_shdzbuf;
+-		w <<= 1;
+-		ecx = h;
+-		do { memset(zptr, -1, w); zptr += (GX_ZBUFW<<1); } while (--ecx);
+-	}
+-}
+-
+-void konamigx_mixer_primode(INT32 mode)
+-{
+-	m_gx_primode = mode;
+-}
+-
+-static void gx_draw_basic_tilemaps(INT32 mixerflags, INT32 code)
+-{
+-	INT32 temp1,temp2,temp3,temp4;
+-	INT32 i = code<<1;
+-	INT32 j = mixerflags>>i & 3;
+-	INT32 k = 0;
+-
+-	INT32 disp = K055555ReadRegister(K55_INPUT_ENABLES);
+-	if (disp & (1<<code))
+-	{
+-		if (j == GXMIX_BLEND_NONE)  { temp1 = 0xff; temp2 = temp3 = 0; } else
+-		if (j == GXMIX_BLEND_FORCE) { temp1 = 0x00; temp2 = mixerflags>>(i+16); temp3 = 3; }
+-		else
+-		{
+-			temp1 = vinmix;
+-			temp2 = vinmix>>i & 3;
+-			temp3 = vmixon>>i & 3;
+-		}
+-
+-		/* blend layer only when:
+-		    1) vinmix != 0xff
+-		    2) its internal mix code is set
+-		    3) all mix code bits are internal(overriden until tile blending has been implemented)
+-		    4) 0 > alpha < 255;
+-		*/
+-		if (temp1!=0xff && temp2 /*&& temp3==3*/)
+-		{
+-			if (konamigx_mystwarr_kludge) temp2 = 1; // mixlev only on this layer via '338 for mystwarr
+-			temp4 = K054338_set_alpha_level(temp2);
+-//			bprintf(0, _T("%x layer, temp4 %x  temp2 %x\n"), code, temp4, temp2);
+-			if (temp4 <= 0 && !konamigx_mystwarr_kludge) return; // alpha level so high that layer is completely invisible. mystwarr needs this disabled for tile-based alpha tile counting.
+-			if (temp4 < 255) k = K056832_SET_ALPHA(temp4);
+-		}
+-
+-		if (mixerflags & 1<<(code+12)) k |= K056382_DRAW_FLAG_FORCE_XYSCROLL;
+-
+-		if (nBurnLayer & (1 << code)) K056832Draw(code, k, 0);
+-	}
+-}
+-
+-static void gx_draw_basic_extended_tilemaps_1(INT32 mixerflags, INT32 code, INT32 sub1, INT32 sub1flags, INT32 rushingheroes_hack, INT32 offs)
+-{
+-	INT32 temp1,temp2,temp3,temp4;
+-	INT32 i = code<<1;
+-	INT32 j = mixerflags>>i & 3;
+-	INT32 k = 0;
+-	static INT32 parity = 0;
+-	parity ^= 1;
+-
+-	sub1 ^= 0; // kill warnings
+-
+-	INT32 disp = K055555ReadRegister(K55_INPUT_ENABLES);
+-	if ((disp & K55_INP_SUB1) || (rushingheroes_hack))
+-	{
+-		INT32 alpha = 255;
+-
+-		if (j == GXMIX_BLEND_NONE)  { temp1 = 0xff; temp2 = temp3 = 0; } else
+-		if (j == GXMIX_BLEND_FORCE) { temp1 = 0x00; temp2 = mixerflags>>24; temp3 = 3; }
+-		else
+-		{
+-			temp1 = osinmix;
+-			temp2 = osinmix>>2 & 3;
+-			temp3 = osmixon>>2 & 3;
+-		}
+-
+-		if (temp1!=0xff && temp2 /*&& temp3==3*/)
+-		{
+-			alpha = temp4 = K054338_set_alpha_level(temp2);
+-
+-			if (temp4 <= 0) return;
+-			if (temp4 < 255) k = (j == GXMIX_BLEND_FAST) ? ~parity : 1;
+-		}
+-
+-		INT32 l = sub1flags & 0xf;
+-
+-		if (offs == -2)
+-		{
+-
+-			INT32 pixeldouble_output = 0;
+-
+-			INT32 width = nScreenWidth;
+-
+-			if (width>512) // vsnetscr case
+-				pixeldouble_output = 1;
+-
+-			if (nSpriteEnable & 4 && K053936_external_bitmap) {
+-				K053936SetRenderTarget(konami_bitmap32, konami_palette32, konami_priority_bitmap);
+-				K053936GP_0_zoom_draw(K053936_external_bitmap, l, k, alpha, pixeldouble_output, m_k053936_0_ctrl_16, m_k053936_0_linectrl_16, m_k053936_0_ctrl, m_k053936_0_linectrl);
+-			}
+-		}
+-		else
+-		{
+-			if (nSpriteEnable & 2)
+-				if (KonamiIC_K053250InUse) K053250Draw(0, vcblk[4]<<l, 0, 0);
+-		}
+-	}
+-}
+-
+-static void gx_draw_basic_extended_tilemaps_2(INT32 mixerflags, INT32 code, INT32 sub2, INT32 sub2flags, INT32 extra_bitmap, INT32 offs)
+-{
+-	INT32 temp1,temp2,temp3,temp4;
+-	INT32 i = code<<1;
+-	INT32 j = mixerflags>>i & 3;
+-//  INT32 k = 0;
+-//  static INT32 parity = 0;
+-//  parity ^= 1;
+-
+-	sub2 ^= 0; // kill warnings
+-
+-	INT32 disp = K055555ReadRegister(K55_INPUT_ENABLES);
+-	if (disp & K55_INP_SUB2)
+-	{
+-		//INT32 alpha = 255;
+-		if (j == GXMIX_BLEND_NONE)  { temp1 = 0xff; temp2 = temp3 = 0; } else
+-		if (j == GXMIX_BLEND_FORCE) { temp1 = 0x00; temp2 = mixerflags>>26; temp3 = 3; }
+-		else
+-		{
+-			temp1 = osinmix;
+-			temp2 = osinmix>>4 & 3;
+-			temp3 = osmixon>>4 & 3;
+-		}
+-
+-		if (temp1!=0xff && temp2 /*&& temp3==3*/)
+-		{
+-			//alpha =
+-			temp4 = K054338_set_alpha_level(temp2);
+-
+-			if (temp4 <= 0) return;
+-			//if (temp4 < 255) k = (j == GXMIX_BLEND_FAST) ? ~parity : 1;
+-		}
+-
+-		INT32 l = sub2flags & 0xf;
+-
+-		if (offs == -3)
+-		{
+-			if (extra_bitmap) // soccer superstars roz layer
+-			{
+-#if 0 // iq_132
+-				INT32 xx,yy;
+-				INT32 width = screen.width();
+-				INT32 height = screen.height();
+-				const pen_t *paldata = m_palette->pens();
+-
+-				// the output size of the roz layer has to be doubled horizontally
+-				// so that it aligns with the sprites and normal tilemaps.  This appears
+-				// to be done as a post-processing / mixing step effect
+-				//
+-				// - todo, use the pixeldouble_output I just added for vsnet instead?
+-				for (yy=0;yy<height;yy++)
+-				{
+-					UINT16* src = &extra_bitmap->pix16(yy);
+-					UINT32* dst = &bitmap.pix32(yy);
+-					INT32 shiftpos = 0;
+-					for (xx=0;xx<width;xx+=2)
+-					{
+-						UINT16 dat = src[(((xx/2)+shiftpos))%width];
+-						if (dat&0xff)
+-							dst[xx+1] = dst[xx] = paldata[dat];
+-					}
+-				}
+-#endif
+-			}
+-			else
+-			{
+-			//  INT32 pixeldouble_output = 0;
+-			//  K053936GP_1_zoom_draw(machine, bitmap, cliprect, sub2, l, k, alpha, pixeldouble_output);
+-			l = 0; // kill warning
+-			}
+-		}
+-		else {
+-// iq_132			machine().device<k053250_device>("k053250_2")->draw(bitmap, cliprect, vcblk[5]<<l, 0, screen.priority(), 0);
+-		}
+-	}
+-}
+-
+-extern void k053247_draw_single_sprite_gxcore(UINT8 *,UINT8 *gx_shdzbuf, INT32 code, UINT16 *gx_spriteram, INT32 offs,
+-		INT32 color, INT32 alpha, INT32 drawmode, INT32 zcode, INT32 pri,
+-		INT32 primask, INT32 shadow, UINT8 *drawmode_table, UINT8 *shadowmode_table, INT32 shdmask);
+-
+-
+-static void konamigx_mixer_draw(INT32 sub1, INT32 sub1flags,INT32 sub2, INT32 sub2flags,INT32 mixerflags,  INT32 extra_bitmap, INT32 rushingheroes_hack,struct GX_OBJ *objpool,INT32 *objbuf,INT32 nobj)
+-{
+-	// traverse draw list
+-	INT32 disp = K055555ReadRegister(K55_INPUT_ENABLES);
+-
+-	for (INT32 count=0; count<nobj; count++)
+-	{
+-		struct GX_OBJ *objptr = objpool + objbuf[count];
+-		INT32 order  = objptr->order;
+-		INT32 offs   = objptr->offs;
+-		INT32 code   = objptr->code;
+-		INT32 color  = objptr->color;
+-
+-		/* entries >=0 in our list are sprites */
+-		if (offs >= 0)
+-		{
+-			if (!(disp & K55_INP_OBJ)) continue;
+-
+-			INT32 drawmode = order>>4 & 0xf;
+-
+-			INT32 alpha = 255;
+-			INT32 pri = 0;
+-			INT32 zcode = -1; // negative zcode values turn off z-buffering
+-
+-			if (drawmode & 2)
+-			{
+-				alpha = color>>K055555_MIXSHIFT & 3;
+-				if (alpha) alpha = K054338_set_alpha_level(alpha);
+-				//bprintf(0, _T("alpha %X : %X "), alpha, color>>K055555_MIXSHIFT & 3);
+-				if (alpha <= 0) continue;
+-			}
+-			color &= K055555_COLORMASK;
+-
+-			if (drawmode >= 4) {
+-			//	m_palette->set_shadow_mode(order & 0x0f);
+-				drawmode |= (order & 0x0f)<<4;
+-				//bprintf(0, _T("shad %X. "), order & 0xf);
+-			}
+-
+-			if (!(mixerflags & GXMIX_NOZBUF))
+-			{
+-				zcode = order>>16 & 0xff;
+-				pri = order>>24 & 0xff;
+-			}
+-
+-			if (nSpriteEnable & 1)
+-				k053247_draw_single_sprite_gxcore(gx_objzbuf, gx_shdzbuf,code,gx_spriteram,offs,color,alpha,drawmode,zcode,pri,0,0,NULL,NULL,0);
+-		}
+-		else
+-		{
+-			switch (offs)
+-			{
+-				case -1:
+-					gx_draw_basic_tilemaps(mixerflags, code);
+-					continue;
+-				case -2:
+-				case -4:
+-					gx_draw_basic_extended_tilemaps_1(mixerflags, code, sub1, sub1flags, rushingheroes_hack, offs);
+-				continue;
+-				case -3:
+-				case -5:
+-					gx_draw_basic_extended_tilemaps_2(mixerflags, code, sub2, sub2flags, extra_bitmap, offs);
+-				continue;
+-			}
+-			continue;
+-		}
+-	}
+-}
+-
+-void konamigx_mixer(INT32 sub1 /*extra tilemap 1*/, INT32 sub1flags, INT32 sub2 /*extra tilemap 2*/, INT32 sub2flags, INT32 mixerflags, INT32 extra_bitmap /*extra tilemap 3*/, INT32 rushingheroes_hack)
+-{
+-	INT32 objbuf[GX_MAX_OBJECTS];
+-	INT32 shadowon[3], shdpri[3], layerid[6], layerpri[6];
+-
+-	struct GX_OBJ *objpool, *objptr;
+-	INT32 cltc_shdpri, /*prflp,*/ disp;
+-
+-	// abort if object database failed to initialize
+-	objpool = gx_objpool;
+-	if (!objpool) return;
+-
+-	// clear screen with backcolor and update flicker pulse
+-	if (konamigx_wrport1_0 & 0x20)
+-		K054338_fill_backcolor(K055555ReadRegister(0) << 9, K055555ReadRegister(1));
+-	else
+-		K054338_fill_solid_bg();
+-
+-	// abort if video has been disabled
+-	disp = K055555ReadRegister(K55_INPUT_ENABLES);
+-	if (!disp) return;
+-	cltc_shdpri = K054338_read_register(K338_REG_CONTROL);
+-
+-	if (!rushingheroes_hack) // Slam Dunk 2 never sets this.  It's either part of the protection, or type4 doesn't use it
+-	{
+-		if (!(cltc_shdpri & K338_CTL_KILL)) return;
+-	}
+-
+-	// demote shadows by one layer when this bit is set??? (see p.73 8.6)
+-	cltc_shdpri &= K338_CTL_SHDPRI;
+-
+-	// wipe z-buffer
+-	if (mixerflags & GXMIX_NOZBUF)
+-		mixerflags |= GXMIX_NOSHADOW;
+-	else
+-		gx_wipezbuf(mixerflags & GXMIX_NOSHADOW);
+-
+-	// cache global parameters
+-	konamigx_precache_registers();
+-
+-	// init OBJSET2 and mixer parameters (see p.51 and chapter 7)
+-	layerid[0] = 0; layerid[1] = 1; layerid[2] = 2; layerid[3] = 3; layerid[4] = 4; layerid[5] = 5;
+-
+-	// invert layer priority when this flag is set (not used by any GX game?)
+-	//prflp = K055555ReadRegister(K55_CONTROL) & K55_CTL_FLIPPRI;
+-
+-	layerpri[0] = K055555ReadRegister(K55_PRIINP_0);
+-	layerpri[1] = K055555ReadRegister(K55_PRIINP_3);
+-	layerpri[3] = K055555ReadRegister(K55_PRIINP_7);
+-	layerpri[4] = K055555ReadRegister(K55_PRIINP_9);
+-	layerpri[5] = K055555ReadRegister(K55_PRIINP_10);
+-
+-	INT32 shdprisel;
+-
+-	if (m_gx_primode == -1)
+-	{
+-		// Lethal Enforcer hack (requires pixel color comparison)
+-		layerpri[2] = K055555ReadRegister(K55_PRIINP_3) + 0x20;
+-		shdprisel = 0x3f;
+-	}
+-	else
+-	{
+-		layerpri[2] = K055555ReadRegister(K55_PRIINP_6);
+-		shdprisel = K055555ReadRegister(K55_SHD_PRI_SEL);
+-	}
+-
+-	// SHDPRISEL filters shadows by different priority comparison methods (UNIMPLEMENTED, see detail on p.66)
+-	if (!(shdprisel & 0x03)) shadowon[0] = 0;
+-	if (!(shdprisel & 0x0c)) shadowon[1] = 0;
+-	if (!(shdprisel & 0x30)) shadowon[2] = 0;
+-
+-	shdpri[0]   = K055555ReadRegister(K55_SHAD1_PRI);
+-	shdpri[1]   = K055555ReadRegister(K55_SHAD2_PRI);
+-	shdpri[2]   = K055555ReadRegister(K55_SHAD3_PRI);
+-
+-	INT32 spri_min = 0;
+-
+-	shadowon[2] = shadowon[1] = shadowon[0] = 0;
+-
+-	INT32 k = 0;
+-	if (!(mixerflags & GXMIX_NOSHADOW))
+-	{
+-		INT32 i,j;
+-		// only enable shadows beyond a +/-7 RGB threshold
+-		for (j=0,i=0; i<3; j+=3,i++)
+-		{
+-			k = K054338_shdRGB[j  ]; if (k < -7 || k > 7) { shadowon[i] = 1; continue; }
+-			k = K054338_shdRGB[j+1]; if (k < -7 || k > 7) { shadowon[i] = 1; continue; }
+-			k = K054338_shdRGB[j+2]; if (k < -7 || k > 7) { shadowon[i] = 1; }
+-		}
+-
+-		// SHDON specifies layers on which shadows can be projected (see detail on p.65 7.2.8)
+-		INT32 temp = K055555ReadRegister(K55_SHD_ON);
+-		for (i=0; i<4; i++) if (!(temp>>i & 1) && spri_min < layerpri[i]) spri_min = layerpri[i]; // HACK
+-
+-		// update shadows status
+-		K054338_update_all_shadows(rushingheroes_hack);
+-	}
+-
+-	// pre-sort layers
+-	for (INT32 j=0; j<5; j++)
+-	{
+-		INT32 temp1 = layerpri[j];
+-		for (INT32 i=j+1; i<6; i++)
+-		{
+-			INT32 temp2 = layerpri[i];
+-			if ((UINT32)temp1 <= (UINT32)temp2)
+-			{
+-				layerpri[i] = temp1; layerpri[j] = temp1 = temp2;
+-				temp2 = layerid[i]; layerid[i] = layerid[j]; layerid[j] = temp2;
+-			}
+-		}
+-	}
+-
+-	// build object database and create indices
+-	objptr = objpool;
+-	INT32 nobj = 0;
+-
+-	for (INT32 i=5; i>=0; i--)
+-	{
+-		INT32 offs;
+-
+-		INT32 code = layerid[i];
+-		switch (code)
+-		{
+-			/*
+-			    Background layers are represented by negative offset values as follow:
+-
+-			    0+ : normal sprites
+-			    -1 : tile layer A - D
+-			    -2 : K053936 ROZ+ layer 1
+-			    -3 : K053936 ROZ+ layer 2
+-			    -4 : K053250 LVC layer 1
+-			    -5 : K053250 LVC layer 2
+-			*/
+-			case 4 :
+-				offs = -128;
+-				if (sub1flags & 0xf) { if (sub1flags & GXSUB_K053250) offs = -4; else if (sub1) offs = -2; }
+-			break;
+-			case 5 :
+-				offs = -128;
+-				if (sub2flags & 0xf) { if (sub2flags & GXSUB_K053250) offs = -5; else if (sub2) offs = -3; }
+-				if (extra_bitmap) offs = -3;
+-			break;
+-			default: offs = -1;
+-		}
+-
+-		if (offs != -128)
+-		{
+-			objptr->order = layerpri[i]<<24;
+-			objptr->code  = code;
+-			objptr->offs = offs;
+-			objptr++;
+-
+-			objbuf[nobj] = nobj;
+-			nobj++;
+-		}
+-	}
+-
+-//  i = j = 0xff;
+-	INT32 l = 0;
+-
+-	for (INT32 offs=0; offs<0x800; offs+=8)
+-	{
+-		INT32 pri = 0;
+-
+-		if (!(BURN_ENDIAN_SWAP_INT16(gx_spriteram[offs]) & 0x8000)) continue;
+-
+-		INT32 zcode = BURN_ENDIAN_SWAP_INT16(gx_spriteram[offs]) & 0xff;
+-
+-		// invert z-order when opset_pri is set (see p.51 OPSET PRI)
+-		if (k053247_opset & 0x10) zcode = 0xff - zcode;
+-
+-		INT32 code  = BURN_ENDIAN_SWAP_INT16(gx_spriteram[offs+1]);
+-		INT32 color = k = BURN_ENDIAN_SWAP_INT16(gx_spriteram[offs+6]);
+-		l     = BURN_ENDIAN_SWAP_INT16(gx_spriteram[offs+7]);
+-
+-		K053247Callback(&code, &color, &pri);
+-
+-		/*
+-		    shadow = shadow code
+-		    spri   = shadow priority
+-		    temp1  = add solid object
+-		    temp2  = solid pens draw mode
+-		    temp3  = add shadow object
+-		    temp4  = shadow pens draw mode
+-		*/
+-		INT32 temp4 = 0;
+-		INT32 temp3 = 0;
+-		INT32 temp2 = 0;
+-		INT32 temp1 = 0;
+-		INT32 spri = 0;
+-		INT32 shadow = 0;
+-
+-		if (color & K055555_FULLSHADOW)
+-		{
+-			shadow = 3; // use default intensity and color
+-			spri = pri; // retain host priority
+-			temp3 = 1; // add shadow
+-			temp4 = 5; // draw full shadow
+-		}
+-		else
+-		{
+-			shadow = k>>10 & 3;
+-			if (shadow) // object has shadow?
+-			{
+-				INT32 k053246_objset1 = K053246ReadRegs(5);
+-
+-				if (shadow != 1 || k053246_objset1 & 0x20)
+-				{
+-					shadow--;
+-					temp1 = 1; // add solid
+-					temp2 = 1; // draw partial solid
+-					if (shadowon[shadow])
+-					{
+-						temp3 = 1; // add shadow
+-						temp4 = 4; // draw partial shadow
+-					}
+-				}
+-				else
+-				{
+-					// drop the entire sprite to shadow if its shadow code is 1 and SD0EN is off (see p.48)
+-					shadow = 0;
+-					if (!shadowon[0]) continue;
+-					temp3 = 1; // add shadow
+-					temp4 = 5; // draw full shadow
+-				}
+-			}
+-			else
+-			{
+-				temp1 = 1; // add solid
+-				temp2 = 0; // draw full solid
+-			}
+-
+-			if (temp1)
+-			{
+-				// tag sprite for alpha blending
+-				if (color>>K055555_MIXSHIFT & 3) temp2 |= 2;
+-			}
+-
+-			if (temp3)
+-			{
+-				// determine shadow priority
+-				spri = (k053247_opset & 0x20) ? pri : shdpri[shadow]; // (see p.51 OPSET SDSEL)
+-			}
+-		}
+-
+-		switch (m_gx_primode & 0xf)
+-		{
+-			case 0xf:
+-				// viostorm bad shadow grid st.2 fireworks (right side of screen)
+-				if (code == 0xe140 && shdpri[0x02] == 0x28) continue;
+-
+-				// move shadows 1-pri behind sprites (first mid-boss, boss, throwing multiple enemies on train platform)
+-				// note: this doesn't affect the fireworks
+-				spri++;
+-			break;
+-
+-			// Dadandarn zcode suppression
+-			case  1:
+-				zcode = 0;
+-			break;
+-
+-			// Daisukiss bad shadow filter
+-			case  4:
+-				if (k & 0x3000 || k == 0x0800) continue;
+-
+-			// Tokkae shadow masking (INACCURATE)
+-			case  5:
+-				if (spri < spri_min) spri = spri_min;
+-			break;
+-		}
+-
+-		/*
+-		    default sort order:
+-		    fedcba9876543210fedcba9876543210
+-		    xxxxxxxx------------------------ (priority)
+-		    --------xxxxxxxx---------------- (zcode)
+-		    ----------------xxxxxxxx-------- (offset)
+-		    ------------------------xxxx---- (shadow mode)
+-		    ----------------------------xxxx (shadow code)
+-		*/
+-		if (temp1)
+-		{
+-
+-			// add objects with solid or alpha pens
+-			INT32 order = pri<<24 | zcode<<16 | offs<<(8-3) | temp2<<4;
+-			objptr->order = order;
+-			objptr->offs  = offs;
+-			objptr->code  = code;
+-			objptr->color = color;
+-			objptr++;
+-
+-			objbuf[nobj] = nobj;
+-			nobj++;
+-		}
+-
+-		if (temp3 && !(color & K055555_SKIPSHADOW) && !(mixerflags & GXMIX_NOSHADOW))
+-		{
+-			// add objects with shadows if enabled
+-			INT32 order = spri<<24 | zcode<<16 | offs<<(8-3) | temp4<<4 | shadow;
+-			objptr->order = order;
+-			objptr->offs  = offs;
+-			objptr->code  = code;
+-			objptr->color = color;
+-			objptr++;
+-
+-			objbuf[nobj] = nobj;
+-			nobj++;
+-		}
+-	}
+-
+-	// sort objects in decending order (SLOW)
+-	k = nobj;
+-	l = nobj - 1;
+-
+-	for (INT32 j=0; j<l; j++)
+-	{
+-		INT32 temp1 = objbuf[j];
+-		INT32 temp2 = objpool[temp1].order;
+-		for (INT32 i=j+1; i<k; i++)
+-		{
+-			INT32 temp3 = objbuf[i];
+-			INT32 temp4 = objpool[temp3].order;
+-			if ((UINT32)temp2 <= (UINT32)temp4) { temp2 = temp4; objbuf[i] = temp1; objbuf[j] = temp1 = temp3; }
+-		}
+-	}
+-
+-	konamigx_mixer_draw(sub1,sub1flags,sub2,sub2flags,mixerflags,extra_bitmap,rushingheroes_hack,objpool,objbuf,nobj);
+-}
++// license:BSD-3-Clause
++// copyright-holders:R. Belmont, Acho A. Tang, Phil Stroffolino, Olivier Galibert
++
++#include "tiles_generic.h"
++#include "konamiic.h"
++
++INT32 konamigx_mystwarr_kludge = 0; // keep layer1 enabled, even if alpha has made it completely invisible
++
++static INT32 konamigx_wrport1_0 = 0;
++
++//static UINT8 m_sound_ctrl;
++//static UINT8 m_sound_intck;
++//static UINT32 m_fantjour_dma[8];
++//static INT32 m_konamigx_current_frame;
++static INT32 m_gx_objdma, m_gx_primode;
++
++#define GX_MAX_SPRITES 512
++#define GX_MAX_LAYERS  6
++#define GX_MAX_OBJECTS (GX_MAX_SPRITES + GX_MAX_LAYERS)
++
++static struct GX_OBJ { INT32 order, offs, code, color; } *gx_objpool;
++static UINT16 *gx_spriteram;
++
++static INT32 *K054338_shdRGB;
++
++static UINT8 *gx_shdzbuf, *gx_objzbuf;
++
++static INT32 k053247_vrcbk[4];
++static INT32 k053247_opset;
++static INT32 k053247_coreg;
++static INT32 k053247_coregshift;
++
++static INT32 opri;
++static INT32 oinprion;
++static INT32 vcblk[6];
++static INT32 ocblk;
++static INT32 vinmix;
++static INT32 vmixon;
++static INT32 osinmix;
++static INT32 osmixon;
++
++void konamigx_precache_registers()
++{
++	// (see sprite color coding scheme on p.46 & 47)
++	static const INT32 coregmasks[5] = {0xf,0xe,0xc,0x8,0x0};
++	static const INT32 coregshifts[5]= {4,5,6,7,8};
++	INT32 i;
++
++	i = K053247ReadRegs(0x8/2);
++	k053247_vrcbk[0] = (i & 0x000f) << 14;
++	k053247_vrcbk[1] = (i & 0x0f00) << 6;
++	i = K053247ReadRegs(0xa/2);
++	k053247_vrcbk[2] = (i & 0x000f) << 14;
++	k053247_vrcbk[3] = (i & 0x0f00) << 6;
++
++	// COREG == OBJSET2+1C == bit8-11 of OPSET ??? (see p.50 last table, needs p.49 to confirm)
++	k053247_opset = K053247ReadRegs(0xc/2);
++
++	i = k053247_opset & 7; if (i > 4) i = 4;
++
++	k053247_coreg = K053247ReadRegs(0xc/2)>>8 & 0xf;
++	k053247_coreg =(k053247_coreg & coregmasks[i]) << 12;
++
++	k053247_coregshift = coregshifts[i];
++
++	opri     = K055555ReadRegister(K55_PRIINP_8);
++	oinprion = K055555ReadRegister(K55_OINPRI_ON);
++	vcblk[0] = K055555ReadRegister(K55_PALBASE_A);
++	vcblk[1] = K055555ReadRegister(K55_PALBASE_B);
++	vcblk[2] = K055555ReadRegister(K55_PALBASE_C);
++	vcblk[3] = K055555ReadRegister(K55_PALBASE_D);
++	vcblk[4] = K055555ReadRegister(K55_PALBASE_SUB1);
++	vcblk[5] = K055555ReadRegister(K55_PALBASE_SUB2);
++	ocblk    = K055555ReadRegister(K55_PALBASE_OBJ);
++	vinmix   = K055555ReadRegister(K55_BLEND_ENABLES);
++	vmixon   = K055555ReadRegister(K55_VINMIX_ON);
++	osinmix  = K055555ReadRegister(K55_OSBLEND_ENABLES);
++	osmixon  = K055555ReadRegister(K55_OSBLEND_ON);
++}
++
++void konamigx_mixer_init(INT32 objdma)
++{
++	KonamiIC_GX_MixerInUse = 1;
++
++	m_gx_objdma = 0;
++	m_gx_primode = 0;
++
++	gx_shdzbuf = (UINT8*)BurnMalloc(512 * 256 * 2);
++	gx_objzbuf = (UINT8*)BurnMalloc(512 * 256 * 2);
++
++	gx_objpool = (struct GX_OBJ*)BurnMalloc(GX_MAX_OBJECTS * sizeof(GX_OBJ));
++
++	K054338_export_config(&K054338_shdRGB);
++
++	gx_spriteram = (UINT16*)K053247Ram;
++
++	if (objdma)
++	{
++		gx_spriteram = (UINT16*)BurnMalloc(0x1000); 
++		m_gx_objdma = 1;
++	}
++	else
++		gx_spriteram = (UINT16*)K053247Ram;
++
++//	m_palette->set_shadow_dRGB32(3,-80,-80,-80, 0); // in k054338 -dink
++	K054338_invert_alpha(1);
++}
++
++void konamigx_mixer_exit()
++{
++	BurnFree(gx_shdzbuf);
++	BurnFree(gx_objzbuf);
++	if (m_gx_objdma && gx_spriteram) {
++		BurnFree(gx_spriteram);
++	}
++	BurnFree(gx_objpool);
++	m_gx_objdma = 0;
++	konamigx_mystwarr_kludge = 0;
++}
++
++void konamigx_scan(INT32 nAction)
++{
++	if (nAction & ACB_MEMORY_RAM) {
++//		ScanVar(gx_shdzbuf, 512 * 256 * 2, "gx shd z buf");    UNNECESSARY
++//		ScanVar(gx_objzbuf, 512 * 256 * 2, "gx obj z buf");    "" -dink
++		if (m_gx_objdma && gx_spriteram) {
++			ScanVar(gx_spriteram, 0x1000, "gx spriteram");
++		}
++		ScanVar(gx_objpool, GX_MAX_OBJECTS * sizeof(GX_OBJ), "gx obj pool");
++	}
++}
++
++static void gx_wipezbuf(INT32 noshadow)
++{
++#define GX_ZBUFW	512
++
++	INT32 w = (nScreenWidth);
++	INT32 h = (nScreenHeight);
++
++	UINT8 *zptr = gx_objzbuf;
++	INT32 ecx = h;
++
++	do { memset(zptr, -1, w); zptr += GX_ZBUFW; } while (--ecx);
++
++	if (!noshadow)
++	{
++		zptr = gx_shdzbuf;
++		w <<= 1;
++		ecx = h;
++		do { memset(zptr, -1, w); zptr += (GX_ZBUFW<<1); } while (--ecx);
++	}
++}
++
++void konamigx_mixer_primode(INT32 mode)
++{
++	m_gx_primode = mode;
++}
++
++static void gx_draw_basic_tilemaps(INT32 mixerflags, INT32 code)
++{
++	INT32 temp1,temp2,temp3,temp4;
++	INT32 i = code<<1;
++	INT32 j = mixerflags>>i & 3;
++	INT32 k = 0;
++
++	INT32 disp = K055555ReadRegister(K55_INPUT_ENABLES);
++	if (disp & (1<<code))
++	{
++		if (j == GXMIX_BLEND_NONE)  { temp1 = 0xff; temp2 = temp3 = 0; } else
++		if (j == GXMIX_BLEND_FORCE) { temp1 = 0x00; temp2 = mixerflags>>(i+16); temp3 = 3; }
++		else
++		{
++			temp1 = vinmix;
++			temp2 = vinmix>>i & 3;
++			temp3 = vmixon>>i & 3;
++		}
++
++		/* blend layer only when:
++		    1) vinmix != 0xff
++		    2) its internal mix code is set
++		    3) all mix code bits are internal(overriden until tile blending has been implemented)
++		    4) 0 > alpha < 255;
++		*/
++		if (temp1!=0xff && temp2 /*&& temp3==3*/)
++		{
++			if (konamigx_mystwarr_kludge) temp2 = 1; // mixlev only on this layer via '338 for mystwarr
++			temp4 = K054338_set_alpha_level(temp2);
++//			bprintf(0, _T("%x layer, temp4 %x  temp2 %x\n"), code, temp4, temp2);
++			if (temp4 <= 0 && !konamigx_mystwarr_kludge) return; // alpha level so high that layer is completely invisible. mystwarr needs this disabled for tile-based alpha tile counting.
++			if (temp4 < 255) k = K056832_SET_ALPHA(temp4);
++		}
++
++		if (mixerflags & 1<<(code+12)) k |= K056382_DRAW_FLAG_FORCE_XYSCROLL;
++
++		if (nBurnLayer & (1 << code)) K056832Draw(code, k, 0);
++	}
++}
++
++static void gx_draw_basic_extended_tilemaps_1(INT32 mixerflags, INT32 code, INT32 sub1, INT32 sub1flags, INT32 rushingheroes_hack, INT32 offs)
++{
++	INT32 temp1,temp2,temp3,temp4;
++	INT32 i = code<<1;
++	INT32 j = mixerflags>>i & 3;
++	INT32 k = 0;
++	static INT32 parity = 0;
++	parity ^= 1;
++
++	sub1 ^= 0; // kill warnings
++
++	INT32 disp = K055555ReadRegister(K55_INPUT_ENABLES);
++	if ((disp & K55_INP_SUB1) || (rushingheroes_hack))
++	{
++		INT32 alpha = 255;
++
++		if (j == GXMIX_BLEND_NONE)  { temp1 = 0xff; temp2 = temp3 = 0; } else
++		if (j == GXMIX_BLEND_FORCE) { temp1 = 0x00; temp2 = mixerflags>>24; temp3 = 3; }
++		else
++		{
++			temp1 = osinmix;
++			temp2 = osinmix>>2 & 3;
++			temp3 = osmixon>>2 & 3;
++		}
++
++		if (temp1!=0xff && temp2 /*&& temp3==3*/)
++		{
++			alpha = temp4 = K054338_set_alpha_level(temp2);
++
++			if (temp4 <= 0) return;
++			if (temp4 < 255) k = (j == GXMIX_BLEND_FAST) ? ~parity : 1;
++		}
++
++		INT32 l = sub1flags & 0xf;
++
++		if (offs == -2)
++		{
++
++			INT32 pixeldouble_output = 0;
++
++			INT32 width = nScreenWidth;
++
++			if (width>512) // vsnetscr case
++				pixeldouble_output = 1;
++
++			if (nSpriteEnable & 4 && K053936_external_bitmap) {
++				K053936SetRenderTarget(konami_bitmap32, konami_palette32, konami_priority_bitmap);
++				K053936GP_0_zoom_draw(K053936_external_bitmap, l, k, alpha, pixeldouble_output, m_k053936_0_ctrl_16, m_k053936_0_linectrl_16, m_k053936_0_ctrl, m_k053936_0_linectrl);
++			}
++		}
++		else
++		{
++			if (nSpriteEnable & 2)
++				if (KonamiIC_K053250InUse) K053250Draw(0, vcblk[4]<<l, 0, 0);
++		}
++	}
++}
++
++static void gx_draw_basic_extended_tilemaps_2(INT32 mixerflags, INT32 code, INT32 sub2, INT32 sub2flags, INT32 extra_bitmap, INT32 offs)
++{
++	INT32 temp1,temp2,temp3,temp4;
++	INT32 i = code<<1;
++	INT32 j = mixerflags>>i & 3;
++//  INT32 k = 0;
++//  static INT32 parity = 0;
++//  parity ^= 1;
++
++	sub2 ^= 0; // kill warnings
++
++	INT32 disp = K055555ReadRegister(K55_INPUT_ENABLES);
++	if (disp & K55_INP_SUB2)
++	{
++		//INT32 alpha = 255;
++		if (j == GXMIX_BLEND_NONE)  { temp1 = 0xff; temp2 = temp3 = 0; } else
++		if (j == GXMIX_BLEND_FORCE) { temp1 = 0x00; temp2 = mixerflags>>26; temp3 = 3; }
++		else
++		{
++			temp1 = osinmix;
++			temp2 = osinmix>>4 & 3;
++			temp3 = osmixon>>4 & 3;
++		}
++
++		if (temp1!=0xff && temp2 /*&& temp3==3*/)
++		{
++			//alpha =
++			temp4 = K054338_set_alpha_level(temp2);
++
++			if (temp4 <= 0) return;
++			//if (temp4 < 255) k = (j == GXMIX_BLEND_FAST) ? ~parity : 1;
++		}
++
++		INT32 l = sub2flags & 0xf;
++
++		if (offs == -3)
++		{
++			if (extra_bitmap) // soccer superstars roz layer
++			{
++#if 0 // iq_132
++				INT32 xx,yy;
++				INT32 width = screen.width();
++				INT32 height = screen.height();
++				const pen_t *paldata = m_palette->pens();
++
++				// the output size of the roz layer has to be doubled horizontally
++				// so that it aligns with the sprites and normal tilemaps.  This appears
++				// to be done as a post-processing / mixing step effect
++				//
++				// - todo, use the pixeldouble_output I just added for vsnet instead?
++				for (yy=0;yy<height;yy++)
++				{
++					UINT16* src = &extra_bitmap->pix16(yy);
++					UINT32* dst = &bitmap.pix32(yy);
++					INT32 shiftpos = 0;
++					for (xx=0;xx<width;xx+=2)
++					{
++						UINT16 dat = src[(((xx/2)+shiftpos))%width];
++						if (dat&0xff)
++							dst[xx+1] = dst[xx] = paldata[dat];
++					}
++				}
++#endif
++			}
++			else
++			{
++			//  INT32 pixeldouble_output = 0;
++			//  K053936GP_1_zoom_draw(machine, bitmap, cliprect, sub2, l, k, alpha, pixeldouble_output);
++			l = 0; // kill warning
++			}
++		}
++		else {
++// iq_132			machine().device<k053250_device>("k053250_2")->draw(bitmap, cliprect, vcblk[5]<<l, 0, screen.priority(), 0);
++		}
++	}
++}
++
++extern void k053247_draw_single_sprite_gxcore(UINT8 *,UINT8 *gx_shdzbuf, INT32 code, UINT16 *gx_spriteram, INT32 offs,
++		INT32 color, INT32 alpha, INT32 drawmode, INT32 zcode, INT32 pri,
++		INT32 primask, INT32 shadow, UINT8 *drawmode_table, UINT8 *shadowmode_table, INT32 shdmask);
++
++
++#ifdef BUILD_ASP
++// Sub-stage timers for the 5.56 ms mixer. The loop dispatches to exactly two
++// things - one sprite at a time, or a tilemap layer - so timing those two and
++// counting the sprites attributes the whole of it. Twice now I have reasoned
++// about where a cost lives and been wrong; this is the alternative.
++#include <time.h>
++unsigned long long asp_t_ksprite = 0, asp_t_ktile = 0;
++unsigned int asp_n_ksprite = 0, asp_n_ktile = 0;
++static inline unsigned long long asp_gx_ns(void)
++{
++	struct timespec ts;
++	clock_gettime(CLOCK_MONOTONIC, &ts);
++	return (unsigned long long)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
++}
++#endif
++
++static void konamigx_mixer_draw(INT32 sub1, INT32 sub1flags,INT32 sub2, INT32 sub2flags,INT32 mixerflags,  INT32 extra_bitmap, INT32 rushingheroes_hack,struct GX_OBJ *objpool,INT32 *objbuf,INT32 nobj)
++{
++	// traverse draw list
++	INT32 disp = K055555ReadRegister(K55_INPUT_ENABLES);
++
++	for (INT32 count=0; count<nobj; count++)
++	{
++		struct GX_OBJ *objptr = objpool + objbuf[count];
++		INT32 order  = objptr->order;
++		INT32 offs   = objptr->offs;
++		INT32 code   = objptr->code;
++		INT32 color  = objptr->color;
++
++		/* entries >=0 in our list are sprites */
++		if (offs >= 0)
++		{
++			if (!(disp & K55_INP_OBJ)) continue;
++
++			INT32 drawmode = order>>4 & 0xf;
++
++			INT32 alpha = 255;
++			INT32 pri = 0;
++			INT32 zcode = -1; // negative zcode values turn off z-buffering
++
++			if (drawmode & 2)
++			{
++				alpha = color>>K055555_MIXSHIFT & 3;
++				if (alpha) alpha = K054338_set_alpha_level(alpha);
++				//bprintf(0, _T("alpha %X : %X "), alpha, color>>K055555_MIXSHIFT & 3);
++				if (alpha <= 0) continue;
++			}
++			color &= K055555_COLORMASK;
++
++			if (drawmode >= 4) {
++			//	m_palette->set_shadow_mode(order & 0x0f);
++				drawmode |= (order & 0x0f)<<4;
++				//bprintf(0, _T("shad %X. "), order & 0xf);
++			}
++
++			if (!(mixerflags & GXMIX_NOZBUF))
++			{
++				zcode = order>>16 & 0xff;
++				pri = order>>24 & 0xff;
++			}
++
++			if (nSpriteEnable & 1) {
++#ifdef BUILD_ASP
++				unsigned long long t0 = asp_gx_ns();
++#endif
++				k053247_draw_single_sprite_gxcore(gx_objzbuf, gx_shdzbuf,code,gx_spriteram,offs,color,alpha,drawmode,zcode,pri,0,0,NULL,NULL,0);
++#ifdef BUILD_ASP
++				asp_t_ksprite += asp_gx_ns() - t0;
++				asp_n_ksprite++;
++#endif
++			}
++		}
++		else
++		{
++			switch (offs)
++			{
++				case -1:
++#ifdef BUILD_ASP
++				{
++					unsigned long long t0 = asp_gx_ns();
++					gx_draw_basic_tilemaps(mixerflags, code);
++					asp_t_ktile += asp_gx_ns() - t0;
++					asp_n_ktile++;
++				}
++#else
++					gx_draw_basic_tilemaps(mixerflags, code);
++#endif
++					continue;
++				case -2:
++				case -4:
++					gx_draw_basic_extended_tilemaps_1(mixerflags, code, sub1, sub1flags, rushingheroes_hack, offs);
++				continue;
++				case -3:
++				case -5:
++					gx_draw_basic_extended_tilemaps_2(mixerflags, code, sub2, sub2flags, extra_bitmap, offs);
++				continue;
++			}
++			continue;
++		}
++	}
++}
++
++#ifdef BUILD_ASP
++// asp_gx_ns is defined with the sub-stage timers above.
++unsigned long long asp_t_kmixer = 0;
++unsigned int asp_n_kmixer = 0;
++#endif
++
++void konamigx_mixer(INT32 sub1 /*extra tilemap 1*/, INT32 sub1flags, INT32 sub2 /*extra tilemap 2*/, INT32 sub2flags, INT32 mixerflags, INT32 extra_bitmap /*extra tilemap 3*/, INT32 rushingheroes_hack)
++{
++#ifdef BUILD_ASP
++	unsigned long long asp_t0 = asp_gx_ns();
++	asp_n_kmixer++;
++#endif
++	INT32 objbuf[GX_MAX_OBJECTS];
++	INT32 shadowon[3], shdpri[3], layerid[6], layerpri[6];
++
++	struct GX_OBJ *objpool, *objptr;
++	INT32 cltc_shdpri, /*prflp,*/ disp;
++
++	// abort if object database failed to initialize
++	objpool = gx_objpool;
++	if (!objpool) return;
++
++	// clear screen with backcolor and update flicker pulse
++	if (konamigx_wrport1_0 & 0x20)
++		K054338_fill_backcolor(K055555ReadRegister(0) << 9, K055555ReadRegister(1));
++	else
++		K054338_fill_solid_bg();
++
++	// abort if video has been disabled
++	disp = K055555ReadRegister(K55_INPUT_ENABLES);
++	if (!disp) return;
++	cltc_shdpri = K054338_read_register(K338_REG_CONTROL);
++
++	if (!rushingheroes_hack) // Slam Dunk 2 never sets this.  It's either part of the protection, or type4 doesn't use it
++	{
++		if (!(cltc_shdpri & K338_CTL_KILL)) return;
++	}
++
++	// demote shadows by one layer when this bit is set??? (see p.73 8.6)
++	cltc_shdpri &= K338_CTL_SHDPRI;
++
++	// wipe z-buffer
++	if (mixerflags & GXMIX_NOZBUF)
++		mixerflags |= GXMIX_NOSHADOW;
++	else
++		gx_wipezbuf(mixerflags & GXMIX_NOSHADOW);
++
++	// cache global parameters
++	konamigx_precache_registers();
++
++	// init OBJSET2 and mixer parameters (see p.51 and chapter 7)
++	layerid[0] = 0; layerid[1] = 1; layerid[2] = 2; layerid[3] = 3; layerid[4] = 4; layerid[5] = 5;
++
++	// invert layer priority when this flag is set (not used by any GX game?)
++	//prflp = K055555ReadRegister(K55_CONTROL) & K55_CTL_FLIPPRI;
++
++	layerpri[0] = K055555ReadRegister(K55_PRIINP_0);
++	layerpri[1] = K055555ReadRegister(K55_PRIINP_3);
++	layerpri[3] = K055555ReadRegister(K55_PRIINP_7);
++	layerpri[4] = K055555ReadRegister(K55_PRIINP_9);
++	layerpri[5] = K055555ReadRegister(K55_PRIINP_10);
++
++	INT32 shdprisel;
++
++	if (m_gx_primode == -1)
++	{
++		// Lethal Enforcer hack (requires pixel color comparison)
++		layerpri[2] = K055555ReadRegister(K55_PRIINP_3) + 0x20;
++		shdprisel = 0x3f;
++	}
++	else
++	{
++		layerpri[2] = K055555ReadRegister(K55_PRIINP_6);
++		shdprisel = K055555ReadRegister(K55_SHD_PRI_SEL);
++	}
++
++	// SHDPRISEL filters shadows by different priority comparison methods (UNIMPLEMENTED, see detail on p.66)
++	if (!(shdprisel & 0x03)) shadowon[0] = 0;
++	if (!(shdprisel & 0x0c)) shadowon[1] = 0;
++	if (!(shdprisel & 0x30)) shadowon[2] = 0;
++
++	shdpri[0]   = K055555ReadRegister(K55_SHAD1_PRI);
++	shdpri[1]   = K055555ReadRegister(K55_SHAD2_PRI);
++	shdpri[2]   = K055555ReadRegister(K55_SHAD3_PRI);
++
++	INT32 spri_min = 0;
++
++	shadowon[2] = shadowon[1] = shadowon[0] = 0;
++
++	INT32 k = 0;
++	if (!(mixerflags & GXMIX_NOSHADOW))
++	{
++		INT32 i,j;
++		// only enable shadows beyond a +/-7 RGB threshold
++		for (j=0,i=0; i<3; j+=3,i++)
++		{
++			k = K054338_shdRGB[j  ]; if (k < -7 || k > 7) { shadowon[i] = 1; continue; }
++			k = K054338_shdRGB[j+1]; if (k < -7 || k > 7) { shadowon[i] = 1; continue; }
++			k = K054338_shdRGB[j+2]; if (k < -7 || k > 7) { shadowon[i] = 1; }
++		}
++
++		// SHDON specifies layers on which shadows can be projected (see detail on p.65 7.2.8)
++		INT32 temp = K055555ReadRegister(K55_SHD_ON);
++		for (i=0; i<4; i++) if (!(temp>>i & 1) && spri_min < layerpri[i]) spri_min = layerpri[i]; // HACK
++
++		// update shadows status
++		K054338_update_all_shadows(rushingheroes_hack);
++	}
++
++	// pre-sort layers
++	for (INT32 j=0; j<5; j++)
++	{
++		INT32 temp1 = layerpri[j];
++		for (INT32 i=j+1; i<6; i++)
++		{
++			INT32 temp2 = layerpri[i];
++			if ((UINT32)temp1 <= (UINT32)temp2)
++			{
++				layerpri[i] = temp1; layerpri[j] = temp1 = temp2;
++				temp2 = layerid[i]; layerid[i] = layerid[j]; layerid[j] = temp2;
++			}
++		}
++	}
++
++	// build object database and create indices
++	objptr = objpool;
++	INT32 nobj = 0;
++
++	for (INT32 i=5; i>=0; i--)
++	{
++		INT32 offs;
++
++		INT32 code = layerid[i];
++		switch (code)
++		{
++			/*
++			    Background layers are represented by negative offset values as follow:
++
++			    0+ : normal sprites
++			    -1 : tile layer A - D
++			    -2 : K053936 ROZ+ layer 1
++			    -3 : K053936 ROZ+ layer 2
++			    -4 : K053250 LVC layer 1
++			    -5 : K053250 LVC layer 2
++			*/
++			case 4 :
++				offs = -128;
++				if (sub1flags & 0xf) { if (sub1flags & GXSUB_K053250) offs = -4; else if (sub1) offs = -2; }
++			break;
++			case 5 :
++				offs = -128;
++				if (sub2flags & 0xf) { if (sub2flags & GXSUB_K053250) offs = -5; else if (sub2) offs = -3; }
++				if (extra_bitmap) offs = -3;
++			break;
++			default: offs = -1;
++		}
++
++		if (offs != -128)
++		{
++			objptr->order = layerpri[i]<<24;
++			objptr->code  = code;
++			objptr->offs = offs;
++			objptr++;
++
++			objbuf[nobj] = nobj;
++			nobj++;
++		}
++	}
++
++//  i = j = 0xff;
++	INT32 l = 0;
++
++	for (INT32 offs=0; offs<0x800; offs+=8)
++	{
++		INT32 pri = 0;
++
++		if (!(BURN_ENDIAN_SWAP_INT16(gx_spriteram[offs]) & 0x8000)) continue;
++
++		INT32 zcode = BURN_ENDIAN_SWAP_INT16(gx_spriteram[offs]) & 0xff;
++
++		// invert z-order when opset_pri is set (see p.51 OPSET PRI)
++		if (k053247_opset & 0x10) zcode = 0xff - zcode;
++
++		INT32 code  = BURN_ENDIAN_SWAP_INT16(gx_spriteram[offs+1]);
++		INT32 color = k = BURN_ENDIAN_SWAP_INT16(gx_spriteram[offs+6]);
++		l     = BURN_ENDIAN_SWAP_INT16(gx_spriteram[offs+7]);
++
++		K053247Callback(&code, &color, &pri);
++
++		/*
++		    shadow = shadow code
++		    spri   = shadow priority
++		    temp1  = add solid object
++		    temp2  = solid pens draw mode
++		    temp3  = add shadow object
++		    temp4  = shadow pens draw mode
++		*/
++		INT32 temp4 = 0;
++		INT32 temp3 = 0;
++		INT32 temp2 = 0;
++		INT32 temp1 = 0;
++		INT32 spri = 0;
++		INT32 shadow = 0;
++
++		if (color & K055555_FULLSHADOW)
++		{
++			shadow = 3; // use default intensity and color
++			spri = pri; // retain host priority
++			temp3 = 1; // add shadow
++			temp4 = 5; // draw full shadow
++		}
++		else
++		{
++			shadow = k>>10 & 3;
++			if (shadow) // object has shadow?
++			{
++				INT32 k053246_objset1 = K053246ReadRegs(5);
++
++				if (shadow != 1 || k053246_objset1 & 0x20)
++				{
++					shadow--;
++					temp1 = 1; // add solid
++					temp2 = 1; // draw partial solid
++					if (shadowon[shadow])
++					{
++						temp3 = 1; // add shadow
++						temp4 = 4; // draw partial shadow
++					}
++				}
++				else
++				{
++					// drop the entire sprite to shadow if its shadow code is 1 and SD0EN is off (see p.48)
++					shadow = 0;
++					if (!shadowon[0]) continue;
++					temp3 = 1; // add shadow
++					temp4 = 5; // draw full shadow
++				}
++			}
++			else
++			{
++				temp1 = 1; // add solid
++				temp2 = 0; // draw full solid
++			}
++
++			if (temp1)
++			{
++				// tag sprite for alpha blending
++				if (color>>K055555_MIXSHIFT & 3) temp2 |= 2;
++			}
++
++			if (temp3)
++			{
++				// determine shadow priority
++				spri = (k053247_opset & 0x20) ? pri : shdpri[shadow]; // (see p.51 OPSET SDSEL)
++			}
++		}
++
++		switch (m_gx_primode & 0xf)
++		{
++			case 0xf:
++				// viostorm bad shadow grid st.2 fireworks (right side of screen)
++				if (code == 0xe140 && shdpri[0x02] == 0x28) continue;
++
++				// move shadows 1-pri behind sprites (first mid-boss, boss, throwing multiple enemies on train platform)
++				// note: this doesn't affect the fireworks
++				spri++;
++			break;
++
++			// Dadandarn zcode suppression
++			case  1:
++				zcode = 0;
++			break;
++
++			// Daisukiss bad shadow filter
++			case  4:
++				if (k & 0x3000 || k == 0x0800) continue;
++
++			// Tokkae shadow masking (INACCURATE)
++			case  5:
++				if (spri < spri_min) spri = spri_min;
++			break;
++		}
++
++		/*
++		    default sort order:
++		    fedcba9876543210fedcba9876543210
++		    xxxxxxxx------------------------ (priority)
++		    --------xxxxxxxx---------------- (zcode)
++		    ----------------xxxxxxxx-------- (offset)
++		    ------------------------xxxx---- (shadow mode)
++		    ----------------------------xxxx (shadow code)
++		*/
++		if (temp1)
++		{
++
++			// add objects with solid or alpha pens
++			INT32 order = pri<<24 | zcode<<16 | offs<<(8-3) | temp2<<4;
++			objptr->order = order;
++			objptr->offs  = offs;
++			objptr->code  = code;
++			objptr->color = color;
++			objptr++;
++
++			objbuf[nobj] = nobj;
++			nobj++;
++		}
++
++		if (temp3 && !(color & K055555_SKIPSHADOW) && !(mixerflags & GXMIX_NOSHADOW))
++		{
++			// add objects with shadows if enabled
++			INT32 order = spri<<24 | zcode<<16 | offs<<(8-3) | temp4<<4 | shadow;
++			objptr->order = order;
++			objptr->offs  = offs;
++			objptr->code  = code;
++			objptr->color = color;
++			objptr++;
++
++			objbuf[nobj] = nobj;
++			nobj++;
++		}
++	}
++
++	// sort objects in decending order (SLOW)
++	k = nobj;
++	l = nobj - 1;
++
++	for (INT32 j=0; j<l; j++)
++	{
++		INT32 temp1 = objbuf[j];
++		INT32 temp2 = objpool[temp1].order;
++		for (INT32 i=j+1; i<k; i++)
++		{
++			INT32 temp3 = objbuf[i];
++			INT32 temp4 = objpool[temp3].order;
++			if ((UINT32)temp2 <= (UINT32)temp4) { temp2 = temp4; objbuf[i] = temp1; objbuf[j] = temp1 = temp3; }
++		}
++	}
++
++	konamigx_mixer_draw(sub1,sub1flags,sub2,sub2flags,mixerflags,extra_bitmap,rushingheroes_hack,objpool,objbuf,nobj);
++#ifdef BUILD_ASP
++	asp_t_kmixer += asp_gx_ns() - asp_t0;
++#endif
++}
+diff --git a/src/burn/drv/konami/konamiic.cpp b/src/burn/drv/konami/konamiic.cpp
+index 74a554d..b836217 100644
+--- a/src/burn/drv/konami/konamiic.cpp
++++ b/src/burn/drv/konami/konamiic.cpp
+@@ -15,8 +15,40 @@ UINT32 *konami_bitmap32 = NULL;
+ UINT8  *konami_priority_bitmap = NULL;
+ UINT32 *konami_palette32;
+ 
++#ifdef BUILD_ASP
++// Stage timers for the Konami draw. The drawn-frame cost is known (20.4 ms on
++// Metamorphic Force against 10.77 undrawn) but not its distribution, and the
++// present-path profiling taught that guessing which stage dominates is how a
++// day gets spent optimising something worth 1.2 ms.
++#include <time.h>
++unsigned long long asp_t_kclear = 0, asp_t_kblend = 0;
++unsigned int asp_n_kclear = 0, asp_n_kblend = 0;
++static inline unsigned long long asp_k_ns(void)
++{
++	struct timespec ts;
++	clock_gettime(CLOCK_MONOTONIC, &ts);
++	return (unsigned long long)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
++}
++#endif
++
+ static INT32 previous_depth = 0;
+-static UINT16 *palette_lut = NULL;
++
++// Three 256-entry channel tables replacing a 16.7-million-entry one.
++//
++// Upstream builds a 32MB lookup of every possible 24-bit colour and indexes it
++// once per pixel. On a desktop that is a warm-cache table; on a Cortex-A7 with
++// a 512KB L2 it is a guaranteed DRAM round trip for every pixel on screen, and
++// at 288x224 that is 64512 cache misses a frame.
++//
++// The decomposition is exact rather than approximate: HighCol15/16/24 all pack
++// r, g and b into disjoint bitfields, each depending on one channel only, so
++// BurnHighCol(r,g,b,0) == BurnHighCol(r,0,0,0) | BurnHighCol(0,g,0,0) |
++// BurnHighCol(0,0,b,0) for every depth, gamma variants included. 3KB of tables
++// live in L1 instead.
++static UINT32 palette_lut_r[256];
++static UINT32 palette_lut_g[256];
++static UINT32 palette_lut_b[256];
++static INT32  palette_lut_built = 0;
+ 
+ //static UINT16 *konami_blendpal16;
+ 
+@@ -162,10 +194,7 @@ void KonamiICExit()
+ 	}
+ 
+ 	previous_depth = 0;
+-	if (palette_lut) {
+-		BurnFree(palette_lut);
+-	}
+-	palette_lut = NULL;
++	palette_lut_built = 0;
+ 
+ 	if (KonamiIC_K051960InUse) K051960Exit();
+ 	if (KonamiIC_K052109InUse) K052109Exit();
+@@ -230,27 +259,51 @@ void KonamiAllocateBitmaps()
+ 
+ void KonamiClearBitmaps(UINT32 color)
+ {
++#ifdef BUILD_ASP
++	unsigned long long asp_t0 = asp_k_ns();
++	asp_n_kclear++;
++#endif
+ 	if (konami_priority_bitmap && konami_bitmap32) {
+-		for (INT32 i = 0; i < nScreenWidth * nScreenHeight; i++) {
+-			konami_priority_bitmap[i] = 0;
+-			konami_bitmap32[i] = color;
++		// Was one interleaved loop writing 1 byte and 4 bytes per pixel, which
++		// the compiler cannot vectorise because the two strides differ. Split
++		// into a memset and a word fill and both become wide stores. The values
++		// written are identical, so this cannot change a pixel.
++		const INT32 n = nScreenWidth * nScreenHeight;
++		memset(konami_priority_bitmap, 0, n * sizeof(UINT8));
++		if (color == 0) {
++			memset(konami_bitmap32, 0, n * sizeof(UINT32));
++		} else {
++			UINT32 *d = konami_bitmap32;
++			for (INT32 i = 0; i < n; i++) d[i] = color;
+ 		}
+ 	}
++#ifdef BUILD_ASP
++	asp_t_kclear += asp_k_ns() - asp_t0;
++#endif
+ }
+ 
+ void KonamiBlendCopy(UINT32 *pPalette)
+ {
++#ifdef BUILD_ASP
++	unsigned long long asp_t0 = asp_k_ns();
++	asp_n_kblend++;
++#endif
+ 	pBurnDrvPalette = pPalette;
+ 
+ 	UINT32 *bmp = konami_bitmap32;
+ 
+ 	if (previous_depth != 2 && nBurnBpp == 2) {
+-		if (palette_lut == NULL) {
+-			palette_lut = (UINT16*)BurnMalloc((1 << 24) * 2);
+-
+-			for (INT32 i = 0; i < (1 << 24); i++) {
+-				palette_lut[i] = BurnHighCol(i / 0x10000, (i / 0x100) & 0xff, i & 0xff, 0);
++		// Rebuilt on any depth change, as the 32MB table was, but 768 calls
++		// instead of 16.7 million - so cheap that the old allocation failing
++		// on a memory-tight device, and then being dereferenced as NULL, is
++		// no longer a way to crash.
++		if (!palette_lut_built) {
++			for (INT32 i = 0; i < 256; i++) {
++				palette_lut_r[i] = BurnHighCol(i, 0, 0, 0);
++				palette_lut_g[i] = BurnHighCol(0, i, 0, 0);
++				palette_lut_b[i] = BurnHighCol(0, 0, i, 0);
+ 			}
++			palette_lut_built = 1;
+ 		}
+ 	}
+ 
+@@ -268,7 +321,10 @@ void KonamiBlendCopy(UINT32 *pPalette)
+ 		{
+ 			UINT16 *dst = (UINT16*)pBurnDraw;
+ 			for (INT32 i = 0; i < nScreenWidth * nScreenHeight; i++, dst++, bmp++) {
+-				*dst = palette_lut[*bmp & 0xffffff];
++				const UINT32 c = *bmp;
++				*dst = (UINT16)(palette_lut_r[(c >> 16) & 0xff]
++				              | palette_lut_g[(c >>  8) & 0xff]
++				              | palette_lut_b[ c        & 0xff]);
+ 			}
+ 		}
+ 		break;
+@@ -303,6 +359,9 @@ void KonamiBlendCopy(UINT32 *pPalette)
+ 			// bprintf (0, _T("Unsupported KonamiBlendCopy bit depth! %d\n"), nBurnBpp);
+ 			break;
+ 	}
++#ifdef BUILD_ASP
++	asp_t_kblend += asp_k_ns() - asp_t0;
++#endif
+ }
+ 
+ void konami_draw_16x16_priozoom_sprite(UINT8 *gfx, INT32 code, INT32 bpp, INT32 color, INT32 t, INT32 sx, INT32 sy, INT32 fx, INT32 fy, INT32 width, INT32 height, INT32 zoomx, INT32 zoomy, UINT32 priority)
+diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
+index 0441a93..f7dd0ad 100755
+--- a/src/burner/pi/main_pi.cpp
++++ b/src/burner/pi/main_pi.cpp
+@@ -1,5 +1,7 @@
+ #include "burner.h"
+ #include <sys/stat.h>
++#include <fcntl.h>
++#include <signal.h>
+ #include <unistd.h>
+ 
+ TCHAR* AdaptiveEncodingReads(const TCHAR* pszFileName)
+@@ -160,6 +162,297 @@ int parseSwitches(int argc, char *argv[])
+ 	return dipSwitchSet;
+ }
+ 
++#ifdef BUILD_ASP
++// The ASP's launcher invokes an emulator as
++//     <emu> "/mnt/hdisk/asph/hack/roms/fba/brawl/metamrph.zip" /mnt/data/save
++// whereas FBNeo's frontend wants a bare short name plus its own ROM search
++// path. Split the argument here rather than ask the launcher to change, which
++// is what every other emulator on this device had to do too.
++//
++// The second argument is used as the working directory. That matters for more
++// than tidiness: nvram and config otherwise land next to the binary on the USB
++// card, and writes to that card during play are what corrupted it twice.
++// /mnt/data is internal storage, so moving them there takes the card out of
++// the write path entirely.
++static char asp_short_name[64];
++
++// Startup logging.
++//
++// There is no console on this device, so a game that fails to initialise just
++// shows a black screen and drops back to the launcher with no clue as to why.
++// This captures stdout and stderr to a file on the card for the duration of
++// startup only, and then sends both to /dev/null before the emulation loop
++// begins - so there is a diagnostic when loading fails and not a single write
++// to the card while a game is actually running. Per-frame writes to the card
++// are what corrupted it twice; a dozen lines per launch is not that.
++static FILE *asp_log = NULL;
++
++static void asp_log_open(const char *romname)
++{
++	static const char *paths[] = {
++		"/mnt/hdisk/ASPh/hack/bin/fba/fba_emu.log",
++		"/mnt/udisk/ASPh/hack/bin/fba/fba_emu.log",
++		NULL
++	};
++
++	for (int i = 0; paths[i] && !asp_log; i++) {
++		asp_log = fopen(paths[i], "a");
++	}
++	if (!asp_log) return;
++
++	setvbuf(asp_log, NULL, _IOLBF, 0);
++	fprintf(asp_log, "\n===== launch: %s =====\n", romname ? romname : "?");
++
++	// What memory is actually free matters here: the device has 262MB and
++	// this binary is 35MB, so a driver that wants a large decode buffer can
++	// fail on allocation alone. Recording it before and after init says
++	// whether that is what happened.
++	FILE *mi = fopen("/proc/meminfo", "r");
++	if (mi) {
++		char l[128];
++		while (fgets(l, sizeof(l), mi)) {
++			if (!strncmp(l, "MemTotal:", 9) || !strncmp(l, "MemFree:", 8)
++				|| !strncmp(l, "MemAvailable:", 13)) {
++				fputs(l, asp_log);
++			}
++		}
++		fclose(mi);
++	}
++
++	dup2(fileno(asp_log), STDOUT_FILENO);
++	dup2(fileno(asp_log), STDERR_FILENO);
++	setvbuf(stdout, NULL, _IOLBF, 0);
++	setvbuf(stderr, NULL, _IOLBF, 0);
++}
++
++// A crash and a failed allocation both look identical on this device - black
++// screen, straight back to the launcher. This tells them apart by name.
++static void asp_fatal_signal(int sig, siginfo_t *si, void *)
++{
++	static const char *n = NULL;
++	switch (sig) {
++	case SIGSEGV: n = "SIGSEGV (bad memory access)"; break;
++	case SIGBUS:  n = "SIGBUS (unaligned or invalid access)"; break;
++	case SIGILL:  n = "SIGILL (illegal instruction)"; break;
++	case SIGFPE:  n = "SIGFPE"; break;
++	case SIGABRT: n = "SIGABRT (abort, often a failed assertion)"; break;
++	default:      n = "signal"; break;
++	}
++
++	// Write with the raw fd: the crash may have come from inside malloc, and
++	// fprintf on a corrupt heap would just hang or fault again.
++	char buf[160];
++	int len = snprintf(buf, sizeof(buf),
++		"\n*** CRASH: %s at %p ***\n", n, si ? si->si_addr : NULL);
++	if (len > 0) {
++		ssize_t ignored = write(STDERR_FILENO, buf, (size_t)len);
++		(void)ignored;
++	}
++
++	signal(sig, SIG_DFL);
++	raise(sig);
++}
++
++static void asp_install_crash_handler(void)
++{
++	struct sigaction sa;
++	memset(&sa, 0, sizeof(sa));
++	sa.sa_sigaction = asp_fatal_signal;
++	sa.sa_flags = SA_SIGINFO | SA_RESETHAND;
++	sigemptyset(&sa.sa_mask);
++
++	sigaction(SIGSEGV, &sa, NULL);
++	sigaction(SIGBUS,  &sa, NULL);
++	sigaction(SIGILL,  &sa, NULL);
++	sigaction(SIGFPE,  &sa, NULL);
++	sigaction(SIGABRT, &sa, NULL);
++}
++
++static void asp_log_close(void)
++{
++	if (!asp_log) return;
++
++	fprintf(asp_log, "----- startup done, logging off -----\n");
++	fflush(asp_log);
++
++	// Both streams go nowhere from here, so the emulation loop cannot write
++	// to the card no matter how chatty a driver is.
++	int devnull = open("/dev/null", O_WRONLY);
++	if (devnull >= 0) {
++		dup2(devnull, STDOUT_FILENO);
++		dup2(devnull, STDERR_FILENO);
++		close(devnull);
++	}
++	fclose(asp_log);
++	asp_log = NULL;
++}
++
++// fbneo.ini lives in the launcher's working directory, /mnt/data/usb, on the
++// device's internal storage - not on the card, so it cannot be edited without
++// the device. This reads an optional "key value" file from the card instead,
++// so a tuning change costs one text edit rather than a 27 MB redeploy.
++extern int bAlwaysDrawFrames;
++extern int asp_draw_every_n;
++extern int asp_draw_guard;
++extern int asp_fb_profile;
++extern int asp_aud_segments;
++extern int asp_draw_lead;
++extern int asp_aud_rate_override;
++extern int asp_aud_device_samples;
++extern int asp_hash_frames;
++
++static void asp_tuning_load(void)
++{
++	static const char *paths[] = {
++		"/mnt/hdisk/ASPh/hack/bin/fba/asp_tuning.txt",
++		"/mnt/udisk/ASPh/hack/bin/fba/asp_tuning.txt",
++		NULL
++	};
++	FILE *f = NULL;
++	for (int i = 0; paths[i] && !f; i++) f = fopen(paths[i], "r");
++	if (!f) {
++		fprintf(stderr, "asp: no asp_tuning.txt, using built-in defaults\n");
++		return;
++	}
++
++	char line[256];
++	while (fgets(line, sizeof(line), f)) {
++		char key[64];
++		int value;
++		if (line[0] == '#' || line[0] == '\n' || line[0] == '\r') continue;
++		if (sscanf(line, "%63s %d", key, &value) != 2) continue;
++
++		if (strcmp(key, "always_draw_frames") == 0) {
++			bAlwaysDrawFrames = value;
++		} else if (strcmp(key, "draw_every_n") == 0) {
++			asp_draw_every_n = value;
++		} else if (strcmp(key, "draw_guard") == 0) {
++			asp_draw_guard = value;      // accepted, no longer consulted
++		} else if (strcmp(key, "profile_present") == 0) {
++			asp_fb_profile = value;
++		} else if (strcmp(key, "audio_segments") == 0) {
++			asp_aud_segments = value;
++		} else if (strcmp(key, "draw_lead") == 0) {
++			asp_draw_lead = value;
++		} else if (strcmp(key, "audio_rate") == 0) {
++			asp_aud_rate_override = value;
++		} else if (strcmp(key, "device_samples") == 0) {
++			asp_aud_device_samples = value;
++		} else if (strcmp(key, "hash_frames") == 0) {
++			asp_hash_frames = value;
++		} else {
++			fprintf(stderr, "asp: tuning: unknown key \"%s\", ignored\n", key);
++			continue;
++		}
++		fprintf(stderr, "asp: tuning: %s = %d\n", key, value);
++	}
++	fclose(f);
++}
++
++// The directory the launcher's ROM argument pointed at, remembered so it can
++// be put back after ConfigAppLoad overwrites szAppRomPaths from fbneo.ini.
++static char asp_rom_dir[MAX_PATH];
++
++static void asp_reapply_rom_path(void)
++{
++	if (asp_rom_dir[0] == '\0') return;
++
++	snprintf(szAppRomPaths[0], MAX_PATH, "%s", asp_rom_dir);
++
++	/* Slot 1 is the card's shared romset directory, which is where the BIOS
++	 * sets live: neogeo.zip and pgm.zip are both in ASPh/roms/ while the
++	 * games that need them sit under ASPh/hack/roms/fba/<page>/. FBNeo
++	 * searches every slot, so adding it is what lets the eight PGM titles -
++	 * Knights of Valour, Oriental Legend, Martial Masters, The Killing
++	 * Blade, The Gladiator, S.V.G., Demon Front, Knights of Valour 2 - find
++	 * their system BIOS. They were not missing a download; the emulator was
++	 * only ever looking in one folder. */
++	snprintf(szAppRomPaths[1], MAX_PATH, "%s", "/mnt/hdisk/ASPh/roms/");
++	snprintf(szAppRomPaths[2], MAX_PATH, "%s", "/mnt/udisk/ASPh/roms/");
++
++	// The saved config also restores whatever directories were in the other
++	// nine slots, which belong to another game. Leaving them costs a pointless
++	// search through paths that cannot hold this ROM, and risks loading a
++	// same-named set from the wrong folder. Slot 1 keeps FBNeo's own relative
++	// "roms/" default.
++	for (int i = 3; i < DIRS_MAX; i++) {
++		szAppRomPaths[i][0] = '\0';
++	}
++
++	fprintf(stderr, "asp: rom paths: \"%s\", \"%s\", \"%s\"\n",
++		szAppRomPaths[0], szAppRomPaths[1], szAppRomPaths[2]);
++}
++
++static const char *asp_setup_paths(const char *arg, const char *savedir)
++{
++	const char *slash = strrchr(arg, '/');
++	const char *base  = slash ? slash + 1 : arg;
++
++	if (slash) {
++		size_t n = (size_t)(slash - arg) + 1;		// keep the trailing slash
++		if (n >= MAX_PATH) n = MAX_PATH - 1;
++		memcpy(szAppRomPaths[0], arg, n);
++		szAppRomPaths[0][n] = '\0';
++		snprintf(asp_rom_dir, sizeof(asp_rom_dir), "%s", szAppRomPaths[0]);
++	}
++
++	snprintf(asp_short_name, sizeof(asp_short_name), "%s", base);
++	char *dot = strrchr(asp_short_name, '.');
++	if (dot && (!strcmp(dot, ".zip") || !strcmp(dot, ".ZIP"))) *dot = '\0';
++
++	if (savedir && *savedir && *savedir == '/') {
++		if (chdir(savedir) != 0) {
++			fprintf(stderr, "asp: could not chdir to \"%s\", "
++				"nvram and config will land next to the binary\n", savedir);
++		}
++	}
++
++	fprintf(stderr, "asp: rom \"%s\" in \"%s\", working dir \"%s\"\n",
++		asp_short_name, szAppRomPaths[0], savedir ? savedir : "(unchanged)");
++
++	return asp_short_name;
++}
++#endif
++
++#ifdef BUILD_ASP
++// Dump every driver's expected ROM list: short name, parent, each ROM's
++// filename and CRC. One run produces the authoritative table for the whole
++// build, straight from FBNeo's own structures rather than scraped out of the
++// source, where a third of the tables could not be matched to their driver by
++// name alone.
++//
++// The point is to check the card's romsets against what this build actually
++// wants, instead of finding out one game at a time. X-Men was exactly that:
++// the driver existed, the zip was present, and the ROMs inside did not match.
++static void asp_dump_roms(void)
++{
++	BurnLibInit();
++	for (unsigned i = 0; i < nBurnDrvCount; i++) {
++		nBurnDrvActive = i;
++		const char *name   = BurnDrvGetTextA(DRV_NAME);
++		const char *parent = BurnDrvGetTextA(DRV_PARENT);
++		if (!name) continue;
++
++		struct BurnRomInfo ri;
++		for (unsigned j = 0; ; j++) {
++			memset(&ri, 0, sizeof(ri));
++			if (BurnDrvGetRomInfo(&ri, j) != 0) break;
++			char *rn = NULL;
++			if (BurnDrvGetRomName(&rn, j, 0) != 0 || rn == NULL) continue;
++			/* nType carries the flags that decide whether a missing file
++			 * actually stops the game: BRF_OPT marks things like the CPS1
++			 * I/O PLD and default NVRAM, BRF_NODUMP marks ROMs nobody has
++			 * dumped. Without them a check reports 49 broken romsets when
++			 * most of them run perfectly. */
++			printf("%s\t%s\t%s\t%u\t%08x\t%08x\n",
++				name, parent ? parent : "", rn,
++				(unsigned)ri.nLen, (unsigned)ri.nCrc, (unsigned)ri.nType);
++		}
++	}
++	BurnLibExit();
++}
++#endif
++
+ int main(int argc, char *argv[])
+ {
+ 	const char *romname = NULL;
+@@ -178,11 +471,34 @@ int main(int argc, char *argv[])
+ 	}
+ 
+ 
++#ifdef BUILD_ASP
++	// argv[1] is the ROM path, argv[2] the save directory, both from the
++	// launcher. Anything beginning with '-' is still a switch.
++	{
++		const char *rompath = NULL, *savedir = NULL;
++		for (int i = 1; i < argc; i++) {
++			if (*argv[i] == '-') continue;
++			if (!rompath)      rompath = argv[i];
++			else if (!savedir) savedir = argv[i];
++		}
++		if (rompath) romname = asp_setup_paths(rompath, savedir);
++	}
++#else
+ 	for (int i = 1; i < argc; i++) {
+ 		if (*argv[i] != '-') {
+ 			romname = argv[i];
+ 		}
+ 	}
++#endif
++
++#ifdef BUILD_ASP
++	for (int i = 1; i < argc; i++) {
++		if (strcmp(argv[i], "-dumproms") == 0) {
++			asp_dump_roms();
++			return 0;
++		}
++	}
++#endif
+ 
+ 	if (romname == NULL) {
+ 		printf("Usage: %s [-f] [-F] [-dumpswitches] <romname>\n", argv[0]);
+@@ -191,7 +507,29 @@ int main(int argc, char *argv[])
+ 		return 0;
+ 	}
+ 
++#ifdef BUILD_ASP
++	asp_install_crash_handler();
++	asp_log_open(romname);
++#endif
++
+ 	ConfigAppLoad();
++
++#ifdef BUILD_ASP
++	// ConfigAppLoad restores szAppRomPaths from fbneo.ini, which clobbers the
++	// path the launcher just told us to use. Re-apply it afterwards.
++	//
++	// This is what broke every game after the first. The launcher hands each
++	// game an absolute path, so the ROM directory changes per game - cps1 for
++	// Captain Commando, brawl for the Konami titles. The first game launched
++	// worked because no fbneo.ini existed yet; quitting it cleanly wrote one
++	// recording cps1, and from then on every game looked for its ROMs in
++	// cps1 and found nothing. Black screen, back to the launcher, no clue
++	// why, and it looked like a Konami problem purely because of test order.
++	asp_reapply_rom_path();
++	// After ConfigAppLoad, so the card's file has the last word.
++	asp_tuning_load();
++#endif
++
+ 	SDL_Init(SDL_INIT_TIMER|SDL_INIT_VIDEO);
+ 	BurnLibInit();
+ 
+@@ -222,10 +560,37 @@ int main(int argc, char *argv[])
+ 
+ 	if (DrvInit(driverId, 0) != 0) {
+ 		fprintf(stderr, "Driver init failed\n");
++#ifdef BUILD_ASP
++		asp_log_close();
++#endif
+ 		return 0;
+ 	}
+ 
++#ifdef BUILD_ASP
++	// Init succeeded, so there is nothing more worth logging and every
++	// further line would be a write to the card during play.
++	asp_log_close();
++#endif
++
+ 	parseSwitches(argc, argv);
++
++#ifdef BUILD_ASP
++	/* Throttle to the rate the driver actually runs at, not a hardcoded 60.
++	 *
++	 * nAppVirtualFps is 6000 (60.00fps) for every game, but Metamorphic
++	 * Force, Knights of Valour and most of the Konami board run at 59.18.
++	 * The throttle was therefore demanding 1.4% more frames per second than
++	 * the hardware is asked to produce - wasted work on a device where the
++	 * measured numbers say emulation already uses about 94% of the frame
++	 * budget (15.8ms of 16.9ms), leaving barely 1ms for a render that costs
++	 * 2.5ms. Small, but it comes straight off the part that is short. */
++	if (nBurnFPS > 0) {
++		nAppVirtualFps = nBurnFPS;
++		fprintf(stderr, "asp: throttling to the driver's %d.%02d fps\n",
++			nBurnFPS / 100, nBurnFPS % 100);
++	}
++#endif
++
+ 	RunMessageLoop();
+ 
+ 	DrvExit();
+diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
+index d917a7c..00ca55a 100644
+--- a/src/burner/pi/run_pi.cpp
++++ b/src/burner/pi/run_pi.cpp
+@@ -1,5 +1,7 @@
+ // Run module
+ #include "burner.h"
++#include <unistd.h>
++#include <time.h>
+ 
+ bool bAltPause = 0;
+ 
+@@ -28,6 +30,83 @@ void ToggleLayer(unsigned char thisLayer)
+ 	VidPaint(0);
+ }
+ 
++#ifdef BUILD_ASP
++// The rendered frame rate sits near half the emulated one, and the drawing
++// ceiling is ~700 fps, so neither "drawing is slow" nor "emulation is slow"
++// explains it on its own. These three counters separate the costs:
++//
++//   asp_t_paint   VidPaint: staging rows and writing the framebuffer
++//   asp_t_draw    VidFrame: emulate one frame AND blit the game into pVidImage
++//   asp_t_emu     BurnDrvFrame: emulate one frame, nothing drawn
++//
++// mean(draw) - mean(emu) + mean(paint) is what one displayed frame costs on
++// top of the emulation, which is the only number that says whether drawing
++// every frame is affordable.
++unsigned long long asp_t_paint = 0, asp_t_draw = 0, asp_t_emu = 0;
++unsigned int asp_n_paint = 0, asp_n_draw = 0, asp_n_emu = 0;
++// How many frames the audio catch-up loop runs through per wake-up. Only the
++// last of each batch is drawn, so this distribution IS the rendered rate.
++unsigned int asp_batch_hist[9];
++
++// 0 = upstream behaviour (draw the last frame of each audio catch-up batch).
++// N = draw one frame in N on a fixed cadence, for even spacing. Set from
++// asp_tuning.txt on the card.
++int asp_draw_every_n = 0;
++
++// How many frames behind the audio may be before the cadence is abandoned.
++// 2 dropped 14% of the slots on metamrph; the margin for a drawn frame is only
++// 1.05 ms, so the guard fires on ordinary variance rather than real trouble.
++int asp_draw_guard = 3;
++
++// Number of audio segments in the ring. 0 leaves FBNeo's default of 6 alone.
++// Each segment is one video frame of sound, and the steady-state queue is
++// segments-1, so this sets both the lip-sync gap and the underrun cushion.
++int asp_aud_segments = 0;
++
++// 0 = a draw may only happen on the last frame of an audio catch-up batch,
++// which is where the buffer is fullest. 1 also allows the frame before it,
++// which doubles the draw opportunities at the cost of leaving one segment
++// unfilled when the expensive drawing happens. v13 allowed any position and
++// starved the audio; this is the measured middle ground, off by default.
++int asp_draw_lead = 0;
++
++// Audio sample rate override, and the SDL device buffer size in samples.
++// Both 0 = leave alone. Lower rate makes the sound chips cheaper per frame,
++// which buys slack and therefore allows a shallower ring; the device buffer is
++// latency stacked on top of the ring.
++int asp_aud_rate_override = 0;
++int asp_aud_device_samples = 0;
++
++// Frame hashing: a correctness harness for touching the renderers.
++//
++// Optimising a sprite mixer by eye means asking Liam whether the layering still
++// looks right, which he cannot reliably judge and should not have to. Instead
++// hash the finished frame and compare the sequence before and after a change -
++// identical hashes prove no pixel moved. FBNeo is deterministic from boot, so
++// the first N drawn frames of attract mode are reproducible as long as nothing
++// is pressed.
++//
++// The hash runs AFTER asp_t_draw closes, so it never contaminates the cost
++// measurements; it only costs a little wall time on the first N frames.
++int asp_hash_frames = 0;
++unsigned int asp_hash_state = 2166136261u;
++unsigned int asp_hash_done = 0;
++unsigned int asp_hash_marks[6];
++static const unsigned int asp_hash_at[6] = { 50, 100, 150, 200, 250, 300 };
++
++// Gaps between drawn frames, in emulated frames. Evenness is the point of the
++// cadence, so the spread is the thing to measure, not just the mean.
++unsigned int asp_gap_hist[9];
++static unsigned int asp_frames_since_draw = 0;
++
++static inline unsigned long long asp_now_ns(void)
++{
++	struct timespec ts;
++	clock_gettime(CLOCK_MONOTONIC, &ts);
++	return (unsigned long long)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
++}
++#endif
++
+ // With or without sound, run one frame.
+ // If bDraw is true, it's the last frame before we are up to date, and so we should draw the screen
+ static int RunFrame(int bDraw, int bPause)
+@@ -36,7 +115,14 @@ static int RunFrame(int bDraw, int bPause)
+ 	static int bPrevDraw = 0;
+ 
+ 	if (bPrevDraw && !bPause) {
++#ifdef BUILD_ASP
++		unsigned long long t0 = asp_now_ns();
+ 		VidPaint(0);
++		asp_t_paint += asp_now_ns() - t0;
++		asp_n_paint++;
++#else
++		VidPaint(0);
++#endif
+ 	}
+ 	if (!bDrvOkay) {
+ 		return 1;
+@@ -55,12 +141,61 @@ static int RunFrame(int bDraw, int bPause)
+ 
+ 	if (bDraw) {
+ 		nFramesRendered++;
++#ifdef BUILD_ASP
++		{
++			unsigned int g = asp_frames_since_draw + 1;
++			asp_gap_hist[g > 8 ? 8 : g]++;
++			asp_frames_since_draw = 0;
++		}
++		unsigned long long t0 = asp_now_ns();
++		int vf = VidFrame();
++		asp_t_draw += asp_now_ns() - t0;
++		asp_n_draw++;
++		// NOT pBurnDraw: vid_interface sets it for the duration of the frame
++		// and nulls it again on the way out, so by the time VidFrame returns
++		// it is always NULL and the hash never ran once. pVidImage is the
++		// persistent buffer holding the finished frame.
++		if (asp_hash_frames > 0 && asp_hash_done < (unsigned)asp_hash_frames
++		    && pVidImage != NULL) {
++			// FNV-1a over 32-bit words rather than bytes: a quarter of the
++			// iterations for the same discriminating power on a frame buffer.
++			// nScreenWidth/Height belong to tiles_generic, which this file
++			// does not include; the video layer's own dimensions are the same
++			// frame and are in scope here.
++			const unsigned int words =
++				(unsigned int)(nVidImageWidth * nVidImageHeight
++					* nVidImageBPP) / 4u;
++			const unsigned int *w = (const unsigned int *)pVidImage;
++			unsigned int h = asp_hash_state;
++			for (unsigned int i = 0; i < words; i++) {
++				h ^= w[i];
++				h *= 16777619u;
++			}
++			asp_hash_state = h;
++			asp_hash_done++;
++			for (int k = 0; k < 6; k++) {
++				if (asp_hash_done == asp_hash_at[k]) asp_hash_marks[k] = h;
++			}
++		}
++		if (vf) {
++			AudBlankSound();
++		}
++#else
+ 		if (VidFrame()) {
+ 			AudBlankSound();
+ 		}
++#endif
+ 	} else {
+ 		pBurnDraw = NULL;
++#ifdef BUILD_ASP
++		asp_frames_since_draw++;
++		unsigned long long t0 = asp_now_ns();
++		BurnDrvFrame();
++		asp_t_emu += asp_now_ns() - t0;
++		asp_n_emu++;
++#else
+ 		BurnDrvFrame();
++#endif
+ 	}
+ 
+ 	bPrevPause = bPause;
+@@ -185,6 +320,202 @@ static int RunExit()
+ 	return 0;
+ }
+ 
++#ifdef BUILD_ASP
++// "Still slow" is not a number, and without one there is no way to tell
++// whether the emulation or the drawing is the limit. Writing the counters out
++// once, at exit, answers it:
++//
++//   emulated and rendered both near 60   fine
++//   emulated near 60, rendered well below  the drawing is the bottleneck
++//   both well below 60                     the emulation is the bottleneck
++//
++// One line, after the game has ended. The startup log is already closed by
++// then, so this reopens it; it is a single write and never happens during
++// play.
++static void asp_log_framerate(unsigned int ticks, int emulated, int rendered)
++{
++	static const char *paths[] = {
++		"/mnt/hdisk/ASPh/hack/bin/fba/fba_emu.log",
++		"/mnt/udisk/ASPh/hack/bin/fba/fba_emu.log",
++		NULL
++	};
++	FILE *f = NULL;
++	for (int i = 0; paths[i] && !f; i++) f = fopen(paths[i], "a");
++	if (!f) return;
++
++	double secs = ticks / 1000.0;
++	if (secs < 0.5) {						// too short to mean anything
++		fprintf(f, "----- ran %.1fs, too short to measure -----\n", secs);
++	} else {
++		fprintf(f, "----- %s: %.1fs, emulated %d frames (%.1f fps), "
++			"rendered %d frames (%.1f fps), target %.2f -----\n",
++			BurnDrvGetTextA(0), secs,
++			emulated, emulated / secs,
++			rendered, rendered / secs,
++			nBurnFPS / 100.0);
++
++		double emu_ms   = asp_n_emu   ? asp_t_emu   / 1e6 / asp_n_emu   : 0.0;
++		double draw_ms  = asp_n_draw  ? asp_t_draw  / 1e6 / asp_n_draw  : 0.0;
++		double paint_ms = asp_n_paint ? asp_t_paint / 1e6 / asp_n_paint : 0.0;
++		// VidFrame emulates as well as blits, so the blit alone is the
++		// difference; the present is on top of it.
++		double extra_ms = (draw_ms - emu_ms) + paint_ms;
++		fprintf(f, "----- cost per frame: emulate %.2f ms (n=%u), "
++			"emulate+blit %.2f ms (n=%u), present %.2f ms (n=%u); "
++			"drawing adds %.2f ms, so every-frame would be %.1f fps "
++			"against a %.2f ms budget -----\n",
++			emu_ms, asp_n_emu, draw_ms, asp_n_draw, paint_ms, asp_n_paint,
++			extra_ms,
++			(emu_ms + extra_ms) > 0.0 ? 1000.0 / (emu_ms + extra_ms) : 0.0,
++			nBurnFPS ? 100000.0 / nBurnFPS : 0.0);
++
++		fprintf(f, "----- audio catch-up batch sizes:");
++		for (int i = 1; i <= 8; i++) {
++			if (asp_batch_hist[i]) fprintf(f, " %d:%u", i, asp_batch_hist[i]);
++		}
++		// A batch at nAudSegCount-1 is the fill pointer as far behind the play
++		// pointer as it can get. On a 6-segment ring that is rare and means
++		// trouble (76 of them in v13, which was audibly booming; 0 in v15). On a
++		// 4-segment ring the maximum backlog IS 3, so the top bucket is the
++		// ordinary top of the distribution: v16 logged 1795 of 5254 and called
++		// them all starvation. Reporting the share, and only calling it starved
++		// when the ring is deep enough for the limit to be exceptional, stops the
++		// metric misleading the next person to read it.
++		unsigned int nbatch = 0;
++		for (int i = 1; i <= 8; i++) nbatch += asp_batch_hist[i];
++		int limit = nAudSegCount - 1;
++		unsigned int at_limit = asp_batch_hist[limit > 8 ? 8 : limit];
++		double share = nbatch ? 100.0 * at_limit / nbatch : 0.0;
++		fprintf(f, " of %d segments; %u of %u batches (%.0f%%) at the %d-segment"
++			" limit%s%s) -----\n",
++			nAudSegCount, at_limit, nbatch, share, limit,
++			(limit >= 5 && share > 1.0) ? " = AUDIO STARVED"
++				: (limit < 5 ? " (shallow ring: the limit is also the normal"
++					" maximum, so this is not by itself starvation)" : ""),
++			bAlwaysDrawFrames ? ", OVERRIDDEN: drawing every frame" : "");
++
++		// Evenness, not the mean, is what the eye objects to.
++		unsigned int gaps = 0, gapsum = 0;
++		for (int i = 1; i <= 8; i++) {
++			gaps += asp_gap_hist[i];
++			gapsum += asp_gap_hist[i] * i;
++		}
++		fprintf(f, "----- gaps between drawn frames (draw_every_n=%d):",
++			asp_draw_every_n);
++		for (int i = 1; i <= 8; i++) {
++			if (asp_gap_hist[i]) {
++				fprintf(f, " %d:%u (%.0f%%)", i, asp_gap_hist[i],
++					100.0 * asp_gap_hist[i] / (gaps ? gaps : 1));
++			}
++		}
++		fprintf(f, " mean %.2f, guard %d -----\n",
++			gaps ? (double)gapsum / gaps : 0.0, asp_draw_guard);
++
++		{
++			extern int asp_aud_rate, asp_aud_seglen, asp_aud_segs;
++			extern int asp_aud_dev_samples, asp_aud_dev_size, asp_aud_dev_freq;
++			extern int asp_aud_want_rate;
++			if (asp_aud_rate > 0 && asp_aud_seglen > 0) {
++				double seg_ms = 1000.0 * asp_aud_seglen / asp_aud_rate;
++				double ring_ms = seg_ms * (asp_aud_segs - 1);
++				double dev_ms = asp_aud_dev_freq > 0
++					? 1000.0 * asp_aud_dev_samples / asp_aud_dev_freq : 0.0;
++				// The rate the DEVICE settled on, not just the one asked for.
++				// Omitting it is why 22050 took two runs to diagnose: the
++				// device almost certainly refused it and played 22 kHz data at
++				// 44 kHz, which is the high-pitched speech, the clashing and
++				// the stalling all at once.
++				if (asp_aud_dev_freq && asp_aud_want_rate
++						&& asp_aud_dev_freq != asp_aud_want_rate) {
++					fprintf(f, "----- AUDIO RATE MISMATCH: asked the device "
++						"for %d Hz, it gave %d Hz. Sound will play at %.2fx "
++						"pitch and the loop will stall on it. -----\n",
++						asp_aud_want_rate, asp_aud_dev_freq,
++						(double)asp_aud_dev_freq / asp_aud_want_rate);
++				}
++				fprintf(f, "----- audio latency: %d Hz asked / %d Hz device, "
++					"%d samples/segment, %d segments of %.1f ms "
++					"= %.0f ms queued in the ring, plus a %d-sample device "
++					"buffer = %.1f ms; picture leads sound by about %.0f ms "
++					"-----\n",
++					asp_aud_rate, asp_aud_dev_freq, asp_aud_seglen,
++					asp_aud_segs, seg_ms, ring_ms,
++					asp_aud_dev_samples, dev_ms, ring_ms + dev_ms);
++			}
++		}
++
++		{
++			extern void asp_fb_present_split(double *, double *,
++				unsigned int *, unsigned int *, unsigned int *);
++			double sc = 0.0, cp = 0.0;
++			unsigned int rs = 0, rc = 0, nf = 0;
++			asp_fb_present_split(&sc, &cp, &rs, &rc, &nf);
++			if (nf) {
++				fprintf(f, "----- present split: scale %.2f ms (%u rows), "
++					"framebuffer write %.2f ms (%u rows), over %u frames "
++					"-----\n", sc, rs, cp, rc, nf);
++			}
++		}
++
++		// Konami draw breakdown. Only non-zero on the Konami boards, so the
++		// line simply does not appear for CPS1/CPS2 - which is the point, it
++		// shows whether the expensive stage is the sprite mixer or the
++		// per-pixel composite.
++		{
++			extern unsigned long long asp_t_kclear, asp_t_kblend, asp_t_kmixer;
++			extern unsigned int asp_n_kclear, asp_n_kblend, asp_n_kmixer;
++			extern unsigned long long asp_t_ksprite, asp_t_ktile;
++			extern unsigned int asp_n_ksprite, asp_n_ktile;
++			if (asp_n_kblend) {
++				fprintf(f, "----- konami draw: clear %.2f ms (n=%u), "
++					"mixer %.2f ms (n=%u), blend-copy %.2f ms (n=%u); "
++					"total %.2f ms per drawn frame -----\n",
++					asp_t_kclear / 1e6 / (asp_n_kclear ? asp_n_kclear : 1),
++					asp_n_kclear,
++					asp_t_kmixer / 1e6 / (asp_n_kmixer ? asp_n_kmixer : 1),
++					asp_n_kmixer,
++					asp_t_kblend / 1e6 / asp_n_kblend, asp_n_kblend,
++					(asp_t_kclear + asp_t_kmixer + asp_t_kblend)
++						/ 1e6 / asp_n_kblend);
++				// Inside the mixer: the loop dispatches only to these two, so
++				// they account for all of it. The sprite COUNT per frame is as
++				// useful as the time, because it says whether the cost is a
++				// slow routine or simply a lot of sprites.
++				fprintf(f, "----- konami mixer split: sprites %.2f ms "
++					"(%u calls, %.1f per drawn frame), tilemaps %.2f ms "
++					"(%u calls) -----\n",
++					asp_t_ksprite / 1e6 / asp_n_kblend, asp_n_ksprite,
++					(double)asp_n_ksprite / asp_n_kblend,
++					asp_t_ktile / 1e6 / asp_n_kblend, asp_n_ktile);
++			}
++		}
++	}
++	{
++		extern int asp_hash_frames;
++		extern unsigned int asp_hash_done, asp_hash_marks[6];
++		if (asp_hash_frames > 0 && asp_hash_done) {
++			fprintf(f, "----- frame hashes (first %u drawn frames): ",
++				asp_hash_done);
++			static const unsigned int at[6] = { 50, 100, 150, 200, 250, 300 };
++			for (int k = 0; k < 6; k++) {
++				if (asp_hash_done >= at[k]) {
++					fprintf(f, "%u:%08x ", at[k], asp_hash_marks[k]);
++				}
++			}
++			fprintf(f, "-----\n");
++		}
++	}
++
++	// The line is written microseconds before the process exits and the user
++	// then powers the device off, so without this it sits in the page cache
++	// and never reaches the card. That is why the first two attempts to
++	// measure the frame rate produced nothing at all.
++	fflush(f);
++	fsync(fileno(f));
++	fclose(f);
++}
++#endif
++
+ // The main message loop
+ int RunMessageLoop()
+ {
+@@ -193,6 +524,13 @@ int RunMessageLoop()
+ 
+ 	RunInit();
+ 
++#ifdef BUILD_ASP
++	// Taken after RunInit so the measurement covers play, not loading.
++	unsigned int asp_run_start = SDL_GetTicks();
++	int asp_frames_emulated_at_start = nFramesEmulated;
++	int asp_frames_rendered_at_start = nFramesRendered;
++#endif
++
+ 	GameInpCheckMouse();
+ 	while (!nExitEmulator) {
+ 		SDL_Event event;
+@@ -209,6 +547,12 @@ int RunMessageLoop()
+ 
+ 	RunExit();
+ 
++#ifdef BUILD_ASP
++	asp_log_framerate(SDL_GetTicks() - asp_run_start,
++		nFramesEmulated - asp_frames_emulated_at_start,
++		nFramesRendered - asp_frames_rendered_at_start);
++#endif
++
+ 	return 0;
+ }
+ 
+diff --git a/src/burner/sdl/config.cpp b/src/burner/sdl/config.cpp
+index 8eaacc2..0bf9049 100644
+--- a/src/burner/sdl/config.cpp
++++ b/src/burner/sdl/config.cpp
+@@ -3,6 +3,12 @@
+ 
+ int nIniVersion = 0;
+ 
++#ifdef BUILD_ASP
++// Readable from fbneo.ini so the "draw every frame" experiment can be run by
++// editing one line on the card instead of redeploying a 27 MB binary.
++extern int bAlwaysDrawFrames;
++#endif
++
+ #if defined(BUILD_SDL2) && !defined(SDL_WINDOWS)
+ void FixAndCreateSupportPath(TCHAR *pSupportFolderPath, TCHAR *pBaseFolderName)
+ {
+@@ -105,6 +111,9 @@ int ConfigAppLoad()
+ 		}
+ 
+ 		VAR(nIniVersion);
++#ifdef BUILD_ASP
++		VAR(bAlwaysDrawFrames);
++#endif
+ #ifndef BUILD_PI
+ 		VAR(nVidSelect);                           // video mode select
+ 		VAR(bVidFullStretch);
+diff --git a/src/intf/audio/sdl/aud_sdl.cpp b/src/intf/audio/sdl/aud_sdl.cpp
+index 5c0063f..c300fdd 100644
+--- a/src/intf/audio/sdl/aud_sdl.cpp
++++ b/src/intf/audio/sdl/aud_sdl.cpp
+@@ -1,230 +1,357 @@
+-// SDL_Sound module
+-
+-#include <SDL.h>
+-#include "burner.h"
+-#include "aud_dsp.h"
+-#include <math.h>
+-
+-static unsigned int nSoundFps;
+-
+-extern int delay_ticks(int ticks);
+-
+-int nSDLVolume = SDL_MIX_MAXVOLUME;
+-int (*GetNextSound)(int);               // Callback used to request more sound
+-
+-static SDL_AudioSpec audiospec;
+-
+-static short* SDLAudBuffer;
+-static int nSDLPlayPos;
+-static int nSDLFillSeg;
+-static int nAudLoopLen;
+-
+-void audiospec_callback(void* /* data */, Uint8* stream, int len)
+-{
+-#ifdef BUILD_SDL2
+-	SDL_memset(stream, 0, len);
+-#endif
+-	int end = nSDLPlayPos + len;
+-	if (end > nAudLoopLen)
+-	{
+-		SDL_MixAudio(stream, (Uint8*)SDLAudBuffer + nSDLPlayPos, nAudLoopLen - nSDLPlayPos, nSDLVolume);
+-		end -= nAudLoopLen;
+-		SDL_MixAudio(stream + nAudLoopLen - nSDLPlayPos, (Uint8*)SDLAudBuffer, end, nSDLVolume);
+-		nSDLPlayPos = end;
+-	}
+-	else
+-	{
+-		SDL_MixAudio(stream, (Uint8*)SDLAudBuffer + nSDLPlayPos, len, nSDLVolume);
+-		nSDLPlayPos = end;
+-
+-		if (nSDLPlayPos == nAudLoopLen)
+-		{
+-			nSDLPlayPos = 0;
+-		}
+-	}
+-}
+-
+-static int SDLSoundGetNextSoundFiller(int)                          // int bDraw
+-{
+-	if (nAudNextSound == NULL)
+-	{
+-		return 1;
+-	}
+-	memset(nAudNextSound, 0, nAudSegLen << 2);                  // Write silence into the buffer
+-
+-	return 0;
+-}
+-
+-static int SDLSoundBlankSound()
+-{
+-	if (nAudNextSound)
+-	{
+-		memset(nAudNextSound, 0, nAudSegLen << 2);
+-	}
+-	return 0;
+-}
+-
+-#define WRAP_INC(x) { x++; if (x >= nAudSegCount) x = 0; }
+-
+-static int SDLSoundCheck()
+-{
+-	int nPlaySeg, nFollowingSeg;
+-
+-	if (!bAudPlaying)
+-		return 1;
+-
+-	// Since the SDL buffer is smaller than a segment, only fill the buffer up to the start of the currently playing segment
+-	nPlaySeg = nSDLPlayPos / (nAudSegLen << 2) - 1;
+-
+-	if (nPlaySeg >= nAudSegCount)
+-	{
+-		nPlaySeg -= nAudSegCount;
+-	}
+-	if (nPlaySeg < 0)
+-	{
+-		nPlaySeg = nAudSegCount - 1;
+-	}
+-
+-	if (nSDLFillSeg == nPlaySeg) {
+-		//	delay_ticks(1);
+-			return 0;
+-		}
+-
+-	// work out which seg we will fill next
+-	nFollowingSeg = nSDLFillSeg;
+-	WRAP_INC(nFollowingSeg);
+-
+-	while (nSDLFillSeg != nPlaySeg)
+-	{
+-		int bDraw;
+-
+-		bDraw = (nFollowingSeg == nPlaySeg);//	|| bAlwaysDrawFrames;	// If this is the last seg of sound, flag bDraw (to draw the graphics)
+-		GetNextSound(bDraw);                                // get more sound into nAudNextSound
+-
+-		if (nAudDSPModule[0])
+-		{
+-			DspDo(nAudNextSound, nAudSegLen);
+-		}
+-
+-		memcpy((char*)SDLAudBuffer + nSDLFillSeg * (nAudSegLen << 2), nAudNextSound, nAudSegLen << 2);
+-
+-		nSDLFillSeg = nFollowingSeg;
+-		WRAP_INC(nFollowingSeg);
+-	}
+-
+-	return 0;
+-}
+-
+-static int SDLSoundExit()
+-{
+-	DspExit();
+-	SDL_CloseAudio();
+-
+-	free(SDLAudBuffer);
+-	SDLAudBuffer = NULL;
+-
+-	free(nAudNextSound);
+-	nAudNextSound = NULL;
+-
+-	return 0;
+-}
+-
+-static int SDLSetCallback(int (*pCallback)(int))
+-{
+-	if (pCallback == NULL)
+-	{
+-		GetNextSound = SDLSoundGetNextSoundFiller;
+-	}
+-	else
+-	{
+-		GetNextSound = pCallback;
+-	}
+-	return 0;
+-}
+-
+-static int SDLSoundInit()
+-{
+-	SDL_AudioSpec audiospec_req;
+-	int nSDLBufferSize;
+-
+-	printf("SDLSoundInit (%dHz) (%dFPS)\n", nAudSampleRate[0], nAppVirtualFps);
+-
+-	if (nAudSampleRate[0] <= 0)
+-	{
+-		return 1;
+-	}
+-
+-	nSoundFps = nAppVirtualFps;
+-	nAudSegLen = (nAudSampleRate[0] * 100 + (nSoundFps >> 1)) / nSoundFps;
+-	nAudLoopLen = (nAudSegLen * nAudSegCount) << 2;
+-	for (nSDLBufferSize = 64; nSDLBufferSize < (nAudSegLen >> 1); nSDLBufferSize <<= 1)
+-	{
+-
+-	}
+-
+-	audiospec_req.freq = nAudSampleRate[0];
+-	audiospec_req.format = AUDIO_S16;
+-	audiospec_req.channels = 2;
+-	audiospec_req.samples = nSDLBufferSize;
+-	audiospec_req.callback = audiospec_callback;
+-
+-	SDLAudBuffer = (short*)malloc(nAudLoopLen);
+-	if (SDLAudBuffer == NULL)
+-	{
+-		printf("Couldn't malloc SDLAudBuffer\n");
+-		SDLSoundExit();
+-		return 1;
+-	}
+-	memset(SDLAudBuffer, 0, nAudLoopLen);
+-
+-	nAudNextSound = (short*)malloc(nAudSegLen << 2);
+-	if (nAudNextSound == NULL)
+-	{
+-		SDLSoundExit();
+-		return 1;
+-	}
+-
+-	nSDLPlayPos = 0;
+-	nSDLFillSeg = nAudSegCount - 1;
+-
+-	if (SDL_OpenAudio(&audiospec_req, &audiospec))
+-	{
+-		fprintf(stderr, "Couldn't open audio: %s\n", SDL_GetError());
+-		return 1;
+-	}
+-	DspInit();
+-	SDLSetCallback(NULL);
+-
+-	return 0;
+-}
+-
+-static int SDLSoundPlay()
+-{
+-	SDL_PauseAudio(0);
+-	bAudPlaying = 1;
+-
+-	return 0;
+-}
+-
+-static int SDLSoundStop()
+-{
+-	SDL_PauseAudio(1);
+-	bAudPlaying = 0;
+-
+-	return 0;
+-}
+-
+-static int SDLSoundSetVolume()
+-{
+-	nSDLVolume = int(SDL_MIX_MAXVOLUME * nAudVolume / 10000);
+-	if (nSDLVolume > SDL_MIX_MAXVOLUME) nSDLVolume=SDL_MIX_MAXVOLUME;
+-	if (nSDLVolume < 0) nSDLVolume=0;
+-	return 1;
+-}
+-
+-static int SDLGetSettings(InterfaceInfo* /* pInfo */)
+-{
+-	return 0;
+-}
+-
+-struct AudOut AudOutSDL = { SDLSoundBlankSound, SDLSoundCheck, SDLSoundInit, SDLSetCallback, SDLSoundPlay, SDLSoundStop, SDLSoundExit, SDLSoundSetVolume, SDLGetSettings, _T("SDL audio output") };
++// SDL_Sound module
++
++#include <SDL.h>
++#include "burner.h"
++#include "aud_dsp.h"
++#include <math.h>
++
++static unsigned int nSoundFps;
++
++extern int delay_ticks(int ticks);
++extern int bAlwaysDrawFrames;
++#ifdef BUILD_ASP
++extern int asp_draw_every_n;
++extern int asp_draw_guard;
++extern int asp_aud_segments;
++extern int asp_draw_lead;
++extern int asp_aud_rate_override;     /* 0 = leave the configured rate alone */
++extern int asp_aud_device_samples;    /* 0 = keep FBNeo's computed size */          /* from asp_tuning.txt, 0 = leave alone */
++/* Recorded at init and printed at exit: the startup log is already closed by
++ * the time the audio opens, which is how three earlier diagnostics went to
++ * /dev/null. */
++int asp_aud_rate = 0, asp_aud_seglen = 0, asp_aud_segs = 0;
++int asp_aud_dev_samples = 0, asp_aud_dev_size = 0, asp_aud_dev_freq = 0;
++int asp_aud_want_rate = 0;
++#endif
++
++int nSDLVolume = SDL_MIX_MAXVOLUME;
++int (*GetNextSound)(int);               // Callback used to request more sound
++
++static SDL_AudioSpec audiospec;
++
++static short* SDLAudBuffer;
++static int nSDLPlayPos;
++static int nSDLFillSeg;
++static int nAudLoopLen;
++
++void audiospec_callback(void* /* data */, Uint8* stream, int len)
++{
++#ifdef BUILD_SDL2
++	SDL_memset(stream, 0, len);
++#endif
++	int end = nSDLPlayPos + len;
++	if (end > nAudLoopLen)
++	{
++		SDL_MixAudio(stream, (Uint8*)SDLAudBuffer + nSDLPlayPos, nAudLoopLen - nSDLPlayPos, nSDLVolume);
++		end -= nAudLoopLen;
++		SDL_MixAudio(stream + nAudLoopLen - nSDLPlayPos, (Uint8*)SDLAudBuffer, end, nSDLVolume);
++		nSDLPlayPos = end;
++	}
++	else
++	{
++		SDL_MixAudio(stream, (Uint8*)SDLAudBuffer + nSDLPlayPos, len, nSDLVolume);
++		nSDLPlayPos = end;
++
++		if (nSDLPlayPos == nAudLoopLen)
++		{
++			nSDLPlayPos = 0;
++		}
++	}
++}
++
++static int SDLSoundGetNextSoundFiller(int)                          // int bDraw
++{
++	if (nAudNextSound == NULL)
++	{
++		return 1;
++	}
++	memset(nAudNextSound, 0, nAudSegLen << 2);                  // Write silence into the buffer
++
++	return 0;
++}
++
++static int SDLSoundBlankSound()
++{
++	if (nAudNextSound)
++	{
++		memset(nAudNextSound, 0, nAudSegLen << 2);
++	}
++	return 0;
++}
++
++#define WRAP_INC(x) { x++; if (x >= nAudSegCount) x = 0; }
++
++static int SDLSoundCheck()
++{
++	int nPlaySeg, nFollowingSeg;
++
++	if (!bAudPlaying)
++		return 1;
++
++	// Since the SDL buffer is smaller than a segment, only fill the buffer up to the start of the currently playing segment
++	nPlaySeg = nSDLPlayPos / (nAudSegLen << 2) - 1;
++
++	if (nPlaySeg >= nAudSegCount)
++	{
++		nPlaySeg -= nAudSegCount;
++	}
++	if (nPlaySeg < 0)
++	{
++		nPlaySeg = nAudSegCount - 1;
++	}
++
++	if (nSDLFillSeg == nPlaySeg) {
++		//	delay_ticks(1);
++			return 0;
++		}
++
++	// work out which seg we will fill next
++	nFollowingSeg = nSDLFillSeg;
++	WRAP_INC(nFollowingSeg);
++
++#ifdef BUILD_ASP
++	// Count the frames in this catch-up batch. Only the last one is drawn, so
++	// a batch size that is reliably 2 is exactly why the rendered rate sits at
++	// half the emulated rate, whatever the drawing costs.
++	{
++		extern unsigned int asp_batch_hist[9];
++		int n = nPlaySeg - nSDLFillSeg;
++		if (n < 0) n += nAudSegCount;
++		if (n > 8) n = 8;
++		if (n > 0) asp_batch_hist[n]++;
++	}
++#endif
++
++	while (nSDLFillSeg != nPlaySeg)
++	{
++		int bDraw;
++
++		bDraw = (nFollowingSeg == nPlaySeg) || bAlwaysDrawFrames;	// If this is the last seg of sound, flag bDraw (to draw the graphics)
++
++#ifdef BUILD_ASP
++		// Displayed frames are unevenly spaced because the batch size varies:
++		// measured on metamrph, 1:657 2:1036 3:1407 5:15, a mean of 2.26. The
++		// gap-1 draws are the ragged part, and suppressing those is the whole
++		// of what this does.
++		if (asp_draw_every_n > 0) {
++			static unsigned int since = 0;
++			since++;
++
++			// Upstream's rule - draw only on the last frame of the batch - is an
++			// audio safety property, not an arbitrary choice. By the last frame
++			// every pending segment has been filled, so the 10.55 ms the drawing
++			// costs is spent with the buffer at its fullest. Pacing the draw by a
++			// counter alone broke that: it drew mid-batch, with segments still
++			// unfilled, and raised the draw rate from 0.44 per frame (one per
++			// batch, mean 2.26) to 0.50. Both drain the buffer, and the result was
++			// audible as clashing and booming - underruns, not a mixing fault.
++			//
++			// So the cadence now only ever suppresses a draw, never adds one: it
++			// still fires at a batch end, but not until n frames have passed. That
++			// removes the gap-1 draws that made the spacing ragged while keeping
++			// the draw rate at or below upstream's, and it is self-correcting,
++			// because a suppressed slot is taken at the next batch end.
++			// With asp_draw_lead the frame before the batch end counts too, so
++			// a batch of 3 offers two chances rather than one. One segment is
++			// then still unfilled while the drawing happens, which is strictly
++			// less cushion than waiting - hence opt-in.
++			int at_end = bDraw;
++			if (asp_draw_lead && !at_end) {
++				int behind = nPlaySeg - nSDLFillSeg;
++				if (behind < 0) behind += nAudSegCount;
++				if (behind == 2) at_end = 1;   // one fill short of the end
++			}
++			bDraw = at_end;
++			if (bDraw) {
++				if ((int)since >= asp_draw_every_n) {
++					since = 0;
++				} else {
++					bDraw = 0;             // too soon; wait for the next batch end
++				}
++			}
++			// asp_draw_guard is no longer consulted. Being "not too far behind"
++			// was a proxy for having buffer cushion, and the last-frame-of-batch
++			// test is the real thing it was approximating.
++		}
++#endif
++		GetNextSound(bDraw);                                // get more sound into nAudNextSound
++
++		if (nAudDSPModule[0])
++		{
++			DspDo(nAudNextSound, nAudSegLen);
++		}
++
++		memcpy((char*)SDLAudBuffer + nSDLFillSeg * (nAudSegLen << 2), nAudNextSound, nAudSegLen << 2);
++
++		nSDLFillSeg = nFollowingSeg;
++		WRAP_INC(nFollowingSeg);
++	}
++
++	return 0;
++}
++
++static int SDLSoundExit()
++{
++	DspExit();
++	SDL_CloseAudio();
++
++	free(SDLAudBuffer);
++	SDLAudBuffer = NULL;
++
++	free(nAudNextSound);
++	nAudNextSound = NULL;
++
++	return 0;
++}
++
++static int SDLSetCallback(int (*pCallback)(int))
++{
++	if (pCallback == NULL)
++	{
++		GetNextSound = SDLSoundGetNextSoundFiller;
++	}
++	else
++	{
++		GetNextSound = pCallback;
++	}
++	return 0;
++}
++
++static int SDLSoundInit()
++{
++	SDL_AudioSpec audiospec_req;
++	int nSDLBufferSize;
++
++	printf("SDLSoundInit (%dHz) (%dFPS)\n", nAudSampleRate[0], nAppVirtualFps);
++
++	if (nAudSampleRate[0] <= 0)
++	{
++		return 1;
++	}
++
++	nSoundFps = nAppVirtualFps;
++
++#ifdef BUILD_ASP
++	/* The cushion exists to absorb cost peaks, so cheaper frames need less of
++	 * it - and less cushion is less lag, which is the only way to improve both
++	 * at once. The sound chips generate one frame of audio per emulated frame,
++	 * so halving the rate halves the samples they must produce. It does not
++	 * change segment DURATION, so it costs nothing in latency directly; the
++	 * gain is in the slack per cycle, and the loss is sound quality. */
++	// ALWAYS authoritative, never "leave alone". FBNeo writes nAudSampleRate
++	// into fbneo.ini on exit and ConfigAppLoad restores it, so a rate tried
++	// once is stuck: after 22050 ran, setting the tuning key back to 0 changed
++	// nothing, because 0 meant leave-alone and what was left was the saved
++	// 22050. The log said "audio_rate = 0" and reported 22050 Hz in the same
++	// breath. So 0 now means FBNeo's own default, and the card file always
++	// wins over the ini.
++	int want = (asp_aud_rate_override >= 8000
++		&& asp_aud_rate_override <= 48000) ? asp_aud_rate_override : 44100;
++	nAudSampleRate[0] = want;
++#endif
++
++#ifdef BUILD_ASP
++	/* One segment is one video frame of audio, and the fill loop always tops
++	 * the ring up to within one segment of the play point, so there are
++	 * steadily nAudSegCount-1 frames of sound queued ahead of what is being
++	 * heard. At 6 segments that is about 85 ms, while the picture is shown the
++	 * instant it is drawn - which is the lip-sync gap. Fewer segments tightens
++	 * it and leaves less cushion against the underruns that made v13 boom, so
++	 * this is a genuine trade and belongs in the tuning file. */
++	if (asp_aud_segments >= 2 && asp_aud_segments <= 16) {
++		nAudSegCount = asp_aud_segments;
++	}
++#endif
++
++	nAudSegLen = (nAudSampleRate[0] * 100 + (nSoundFps >> 1)) / nSoundFps;
++	nAudLoopLen = (nAudSegLen * nAudSegCount) << 2;
++	for (nSDLBufferSize = 64; nSDLBufferSize < (nAudSegLen >> 1); nSDLBufferSize <<= 1)
++	{
++
++	}
++
++#ifdef BUILD_ASP
++	/* The device buffer is latency on top of the ring - 512 samples measured
++	 * as 11.6 ms of the 62 ms total, about a fifth of it. Smaller means the
++	 * driver has less margin of its own, so this is opt-in. */
++	if (asp_aud_device_samples >= 64 && asp_aud_device_samples <= 4096
++			&& asp_aud_device_samples < nSDLBufferSize) {
++		nSDLBufferSize = asp_aud_device_samples;
++	}
++#endif
++
++	audiospec_req.freq = nAudSampleRate[0];
++	audiospec_req.format = AUDIO_S16;
++	audiospec_req.channels = 2;
++	audiospec_req.samples = nSDLBufferSize;
++	audiospec_req.callback = audiospec_callback;
++
++	SDLAudBuffer = (short*)malloc(nAudLoopLen);
++	if (SDLAudBuffer == NULL)
++	{
++		printf("Couldn't malloc SDLAudBuffer\n");
++		SDLSoundExit();
++		return 1;
++	}
++	memset(SDLAudBuffer, 0, nAudLoopLen);
++
++	nAudNextSound = (short*)malloc(nAudSegLen << 2);
++	if (nAudNextSound == NULL)
++	{
++		SDLSoundExit();
++		return 1;
++	}
++
++	nSDLPlayPos = 0;
++	nSDLFillSeg = nAudSegCount - 1;
++
++	if (SDL_OpenAudio(&audiospec_req, &audiospec))
++	{
++		fprintf(stderr, "Couldn't open audio: %s\n", SDL_GetError());
++		return 1;
++	}
++#ifdef BUILD_ASP
++	asp_aud_rate = nAudSampleRate[0];
++	asp_aud_seglen = nAudSegLen;
++	asp_aud_segs = nAudSegCount;
++	asp_aud_dev_samples = audiospec.samples;
++	asp_aud_dev_size = audiospec.size;
++	asp_aud_dev_freq = audiospec.freq;
++	asp_aud_want_rate = want;
++#endif
++	DspInit();
++	SDLSetCallback(NULL);
++
++	return 0;
++}
++
++static int SDLSoundPlay()
++{
++	SDL_PauseAudio(0);
++	bAudPlaying = 1;
++
++	return 0;
++}
++
++static int SDLSoundStop()
++{
++	SDL_PauseAudio(1);
++	bAudPlaying = 0;
++
++	return 0;
++}
++
++static int SDLSoundSetVolume()
++{
++	nSDLVolume = int(SDL_MIX_MAXVOLUME * nAudVolume / 10000);
++	if (nSDLVolume > SDL_MIX_MAXVOLUME) nSDLVolume=SDL_MIX_MAXVOLUME;
++	if (nSDLVolume < 0) nSDLVolume=0;
++	return 1;
++}
++
++static int SDLGetSettings(InterfaceInfo* /* pInfo */)
++{
++	return 0;
++}
++
++struct AudOut AudOutSDL = { SDLSoundBlankSound, SDLSoundCheck, SDLSoundInit, SDLSetCallback, SDLSoundPlay, SDLSoundStop, SDLSoundExit, SDLSoundSetVolume, SDLGetSettings, _T("SDL audio output") };
+diff --git a/src/intf/input/pi/inp_pi.cpp b/src/intf/input/pi/inp_pi.cpp
+index f856045..3b57976 100644
+--- a/src/intf/input/pi/inp_pi.cpp
++++ b/src/intf/input/pi/inp_pi.cpp
+@@ -48,6 +48,224 @@ static int handleFreeplayHack(int player, int code);
+ 
+ #define JOY_DEADZONE 0x4000
+ 
++#ifdef BUILD_ASP
++// ---------------------------------------------------------------------------
++// Reading the stick's directions straight from the kernel.
++//
++// The twelve buttons arrive as a joystick, which SDL reads happily. The four
++// directions do not: they arrive as arrow KEY events, and SDL 1.2 only starts
++// reading the console keyboard once a video mode has been set, because fbcon
++// opens it inside SDL_SetVideoMode rather than SDL_Init. This build draws
++// straight to /dev/fb0 and sets no mode, so SDL never saw them.
++//
++// Setting a mode just to wake that path was the obvious fix and it was wrong:
++// this display driver does not survive a depth change, and the call left the
++// game with a black screen and the launcher with no background once it
++// returned. That is the hazard libpicofe already documented here, and I
++// walked into it.
++//
++// So the directions are read from the evdev device directly. No SDL, no video
++// mode, nothing that can touch the display. If no suitable device turns up,
++// the directions simply stay dead, which is where they were anyway.
++// ---------------------------------------------------------------------------
++#include <linux/input.h>
++#include <fcntl.h>
++#include <errno.h>
++#include <sys/ioctl.h>
++#include <unistd.h>
++#include <dirent.h>
++
++#define ASP_MAX_KBD 4
++
++static int asp_kbd_fd[ASP_MAX_KBD];
++static int asp_kbd_count = -1;			// -1 = not yet opened
++static unsigned char asp_dir_down[4];	// up, down, left, right
++
++static int asp_dir_index(int code)
++{
++	switch (code) {
++	case KEY_UP:    return 0;
++	case KEY_DOWN:  return 1;
++	case KEY_LEFT:  return 2;
++	case KEY_RIGHT: return 3;
++	default:        return -1;
++	}
++}
++
++static int asp_evdev_has_arrows(int fd)
++{
++	// EVIOCGBIT for EV_KEY returns a bitmap of the keys this device can
++	// report. A device that cannot report arrows is not the stick, and
++	// opening every event node indiscriminately would also pick up the
++	// joystick's own node and anything else plugged in.
++	unsigned char bits[(KEY_MAX / 8) + 1];
++	memset(bits, 0, sizeof(bits));
++	if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(bits)), bits) < 0)
++		return 0;
++
++	static const int want[] = { KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT };
++	static const char *label[] = { "up", "down", "left", "right" };
++
++	// Any one arrow is enough to be worth reading. Requiring all four would
++	// miss a stick that splits the axes across two nodes, and opening a
++	// device that reports only one of them costs nothing, since only arrow
++	// codes are ever acted on.
++	int found = 0;
++	for (int i = 0; i < 4; i++) {
++		int c = want[i];
++		if (bits[c / 8] & (1 << (c % 8))) {
++			found++;
++			fprintf(stderr, " %s", label[i]);
++		}
++	}
++	return found;
++}
++
++static void asp_evdev_open(void)
++{
++	asp_kbd_count = 0;
++
++	DIR *d = opendir("/dev/input");
++	if (!d) {
++		fprintf(stderr, "asp: cannot open /dev/input (%s); the stick's "
++			"directions will not work\n", strerror(errno));
++		return;
++	}
++
++	struct dirent *e;
++	while ((e = readdir(d)) != NULL && asp_kbd_count < ASP_MAX_KBD) {
++		if (strncmp(e->d_name, "event", 5) != 0) continue;
++
++		char path[280];
++		snprintf(path, sizeof(path), "/dev/input/%s", e->d_name);
++
++		int fd = open(path, O_RDONLY | O_NONBLOCK);
++		if (fd < 0) continue;
++
++		char name[128] = "";
++		ioctl(fd, EVIOCGNAME(sizeof(name)), name);
++		fprintf(stderr, "asp: %s (%s) reports:", path,
++			name[0] ? name : "unnamed");
++
++		if (asp_evdev_has_arrows(fd)) {
++			fprintf(stderr, " - reading directions from it\n");
++			asp_kbd_fd[asp_kbd_count++] = fd;
++		} else {
++			fprintf(stderr, " no arrows, skipped\n");
++			close(fd);
++		}
++	}
++	closedir(d);
++
++	if (asp_kbd_count == 0) {
++		fprintf(stderr, "asp: no input device reports arrow keys; the "
++			"stick's directions will not work\n");
++	}
++}
++
++// One bounded trace of what the stick really sends.
++//
++// "Up and down not really working, a bit random" has several possible causes
++// that cannot be told apart by reasoning: the physical directions might send
++// codes other than the four arrows this device advertises; the driver might
++// report a press with no matching release; or it might autorepeat in a way
++// that makes a held direction look like it keeps letting go. Guessing cost
++// two build-and-test rounds already, so this records the first
++// ASP_TRACE_EVENTS key events - every code, not just arrows - and then stops
++// writing for good.
++#define ASP_TRACE_EVENTS 120
++
++static FILE *asp_trace = NULL;
++static int asp_trace_left = ASP_TRACE_EVENTS;
++
++static void asp_trace_open(void)
++{
++	static const char *paths[] = {
++		"/mnt/hdisk/ASPh/hack/bin/fba/fba_input.log",
++		"/mnt/udisk/ASPh/hack/bin/fba/fba_input.log",
++		NULL
++	};
++	for (int i = 0; paths[i] && !asp_trace; i++) asp_trace = fopen(paths[i], "w");
++	if (!asp_trace) return;
++	setvbuf(asp_trace, NULL, _IOLBF, 0);
++	fprintf(asp_trace, "# first %d key events, then this file stops growing.\n",
++		ASP_TRACE_EVENTS);
++	fprintf(asp_trace, "# arrows are up=%d down=%d left=%d right=%d\n",
++		KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT);
++	fprintf(asp_trace, "# value 1=press 2=repeat 0=release\n");
++}
++
++static void asp_trace_event(const struct input_event *ev)
++{
++	if (asp_trace_left <= 0) return;
++	if (!asp_trace) asp_trace_open();
++	if (!asp_trace) { asp_trace_left = 0; return; }
++
++	const char *name = "";
++	switch (ev->code) {
++	case KEY_UP:    name = " (up)";    break;
++	case KEY_DOWN:  name = " (down)";  break;
++	case KEY_LEFT:  name = " (left)";  break;
++	case KEY_RIGHT: name = " (right)"; break;
++	default: break;
++	}
++	// SDL's millisecond clock rather than the event timestamp: this kernel's
++	// input_event does not expose .time under these headers, and relative
++	// timing is all that matters for spotting a press with no release or a
++	// direction that keeps flickering.
++	fprintf(asp_trace, "%8u ms  code %d%s  value %d\n",
++		SDL_GetTicks(), ev->code, name, ev->value);
++
++	if (--asp_trace_left <= 0) {
++		fprintf(asp_trace, "# limit reached, no further writes\n");
++		fflush(asp_trace);
++		fsync(fileno(asp_trace));
++		fclose(asp_trace);
++		asp_trace = NULL;
++	}
++}
++
++static void asp_evdev_poll(void)
++{
++	if (asp_kbd_count <= 0) return;			// opened in piInputInit
++
++	for (int i = 0; i < asp_kbd_count; i++) {
++		struct input_event ev;
++		ssize_t n;
++		// Drain everything queued. Non-blocking, so this ends in EAGAIN.
++		while ((n = read(asp_kbd_fd[i], &ev, sizeof(ev))) == (ssize_t)sizeof(ev)) {
++			if (ev.type != EV_KEY) continue;
++			asp_trace_event(&ev);
++			int d = asp_dir_index(ev.code);
++			if (d < 0) continue;
++			// value 1 = pressed, 2 = autorepeat, 0 = released
++			asp_dir_down[d] = (ev.value != 0);
++		}
++	}
++}
++
++static void asp_evdev_close(void)
++{
++	for (int i = 0; i < asp_kbd_count && i > -1; i++) {
++		close(asp_kbd_fd[i]);
++	}
++	asp_kbd_count = -1;
++	memset(asp_dir_down, 0, sizeof(asp_dir_down));
++}
++
++// Measured on the device with a twelve-press discovery run, not taken from
++// documentation - the figures in the stock RetroArch config are wrong and are
++// what caused the original mis-mapping.
++//
++//   top row:  A red 0    C green 2   grey 3 (LED)   white 6
++//   bottom:   B yellow 1 D blue 5    grey 4 (LED)   white 7
++//   side:     Select 8   Start 9     Options 10     Turbo 11
++//
++// None of the twelve are directions. The stick sends arrow keysyms, which
++// reach FBNeo through keyLookupTable with nothing configured.
++#define ASP_OPTIONS_BUTTON 10
++#endif
++
+ static unsigned int defaultLayout[] = {
+ 	FBK_Z, FBK_X, FBK_C, FBK_A, FBK_S, FBK_D, FBK_Q, FBK_W, FBK_E,
+ };
+@@ -78,6 +296,10 @@ static int piInputExit()
+ 		}
+ 	}
+ 
++#ifdef BUILD_ASP
++	asp_evdev_close();
++#endif
++
+ 	free(joyLookupTable);
+ 	joyLookupTable = NULL;
+ 
+@@ -117,6 +339,10 @@ static int piInputInit()
+ 	}
+ 	SDL_JoystickEventState(SDL_IGNORE);
+ 
++#ifdef BUILD_ASP
++	asp_evdev_open();
++#endif
++
+ 	resetJoystickMap();
+ 
+ 	return 0;
+@@ -129,6 +355,9 @@ static int piInputStart()
+ 
+ 	scanJoysticks();
+ 	scanKeyboard();
++#ifdef BUILD_ASP
++	asp_evdev_poll();					// the stick's four directions
++#endif
+ 
+ 	struct timeval now;
+ 	gettimeofday(&now, NULL);
+@@ -184,6 +413,19 @@ static int piInputState(int nCode)
+ 		player = nCode - FBK_5;
+ 	}
+ 
++#ifdef BUILD_ASP
++	// The stick's directions come from evdev, not from SDL. Checked before
++	// the keyboard table because keyLookupTable holds -1 for anything SDL
++	// never mapped, and KEY_IS_DOWN(-1) reads off the front of the array.
++	switch (nCode) {
++	case FBK_UPARROW:    if (asp_dir_down[0]) return 1; break;
++	case FBK_DOWNARROW:  if (asp_dir_down[1]) return 1; break;
++	case FBK_LEFTARROW:  if (asp_dir_down[2]) return 1; break;
++	case FBK_RIGHTARROW: if (asp_dir_down[3]) return 1; break;
++	default: break;
++	}
++#endif
++
+ 	if (nCode < 0x100) {
+ 		int mapped = keyLookupTable[nCode];
+ 		if (nEnableFreeplayHack && player != -1) {
+@@ -262,6 +504,19 @@ static void scanKeyboard()
+ 	screenshotDown = keyState[SDLK_F10];
+ }
+ 
++// A joyconfig "QUIT=n" line binds FBK_ESCAPE, but the exit checks below only
++// ever compared against FBK_F12, so QUIT= did nothing at all. Accept either.
++// That is what turns "QUIT=11" in joyconfig/*.jc into a working exit button
++// instead of a no-op, and on the Arcade Stick Pro a working exit button is the
++// difference between quitting a game and pulling the power - which is what
++// corrupted the USB card twice.
++static int isExitBinding(int mapped)
++{
++	// Unbound entries are -1, and no valid mapping is ever -1, so an
++	// unconfigured QUIT cannot match anything by accident.
++	return mapped == joyLookupTable[FBK_F12] || mapped == joyLookupTable[FBK_ESCAPE];
++}
++
+ static void scanJoysticks()
+ {
+ 	SDL_JoystickUpdate();
+@@ -290,7 +545,7 @@ static void scanJoysticks()
+ 		};
+ 		for (int i = 0; i < 4; i++) {
+ 			joyButtonStates[joy] |= (dirStates[i] << i);
+-			if (dirStates[i] && joyLookupTable[FBK_F12] == JOY_MAP_DIR(joy, i)) {
++			if (dirStates[i] && isExitBinding(JOY_MAP_DIR(joy, i))) {
+ 				nExitEmulator = 1;
+ 				return;
+ 			}
+@@ -305,7 +560,7 @@ static void scanJoysticks()
+ 			int state = SDL_JoystickGetButton(joystick, button);
+ 			joyButtonStates[joy] |= ((state & 1) << shift);
+ 
+-			if (state && joyLookupTable[FBK_F12] == JOY_MAP_BUTTON(joy, button)) {
++			if (state && isExitBinding(JOY_MAP_BUTTON(joy, button))) {
+ 				nExitEmulator = 1;
+ 				return;
+ 			}
+@@ -413,11 +668,25 @@ static int readConfigFile(int pindex, const char *path, int sixButton)
+ 		if (!delim) continue;
+ 		*delim = '\0';
+ 
+-		char *eol = strchr(delim, '\n');
+-		if (!eol) continue;
+-		*eol = '\0';
++		// Upstream searched for the newline from delim, which has just been
++		// overwritten with '\0' - so strchr was handed an empty string, found
++		// nothing, and every single line was skipped. The whole joyconfig
++		// feature has therefore never done anything. Searching from delim + 1
++		// is the fix; while here, accept a CRLF file and a last line with no
++		// newline at all rather than silently dropping them.
++		char *val = delim + 1;
++		for (char *e = val + strlen(val); e > val; e--) {
++			char c = e[-1];
++			if (c != '\n' && c != '\r' && c != ' ' && c != '\t') break;
++			e[-1] = '\0';
++		}
+ 
+-		int hbindex = atoi(delim + 1) - 1;
++		int hbindex = atoi(val) - 1;
++		if (hbindex < 0 || hbindex >= MAX_JOY_BUTTONS) {
++			fprintf(stderr, "joyconfig: %s has no usable button number, "
++				"ignored\n", line);
++			continue;
++		}
+ 		if (pindex == 0 && strncmp(line, "TEST", 4) == 0) {
+ 			joyLookupTable[FBK_F2] = JOY_MAP_BUTTON(pindex, hbindex);
+ 		} else if (pindex == 0 && strncmp(line, "SERVICE", 7) == 0) {
+@@ -469,8 +738,31 @@ static int readConfigFile(int pindex, const char *path, int sixButton)
+ 
+ static int configExists(char *path, int pathSize, const char *name)
+ {
+-	snprintf(path, pathSize, "joyconfig/%s.jc", name);
+-	return access(path, F_OK) != -1;
++	// The launcher runs us with the working directory set to internal storage
++	// (so nvram and config do not get written to the USB card during play),
++	// which means a bare relative "joyconfig/" no longer finds the files that
++	// ship beside the binary. Try the working directory first, so a config
++	// dropped there still wins, then the two mount points the card appears
++	// under. A parent name can be NULL, which is not a lookup at all.
++	static const char *dirs[] = {
++		"joyconfig",
++		"/mnt/hdisk/ASPh/hack/bin/fba/joyconfig",
++		"/mnt/udisk/ASPh/hack/bin/fba/joyconfig",
++		NULL
++	};
++
++	if (name == NULL || *name == '\0') {
++		return 0;
++	}
++
++	for (int i = 0; dirs[i] != NULL; i++) {
++		snprintf(path, pathSize, "%s/%s.jc", dirs[i], name);
++		if (access(path, F_OK) != -1) {
++			return 1;
++		}
++	}
++
++	return 0;
+ }
+ 
+ static void resetJoystickMap()
+@@ -500,6 +792,25 @@ static void resetJoystickMap()
+ 		if (loadConfig)
+ 			readConfigFile(i, path, sixButton);
+ 	}
++
++#ifdef BUILD_ASP
++	// Last resort: if nothing has bound a quit button, put it on Options.
++	//
++	// The config file is the proper place for this (QUIT=11 in a .jc), and a
++	// config that binds it wins because this only fills an unbound slot. But
++	// on the Arcade Stick Pro there is no keyboard to press Escape on, so a
++	// missing or unreadable joyconfig would leave a game with no way out but
++	// the power switch - and power-cycling to exit is what corrupted the USB
++	// card twice. A built-in exit is worth more than a tidy abstraction.
++	if (joyLookupTable[FBK_ESCAPE] == -1 && joyLookupTable[FBK_F12] == -1) {
++		joyLookupTable[FBK_ESCAPE] = JOY_MAP_BUTTON(0, ASP_OPTIONS_BUTTON);
++		// stderr, like the other asp: lines: stdout is block-buffered here,
++		// and a message about how to quit is no use if it is still sitting in
++		// a buffer when the game is killed.
++		fprintf(stderr, "asp: no quit button configured, using Options "
++			"(button %d)\n", ASP_OPTIONS_BUTTON);
++	}
++#endif
+ }
+ 
+ struct InputInOut InputInOutSDL = { piInputInit, piInputExit, NULL, piInputStart, piInputState, NULL, NULL, NULL, NULL, NULL, _T("Raspberry Pi input") };
+diff --git a/src/intf/video/asp/asp_fbout.h b/src/intf/video/asp/asp_fbout.h
+new file mode 100644
+index 0000000..bd24e7f
+--- /dev/null
++++ b/src/intf/video/asp/asp_fbout.h
+@@ -0,0 +1,619 @@
++/* asp_fbout.h - write frames straight to /dev/fb0 at the stride the display
++ * driver actually reports, bypassing SDL's video surface.
++ *
++ * Why this exists. On this device the driver answers FBIOGET_VSCREENINFO with
++ * bits_per_pixel 16 and FBIOGET_FSCREENINFO with line_length 5120 for a
++ * 1280-wide mode. Those cannot both describe the same thing: 1280 pixels at
++ * 16bpp is a 2560-byte scanline. SDL believes bits_per_pixel, hands out a
++ * surface with pitch 2560, and every row we draw then lands at half the
++ * distance the hardware reads rows from - which is what put a NES cursor in
++ * the top-left corner and made all three emulators' output the wrong shape.
++ * Setting the mode does not reconcile the two numbers; the mismatch is still
++ * there afterwards.
++ *
++ * Rather than argue with SDL about it, the final blit goes here. SDL keeps
++ * input, audio and timing; the picture is ours.
++ *
++ * Which of the two numbers is right is an open question, so it is a setting
++ * rather than an assumption. asp_screen.cfg's fb_mode selects:
++ *
++ *   1  stride = line_length, 2 bytes/pixel  - the scanline is really 2560
++ *      pixels wide and only the left 1280 are visible
++ *   2  stride = line_length, 4 bytes/pixel  - the pixels are really 32-bit
++ *   3  stride = xres * 2,    2 bytes/pixel  - what SDL does today, kept so the
++ *      known-wrong case can be compared against directly
++ *   0  auto: 1 when line_length is exactly xres*4 and the masks are RGB565,
++ *      otherwise 3
++ *
++ * The calibration pattern cycles all three, so one photograph settles it
++ * instead of another round of inference.
++ *
++ * Every write is bounds-checked against smem_len. A wrong stride here would
++ * otherwise walk off the end of the mapping.
++ */
++
++#ifndef ASP_FBOUT_H
++#define ASP_FBOUT_H
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <time.h>
++#include <unistd.h>
++#include <fcntl.h>
++#include <errno.h>
++#include <sys/mman.h>
++#include <sys/time.h>
++#include <sys/ioctl.h>
++#include <linux/fb.h>
++
++#ifndef FBIO_WAITFORVSYNC
++#define FBIO_WAITFORVSYNC _IOW('F', 0x20, unsigned int)
++#endif
++
++static unsigned char *asp_fb_mem;
++static long  asp_fb_len;
++static long  asp_fb_stride;      /* bytes between scanlines */
++static int   asp_fb_px;          /* bytes per pixel: 2 or 4 */
++static int   asp_fb_w, asp_fb_h; /* visible geometry */
++static long  asp_fb_origin;      /* byte offset of the displayed page */
++static int   asp_fb_ready;
++static int   asp_fb_fd = -1;     /* kept open for the vblank wait */
++static int   asp_fb_vsync_ok = 1;
++
++/* Set from asp_screen.cfg before asp_fb_open(). */
++static int asp_fb_mode_cfg;
++
++static int asp_fb_open(void)
++{
++	struct fb_var_screeninfo v;
++	const char *dev;
++	struct fb_fix_screeninfo f;
++	int fd, mode;
++
++	if (asp_fb_ready)
++		return 1;
++
++	/* Test hooks. ASP_FB_DEV points the output at an ordinary file and
++	 * ASP_FB_GEOM supplies the geometry the ioctls would have returned, as
++	 * "xres,yres,line_length,bpp,smem_len". Together they let the blit
++	 * arithmetic and the bounds checks be exercised off-device, which matters
++	 * for code that writes into a raw mapping at a stride taken on trust. */
++	{
++		const char *devenv = getenv("ASP_FB_DEV");
++		dev = devenv ? devenv : "/dev/fb0";
++	}
++
++	fd = open(dev, O_RDWR);
++	if (fd < 0) {
++		fprintf(stderr, "asp-fbout: open %s: %s\n", dev, strerror(errno));
++		return 0;
++	}
++
++	memset(&v, 0, sizeof(v));
++	memset(&f, 0, sizeof(f));
++	if (ioctl(fd, FBIOGET_VSCREENINFO, &v) < 0 ||
++	    ioctl(fd, FBIOGET_FSCREENINFO, &f) < 0) {
++		const char *g = getenv("ASP_FB_GEOM");
++		unsigned xr, yr, ll, bpp, sl;
++		if (g == NULL || sscanf(g, "%u,%u,%u,%u,%u",
++		                        &xr, &yr, &ll, &bpp, &sl) != 5) {
++			fprintf(stderr, "asp-fbout: ioctl: %s\n", strerror(errno));
++			close(fd);
++			return 0;
++		}
++		v.xres = xr; v.yres = yr; v.bits_per_pixel = bpp;
++		v.xres_virtual = xr; v.yres_virtual = yr; v.yoffset = 0;
++		v.red.offset = 11; v.red.length = 5;
++		v.green.offset = 5; v.green.length = 6;
++		v.blue.offset = 0; v.blue.length = 5;
++		f.line_length = ll; f.smem_len = sl;
++		fprintf(stderr, "asp-fbout: using ASP_FB_GEOM %ux%u ll=%u bpp=%u "
++			"smem=%u\n", xr, yr, ll, bpp, sl);
++	}
++
++	asp_fb_w = v.xres ? (int)v.xres : 1280;
++	asp_fb_h = v.yres ? (int)v.yres : 720;
++
++	mode = asp_fb_mode_cfg;
++	if (mode == 0) {
++		int rgb565 = (v.red.length == 5 && v.green.length == 6 &&
++		              v.blue.length == 5);
++		mode = (rgb565 && f.line_length == v.xres * 4u) ? 1 : 3;
++		fprintf(stderr, "asp-fbout: auto-selected fb_mode %d "
++			"(rgb565=%d line_length=%u xres*4=%u)\n",
++			mode, rgb565, f.line_length, v.xres * 4u);
++	}
++
++	switch (mode) {
++	case 1:  asp_fb_stride = f.line_length;      asp_fb_px = 2; break;
++	case 2:  asp_fb_stride = f.line_length;      asp_fb_px = 4; break;
++	default: asp_fb_stride = (long)asp_fb_w * 2; asp_fb_px = 2; break;
++	}
++
++	/* Pin the display to the first page and keep it there.
++	 *
++	 * The driver offers two pages (yres_virtual is twice yres) and SDL_Flip
++	 * pans between them. We write to one fixed address, so a pan we did not
++	 * make means every other frame shows a page nothing ever wrote - which is
++	 * the flicker on the Mega Drive. The emulators no longer call SDL_Flip,
++	 * but SDL_SetVideoMode may already have left the display on the second
++	 * page, so ask for page 0 explicitly rather than inferring where we are.
++	 *
++	 * If the pan is refused, fall back to the page the driver says is live.
++	 * The offset for that is counted in line_length units, not ours: panning
++	 * is the driver's arithmetic, and on this device the two disagree. */
++	v.yoffset = 0;
++	if (ioctl(fd, FBIOPAN_DISPLAY, &v) == 0) {
++		asp_fb_origin = 0;
++	} else {
++		fprintf(stderr, "asp-fbout: pan to page 0 refused (%s); "
++			"using the live page at yoffset %u\n",
++			strerror(errno), v.yoffset);
++		asp_fb_origin = (long)v.yoffset * (long)f.line_length;
++	}
++
++	asp_fb_len = f.smem_len;
++	/* The cast is for the C++ builds. C converts void* silently; C++ does
++	   not, and FBNeo compiles this header as C++. */
++	asp_fb_mem = (unsigned char *)mmap(NULL, asp_fb_len,
++	                                   PROT_READ | PROT_WRITE,
++	                                   MAP_SHARED, fd, 0);
++	asp_fb_fd = fd;
++	if (asp_fb_mem == (unsigned char *)MAP_FAILED) {
++		fprintf(stderr, "asp-fbout: mmap %ld: %s\n",
++			asp_fb_len, strerror(errno));
++		asp_fb_mem = NULL;
++		close(asp_fb_fd);
++		asp_fb_fd = -1;
++		return 0;
++	}
++
++	fprintf(stderr, "asp-fbout: %dx%d visible, stride %ld, %d bytes/pixel, "
++		"page offset %ld, mapping %ld bytes (mode %d)\n",
++		asp_fb_w, asp_fb_h, asp_fb_stride, asp_fb_px,
++		asp_fb_origin, asp_fb_len, mode);
++
++	/* A whole frame must fit, or the stride is wrong in a way that would
++	 * write past the mapping. Refuse rather than corrupt memory. */
++	if (asp_fb_origin + (long)asp_fb_h * asp_fb_stride > asp_fb_len) {
++		fprintf(stderr, "asp-fbout: %d rows at stride %ld exceed the "
++			"%ld byte mapping - refusing this mode\n",
++			asp_fb_h, asp_fb_stride, asp_fb_len);
++		munmap(asp_fb_mem, asp_fb_len);
++		asp_fb_mem = NULL;
++		close(asp_fb_fd);
++		asp_fb_fd = -1;
++		return 0;
++	}
++
++	asp_fb_ready = 1;
++	return 1;
++}
++
++static void asp_fb_close(void)
++{
++	if (asp_fb_mem) {
++		munmap(asp_fb_mem, asp_fb_len);
++		asp_fb_mem = NULL;
++	}
++	if (asp_fb_fd >= 0) {
++		close(asp_fb_fd);
++		asp_fb_fd = -1;
++	}
++	asp_fb_ready = 0;
++}
++
++/* Reopen under a different interpretation of the geometry. Only the
++ * calibration pass uses this. */
++static int asp_fb_reopen(int mode)
++{
++	asp_fb_close();
++	asp_fb_mode_cfg = mode;
++	return asp_fb_open();
++}
++
++/* Block until the display starts a new frame.
++ *
++ * We draw straight into the page being scanned out, so without this the beam
++ * can be halfway down the panel while a frame is being replaced underneath it,
++ * showing the top of the new frame and the bottom of the old one at once. On
++ * fast motion that reads as the picture glitching and shearing.
++ *
++ * Best effort: some drivers do not implement the wait, and one refusal is
++ * enough to stop asking. Costs nothing when unsupported. */
++static void asp_fb_wait_vsync(void)
++{
++	unsigned int zero = 0;
++
++	if (!asp_fb_vsync_ok || asp_fb_fd < 0)
++		return;
++	if (ioctl(asp_fb_fd, FBIO_WAITFORVSYNC, &zero) == 0)
++		return;
++
++	asp_fb_vsync_ok = 0;
++	fprintf(stderr, "asp-fbout: no vblank wait on this driver (%s); "
++		"drawing unsynchronised\n", strerror(errno));
++}
++
++/* Present cost split: the scale pass versus the framebuffer write. */
++/* Timing every row cost about 0.9 ms per frame in clock_gettime calls alone -
++ * 900 of them, more than any saving the measurement was looking for, and it
++ * pushed the measured present from 2.63 ms to 4.39. Off unless asked for. */
++int asp_fb_profile = 0;
++static unsigned long long asp_fb_t_scale = 0, asp_fb_t_copy = 0;
++static unsigned int asp_fb_n_scale = 0, asp_fb_n_copy = 0, asp_fb_n_frames = 0;
++
++static inline unsigned long long asp_fb_now_ns(void)
++{
++	struct timespec ts;
++	clock_gettime(CLOCK_MONOTONIC, &ts);
++	return (unsigned long long)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
++}
++
++static inline unsigned char *asp_fb_row(int y)
++{
++	long off = asp_fb_origin + (long)y * asp_fb_stride;
++	if (y < 0 || y >= asp_fb_h)
++		return NULL;
++	if (off < 0 || off + (long)asp_fb_w * asp_fb_px > asp_fb_len)
++		return NULL;
++	return asp_fb_mem + off;
++}
++
++/* Wipe the whole mapping, not just the visible rectangle at the current
++ * stride. The calibration passes each write at a different stride, so bytes one
++ * pass touches are bytes another pass's "visible area" never covers; clearing
++ * per-interpretation left the earlier passes showing through underneath the
++ * game, which is what put a grid of bright bands over Super Mario World. */
++static void asp_fb_clear_all(void)
++{
++	if (asp_fb_ready && asp_fb_mem)
++		memset(asp_fb_mem, 0, (size_t)asp_fb_len);
++}
++
++static void asp_fb_clear(void)
++{
++	int y;
++	if (!asp_fb_ready)
++		return;
++	for (y = 0; y < asp_fb_h; y++) {
++		unsigned char *p = asp_fb_row(y);
++		if (p)
++			memset(p, 0, (size_t)asp_fb_w * asp_fb_px);
++	}
++}
++
++#ifdef __ARM_NEON
++#include <arm_neon.h>
++#endif
++
++/* RGB565 -> whatever the framebuffer takes. The 32bpp case assumes the usual
++ * XRGB8888 byte order; the masks are checked at open time for the 16bpp case,
++ * which is the one this device actually reports. */
++static inline void asp_fb_putrow16(unsigned char *p, const unsigned short *src,
++                                   const unsigned short *xmap, int dw)
++{
++	unsigned short *q = (unsigned short *)p;
++	int j;
++	for (j = 0; j < dw; j++)
++		q[j] = src[xmap[j]];
++}
++
++/* The same nearest-neighbour row scale, walked along the SOURCE instead.
++ *
++ * The version above costs two loads and a store for every destination pixel,
++ * and the second load is a gather the CPU cannot pipeline well. Measured on
++ * the device it held the picture to 22.3fps while the emulation itself ran at
++ * 58.5 of a 59.18 target - so the drawing, not the emulation, is the limit.
++ *
++ * Upscaling means consecutive destination pixels share a source pixel: at
++ * 288 wide into 1280 each source pixel covers four or five. So walk the
++ * source once and write each pixel as a run of identical values, which needs
++ * no xmap, no gather, and lets a whole run leave in one wide store.
++ *
++ * runlen[] must describe exactly the mapping xmap[] does, or the picture
++ * shifts. Destination j takes source (j*sw)/dw, so source sx covers every j
++ * with sx*dw/sw <= j < (sx+1)*dw/sw, which for integers is
++ * ceil(sx*dw/sw) .. ceil((sx+1)*dw/sw)-1. asp_fb_rowmap builds it that way
++ * and the two are checked against each other in the host-side test. */
++static inline void asp_fb_putrow16_runs(unsigned char *p,
++                                        const unsigned short *src,
++                                        const unsigned short *runlen, int sw)
++{
++	unsigned short *q = (unsigned short *)p;
++	int sx;
++
++	for (sx = 0; sx < sw; sx++) {
++		unsigned short v = src[sx];
++		int n = runlen[sx];
++
++		if (n <= 0)					/* downscaling drops this one */
++			continue;
++
++#ifdef __ARM_NEON
++		if (n >= 8) {
++			uint16x8_t v8 = vdupq_n_u16(v);
++			do { vst1q_u16(q, v8); q += 8; n -= 8; } while (n >= 8);
++		}
++		if (n >= 4) {
++			uint16x4_t v4 = vdup_n_u16(v);
++			vst1_u16(q, v4); q += 4; n -= 4;
++		}
++#else
++		/* Two pixels per 32-bit store, once q is 4-byte aligned. */
++		if (n >= 2 && (((unsigned long)(void *)q) & 2u) != 0) {
++			*q++ = v; n--;
++		}
++		if (n >= 2) {
++			unsigned int vv = ((unsigned int)v << 16) | v;
++			do {
++				*(unsigned int *)(void *)q = vv;
++				q += 2; n -= 2;
++			} while (n >= 2);
++		}
++#endif
++		while (n-- > 0)
++			*q++ = v;
++	}
++}
++
++static inline void asp_fb_putrow32(unsigned char *p, const unsigned short *src,
++                                   const unsigned short *xmap, int dw)
++{
++	unsigned int *q = (unsigned int *)p;
++	int j;
++	for (j = 0; j < dw; j++) {
++		unsigned c = src[xmap[j]];
++		unsigned r = (c >> 11) & 0x1f, g = (c >> 5) & 0x3f, b = c & 0x1f;
++		q[j] = (((r * 255 + 15) / 31) << 16)
++		     | (((g * 255 + 31) / 63) << 8)
++		     |  ((b * 255 + 15) / 31);
++	}
++}
++
++/* How fast can this framebuffer actually be written?
++ *
++ * Every judgement about whether 60fps is reachable has rested on an estimate
++ * of ~104MB/s that was never measured. At 1280x675x16bpp a full frame is
++ * 1.728MB, so 60fps needs 103.7MB/s of writes and nothing else matters until
++ * that number is known. This fills the visible area a few times with wide
++ * stores and reports what the hardware gives, once, at startup. */
++static void asp_fb_bench(void)
++{
++	struct timeval t0, t1;
++	const int reps = 8;
++	long bytes = (long)asp_fb_w * asp_fb_h * asp_fb_px;
++	double secs, mbps, frame_mb, fps_cap;
++	int i, y;
++
++	if (!asp_fb_ready || bytes <= 0)
++		return;
++
++	gettimeofday(&t0, NULL);
++	for (i = 0; i < reps; i++) {
++		for (y = 0; y < asp_fb_h; y++) {
++			unsigned char *p = asp_fb_row(y);
++			if (p) memset(p, (i & 1) ? 0x00 : 0x11,
++				(size_t)asp_fb_w * asp_fb_px);
++		}
++	}
++	gettimeofday(&t1, NULL);
++
++	secs = (t1.tv_sec - t0.tv_sec) + (t1.tv_usec - t0.tv_usec) / 1e6;
++	if (secs <= 0.0) return;
++
++	mbps = (double)bytes * reps / secs / (1024.0 * 1024.0);
++	/* What a full-screen blit of the real target rectangle would cost. */
++	frame_mb = (double)bytes / (1024.0 * 1024.0);
++	fps_cap = mbps / frame_mb;
++
++	/* Write straight to the log file rather than to stderr.
++	 *
++	 * On this device the startup log is closed before the real video init
++	 * runs - AspInit is first called while bDrvOkay is still false, returns
++	 * early, and the call that actually sets the mode up happens later from
++	 * the message loop, by which point stdout and stderr point at
++	 * /dev/null. Three separate diagnostics have been lost that way: the
++	 * evdev probe, this bench, and the "asp: game" line, which has never
++	 * once appeared in a device log despite being printed on every launch.
++	 * Owning its own file handle makes this immune to when it runs. */
++	static const char *paths[] = {
++		"/mnt/hdisk/ASPh/hack/bin/fba/fba_emu.log",
++		"/mnt/udisk/ASPh/hack/bin/fba/fba_emu.log",
++		NULL
++	};
++	FILE *lf = NULL;
++	for (int k = 0; paths[k] && !lf; k++) lf = fopen(paths[k], "a");
++	if (lf) {
++		fprintf(lf, "----- framebuffer write bandwidth %.1f MB/s "
++			"(%ld bytes x%d in %.3fs); a full %dx%d frame is %.2f MB, "
++			"so the drawing ceiling is about %.0f fps -----\n",
++			mbps, bytes, reps, secs, asp_fb_w, asp_fb_h,
++			frame_mb, fps_cap);
++		fflush(lf);
++		fsync(fileno(lf));
++		fclose(lf);
++	}
++
++	fprintf(stderr, "asp: framebuffer write bandwidth %.1f MB/s -> "
++		"ceiling about %.0f fps\n", mbps, fps_cap);
++}
++
++/* Nearest-neighbour scale of an RGB565 frame into the rectangle (ox,oy,dw,dh).
++ * Rows that map to the same source line are copied from the previous row, so
++ * only sh rows are actually built. */
++static void asp_fb_present(const unsigned short *src, int sw, int sh,
++                           int spitch_px, int ox, int oy, int dw, int dh)
++{
++	static unsigned short xmap[2560];
++	static unsigned short runlen[2560];
++	/* One destination row, in cached memory. 4 bytes per pixel so the 32bpp
++	 * path fits too; 8-byte aligned for the wide stores the row writers use. */
++	static unsigned char rowbuf[2560 * 4] __attribute__((aligned(8)));
++	static int cache_dw, cache_sw;
++	unsigned char *prev = NULL;
++	int i, j, prev_sy = -1;
++
++	if (!asp_fb_ready || src == NULL)
++		return;
++	if (sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0)
++		return;
++	if (dw > 2560) dw = 2560;
++	if (ox < 0) ox = 0;
++	if (oy < 0) oy = 0;
++	if (ox + dw > asp_fb_w) dw = asp_fb_w - ox;
++	if (oy + dh > asp_fb_h) dh = asp_fb_h - oy;
++	if (dw <= 0 || dh <= 0)
++		return;
++
++	if (dw != cache_dw || sw != cache_sw) {
++		for (j = 0; j < dw; j++)
++			xmap[j] = (unsigned short)(((unsigned)j * sw) / dw);
++
++		/* The same mapping expressed as a run per source pixel. Boundary
++		 * b(sx) = ceil(sx*dw/sw) is where source sx starts in the
++		 * destination, so its run is b(sx+1) - b(sx). The runs sum to
++		 * exactly dw, and are 0 for pixels a downscale skips. */
++		if (sw > 0 && sw <= (int)(sizeof(runlen) / sizeof(runlen[0]))) {
++			unsigned prev = 0;
++			for (j = 0; j < sw; j++) {
++				unsigned next = ((unsigned)(j + 1) * dw + sw - 1) / sw;
++				runlen[j] = (unsigned short)(next - prev);
++				prev = next;
++			}
++		}
++		cache_dw = dw; cache_sw = sw;
++	}
++
++	/* Each distinct source row is built once into ordinary cached memory and
++	 * then copied out; the framebuffer is only ever written, never read.
++	 *
++	 * The previous version copied a repeated row from the PREVIOUS
++	 * FRAMEBUFFER ROW, which meant reading back out of uncached video
++	 * memory. At 288x224 into 1280x675 two rows in every three are repeats,
++	 * so that was about 1.15MB per frame of reads from the slowest memory on
++	 * the device, to save building a row into the fastest. Staging in RAM
++	 * costs one extra copy of each distinct row and removes all of it. */
++	for (i = 0; i < dh; i++) {
++		unsigned char *p = asp_fb_row(oy + i);
++		int sy;
++		if (p == NULL)
++			continue;
++		p += (long)ox * asp_fb_px;
++		sy = (int)(((unsigned)i * sh) / dh);
++
++		if (sy != prev_sy) {
++			unsigned long long t0 = asp_fb_profile ? asp_fb_now_ns() : 0;
++			if (asp_fb_px == 2) {
++				/* Run-walk when the run table covers this source width,
++				 * which is every real case here; the xmap gather stays as
++				 * the fallback so behaviour cannot depend on the new path. */
++				if (sw > 0 && sw <= (int)(sizeof(runlen) / sizeof(runlen[0])))
++					asp_fb_putrow16_runs(rowbuf,
++						src + (long)sy * spitch_px, runlen, sw);
++				else
++					asp_fb_putrow16(rowbuf,
++						src + (long)sy * spitch_px, xmap, dw);
++			} else {
++				asp_fb_putrow32(rowbuf, src + (long)sy * spitch_px, xmap, dw);
++			}
++			prev_sy = sy;
++			if (asp_fb_profile) {
++				asp_fb_t_scale += asp_fb_now_ns() - t0;
++				asp_fb_n_scale++;
++			}
++		}
++
++		if (asp_fb_profile) {
++			unsigned long long t0 = asp_fb_now_ns();
++			memcpy(p, rowbuf, (size_t)dw * asp_fb_px);
++			asp_fb_t_copy += asp_fb_now_ns() - t0;
++			asp_fb_n_copy++;
++		} else {
++			memcpy(p, rowbuf, (size_t)dw * asp_fb_px);
++		}
++	}
++	asp_fb_n_frames++;
++	(void)prev;
++}
++
++/* The present costs 2.62 ms against a 1.43 ms floor for the bytes it writes.
++ * Which half holds the other 1.19 ms decides whether the scaler is worth
++ * rewriting or the framebuffer write is simply slower than a fill benchmark
++ * suggests, and guessing that wrong has already cost days. */
++void asp_fb_present_split(double *scale_ms, double *copy_ms,
++                          unsigned int *rows_scaled, unsigned int *rows_copied,
++                          unsigned int *frames)
++{
++	unsigned int f = asp_fb_n_frames ? asp_fb_n_frames : 1;
++	*scale_ms = asp_fb_t_scale / 1e6 / f;
++	*copy_ms = asp_fb_t_copy / 1e6 / f;
++	*rows_scaled = asp_fb_n_scale / f;
++	*rows_copied = asp_fb_n_copy / f;
++	*frames = asp_fb_n_frames;
++}
++
++/* Same, for an 8-bit indexed source with an RGB565 palette (FCEUX). */
++static void asp_fb_present_indexed(const unsigned char *src,
++                                   const unsigned short *pal565,
++                                   int sw, int sh, int spitch,
++                                   int ox, int oy, int dw, int dh)
++{
++	static unsigned short xmap[2560];
++	static int cache_dw, cache_sw;
++	unsigned char *prev = NULL;
++	int i, j, prev_sy = -1;
++
++	if (!asp_fb_ready || src == NULL)
++		return;
++	if (sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0)
++		return;
++	if (dw > 2560) dw = 2560;
++	if (ox < 0) ox = 0;
++	if (oy < 0) oy = 0;
++	if (ox + dw > asp_fb_w) dw = asp_fb_w - ox;
++	if (oy + dh > asp_fb_h) dh = asp_fb_h - oy;
++	if (dw <= 0 || dh <= 0)
++		return;
++
++	if (dw != cache_dw || sw != cache_sw) {
++		for (j = 0; j < dw; j++)
++			xmap[j] = (unsigned short)(((unsigned)j * sw) / dw);
++		cache_dw = dw; cache_sw = sw;
++	}
++
++	for (i = 0; i < dh; i++) {
++		unsigned char *p = asp_fb_row(oy + i);
++		const unsigned char *s;
++		int sy;
++		if (p == NULL)
++			continue;
++		p += (long)ox * asp_fb_px;
++		sy = (int)(((unsigned)i * sh) / dh);
++		if (sy == prev_sy && prev) {
++			memcpy(p, prev, (size_t)dw * asp_fb_px);
++			continue;
++		}
++		s = src + (long)sy * spitch;
++		if (asp_fb_px == 2) {
++			unsigned short *q = (unsigned short *)p;
++			for (j = 0; j < dw; j++)
++				q[j] = pal565[s[xmap[j]]];
++		} else {
++			unsigned int *q = (unsigned int *)p;
++			for (j = 0; j < dw; j++) {
++				unsigned c = pal565[s[xmap[j]]];
++				unsigned r = (c >> 11) & 0x1f;
++				unsigned g = (c >> 5) & 0x3f;
++				unsigned b = c & 0x1f;
++				q[j] = (((r * 255 + 15) / 31) << 16)
++				     | (((g * 255 + 31) / 63) << 8)
++				     |  ((b * 255 + 15) / 31);
++			}
++		}
++		prev_sy = sy; prev = p;
++	}
++}
++
++#endif /* ASP_FBOUT_H */
+diff --git a/src/intf/video/asp/vid_asp.cpp b/src/intf/video/asp/vid_asp.cpp
+new file mode 100644
+index 0000000..d0c4265
+--- /dev/null
++++ b/src/intf/video/asp/vid_asp.cpp
+@@ -0,0 +1,211 @@
++// Video output for the Neo Geo Arcade Stick Pro.
++//
++// Writes RGB565 straight to /dev/fb0 at the stride the display driver really
++// uses, with no SDL surface and no scaler in between. That is the same path
++// the SNES, NES and Mega Drive builds on this device use, and it is the reason
++// they hold 60fps where RetroArch managed 35: RetroArch goes through an SDL
++// surface into a 32bpp framebuffer at two to three times the memory traffic,
++// on a chip with no GPU.
++//
++// The device has two quirks that this file exists to deal with, both learned
++// the hard way and both documented in asp_fbout.h and asp_geom.h:
++//
++//   The driver reports bits_per_pixel 16 AND line_length 5120 for a 1280-wide
++//   mode. Those cannot both be true. The hardware reads rows 2560 bytes apart;
++//   honouring line_length puts row i on hardware row 2i and shows the top half
++//   of the picture stretched over the whole screen.
++//
++//   The panel is not the shape of the framebuffer. A display that scales
++//   1280x720 to fill a 5:4 panel distorts the picture after it leaves the
++//   framebuffer, where no software can reach it, so the target rectangle is
++//   solved for the shape that comes out right once the panel has had its way.
++//
++// Both live in asp_screen.cfg so they can be corrected without a rebuild.
++
++#include "burner.h"
++
++// ---------------------------------------------------------------------------
++// asp_screen.cfg, read once at startup. Same file and keys as the other three
++// emulators on this device, so one place governs all of them.
++//
++// These have to be defined BEFORE asp_geom.h, which reads them directly -
++// its own header comment says as much. Declaring them underneath the include
++// compiles everywhere except here, because the other three emulators keep
++// them as file-scope globals above their includes.
++// ---------------------------------------------------------------------------
++static int  asp_fb_mode    = 3;      // 3 = stride is xres*2, the correct one here
++static int  asp_inset_x    = 0;
++static int  asp_inset_y    = 0;
++static int  asp_keep_aspect = 1;
++static int  asp_calibrate  = 0;
++static int  asp_panel_w    = 5;      // measured: a 1280x1024 monitor
++static int  asp_panel_h    = 4;
++
++// asp_geom.h calls this; it has to be declared before the include.
++static void asp_read_screen_cfg();
++
++#include "asp_fbout.h"
++#include "asp_calib.h"
++#include "asp_geom.h"
++
++static unsigned char *asp_buffer = NULL;   // RGB565, what FBNeo draws into
++static int asp_buf_w = 0, asp_buf_h = 0;   // in display orientation
++static int asp_rotated = 0, asp_flipped = 0;
++
++static void asp_read_screen_cfg()
++{
++	static int done = 0;
++	if (done) return;
++	done = 1;
++
++	const char *paths[] = {
++		"asp_screen.cfg",
++		"/mnt/hdisk/ASPh/hack/bin/fba/asp_screen.cfg",
++		"/mnt/udisk/ASPh/hack/bin/fba/asp_screen.cfg",
++		NULL
++	};
++	FILE *fp = NULL;
++	for (int i = 0; paths[i] && !fp; i++) fp = fopen(paths[i], "r");
++	if (!fp) {
++		fprintf(stderr, "asp: no asp_screen.cfg, using built-in defaults "
++			"(fb_mode=%d panel=%d:%d)\n", asp_fb_mode, asp_panel_w, asp_panel_h);
++		return;
++	}
++
++	char line[256];
++	while (fgets(line, sizeof(line), fp)) {
++		char *p = line;
++		while (*p == ' ' || *p == '\t') p++;
++		if (*p == '#' || *p == '\n' || *p == '\0') continue;
++		char *eq = strchr(p, '=');
++		if (!eq) continue;
++		*eq = '\0';
++		char *key = p, *val = eq + 1;
++		for (char *q = key + strlen(key) - 1; q >= key && (*q==' '||*q=='\t'); q--) *q = '\0';
++		while (*val == ' ' || *val == '\t') val++;
++
++		if      (!strcmp(key, "fb_mode"))  asp_fb_mode  = atoi(val);
++		else if (!strcmp(key, "inset_x"))  asp_inset_x  = atoi(val);
++		else if (!strcmp(key, "inset_y"))  asp_inset_y  = atoi(val);
++		else if (!strcmp(key, "calibrate"))asp_calibrate= atoi(val);
++		else if (!strcmp(key, "aspect"))   asp_keep_aspect = (strncmp(val,"fill",4) != 0);
++		else if (!strcmp(key, "panel_aspect")) {
++			int a = 0, b = 0;
++			if (sscanf(val, "%d:%d", &a, &b) == 2 && a > 0 && b > 0) {
++				asp_panel_w = a; asp_panel_h = b;
++			}
++		}
++	}
++	fclose(fp);
++	fprintf(stderr, "asp: fb_mode=%d inset=%d,%d aspect=%s panel=%d:%d calibrate=%d\n",
++		asp_fb_mode, asp_inset_x, asp_inset_y,
++		asp_keep_aspect ? "keep" : "fill", asp_panel_w, asp_panel_h, asp_calibrate);
++}
++
++// ---------------------------------------------------------------------------
++// Present
++// ---------------------------------------------------------------------------
++static void asp_present()
++{
++	int ox, oy, dw, dh;
++	if (!asp_buffer) return;
++	if (!asp_fb_first_frame_setup()) return;
++
++	asp_target_rect_fb(&ox, &oy, &dw, &dh);
++	asp_fb_present((const unsigned short *)asp_buffer,
++		asp_buf_w, asp_buf_h, asp_buf_w, ox, oy, dw, dh);
++}
++
++// ---------------------------------------------------------------------------
++// VidOut
++// ---------------------------------------------------------------------------
++static int AspInit()
++{
++	int gw = 0, gh = 0, xa = 0, ya = 0;
++
++	asp_read_screen_cfg();
++
++	if (!bDrvOkay) return 0;
++
++	BurnDrvGetVisibleSize(&gw, &gh);
++	BurnDrvGetAspect(&xa, &ya);
++	asp_rotated = (BurnDrvGetFlags() & BDF_ORIENTATION_VERTICAL) ? 1 : 0;
++	asp_flipped = (BurnDrvGetFlags() & BDF_ORIENTATION_FLIPPED)  ? 1 : 0;
++
++	// FBNeo's blitter rotates into the buffer when the image dimensions are
++	// given swapped, so from here on everything is in display orientation.
++	nVidImageDepth = 16;
++	nVidImageBPP   = 2;
++	nVidImageWidth  = asp_rotated ? gh : gw;
++	nVidImageHeight = asp_rotated ? gw : gh;
++	nVidImagePitch  = nVidImageWidth * nVidImageBPP;
++
++	SetBurnHighCol(nVidImageDepth);
++
++	asp_buf_w = nVidImageWidth;
++	asp_buf_h = nVidImageHeight;
++
++	free(asp_buffer);
++	asp_buffer = (unsigned char *)calloc(1, (size_t)asp_buf_w * asp_buf_h * nVidImageBPP);
++	if (!asp_buffer) {
++		fprintf(stderr, "asp: could not allocate a %dx%d RGB565 buffer\n",
++			asp_buf_w, asp_buf_h);
++		return 1;
++	}
++
++	nBurnBpp   = nVidImageBPP;
++	nBurnPitch = nVidImagePitch;
++	pVidImage  = asp_buffer;
++
++	/* Measure the framebuffer here, not on the first drawn frame. Startup
++	 * logging is closed before the emulation loop begins, so a bench run
++	 * from the present path reported its result into /dev/null - the same
++	 * mistake the evdev probe made. AspInit runs inside DrvInit, while the
++	 * log is still open. */
++	if (asp_fb_first_frame_setup())
++		asp_fb_bench();
++
++	fprintf(stderr, "asp: game %dx%d aspect %d:%d%s%s -> buffer %dx%d RGB565\n",
++		gw, gh, xa, ya,
++		asp_rotated ? " rotated" : "", asp_flipped ? " flipped" : "",
++		asp_buf_w, asp_buf_h);
++
++	return 0;
++}
++
++static int AspExit()
++{
++	asp_fb_close();
++	free(asp_buffer);
++	asp_buffer = NULL;
++	pVidImage  = NULL;
++	return 0;
++}
++
++static int AspRunFrame(bool bRedraw)
++{
++	if (!pVidImage) return 1;
++	VidFrameCallback(bRedraw);
++	return 0;
++}
++
++static int AspPaint(int /*bValidate*/)
++{
++	asp_present();
++	return 0;
++}
++
++static int AspGetSettings(InterfaceInfo *)
++{
++	return 0;
++}
++
++static int AspScale(RECT *, int, int)
++{
++	return 0;
++}
++
++struct VidOut VidOutAsp = {
++	AspInit, AspExit, AspRunFrame, AspPaint, AspScale, AspGetSettings,
++	_T("Arcade Stick Pro direct framebuffer")
++};
+diff --git a/src/intf/video/vid_interface.cpp b/src/intf/video/vid_interface.cpp
+index 225329c..a54c879 100644
+--- a/src/intf/video/vid_interface.cpp
++++ b/src/intf/video/vid_interface.cpp
+@@ -6,7 +6,11 @@
+ 
+ #define ENABLE_PREVIEW
+ 
+-#if defined (BUILD_WIN32)
++#if defined (BUILD_ASP)
++	// Must come first: the ASP build also defines BUILD_SDL and BUILD_PI so it
++	// can reuse their input, audio and frontend, but its video is its own.
++	extern struct VidOut VidOutAsp;
++#elif defined (BUILD_WIN32)
+ 	extern struct VidOut VidOutDDraw;
+ 	extern struct VidOut VidOutD3D;
+ 	extern struct VidOut VidOutDDrawFX;
+@@ -29,7 +33,9 @@
+ #endif
+ 
+ static struct VidOut *pVidOut[] = {
+-#if defined (BUILD_WIN32)
++#if defined (BUILD_ASP)
++	&VidOutAsp,
++#elif defined (BUILD_WIN32)
+ 	&VidOutDDraw,
+ 	&VidOutD3D,
+ 	&VidOutDDrawFX,
+-- 
+2.43.0
+

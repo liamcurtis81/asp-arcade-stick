@@ -1,0 +1,12 @@
+Mem: 166476K used, 95668K free, 0K shrd, 1K buff, 5K cached
+CPU:  0.0% usr  0.0% sys  0.0% nic  100% idle  0.0% io  0.0% irq  0.0% sirq
+Load average: 1.78 0.77 0.29 1/77 1774
+  PID  PPID USER     STAT   VSZ %MEM CPU %CPU COMMAND
+ 1773  1309 0        R     2240  0.8   1  0.0 busybox top -b -n 1 
+ 1164  1158 0        S     125m 49.0   3  0.0 ././QUI_G1 
+ 1078  1061 0        S    51252 19.5   3  0.0 .//misc/SNK_MAIN 
+ 1299  1164 0        S    36508 13.9   1  0.0 /mnt/hdisk/ASPh/biosme metamrph 
+ 1153  1135 0        S    35952 13.7   0  0.0 ././splash 
+ 1774  1309 0        S     2244  0.8   0  0.0 busybox head -12 
+ 1158  1153 0        S     2240  0.8   3  0.0 busybox sh /mnt/data/usb/real_dmen
+ 1771  1159 0        S     2240  0.8   0  0.0 busybox sleep 1 

@@ -1,0 +1,30 @@
+From beaa8784ddbad3f0779e11f3eb2c44e10ad0678d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 1 Nov 2026 16:17:05 +0000
+Subject: [PATCH 13/21] ASP: snd_jit_ms tuning key (just-in-time writes in our
+ SDL OSS backend)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/burner/pi/main_pi.cpp | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
+index e28cd41..ed9cc68 100755
+--- a/src/burner/pi/main_pi.cpp
++++ b/src/burner/pi/main_pi.cpp
+@@ -348,6 +348,10 @@ static int asp_tuning_apply(const char *key, int value)
+ 		asp_z80_idle = value;
+ 	} else if (strcmp(key, "idle_skips") == 0) {
+ 		asp_idle_skips = value;
++	} else if (strcmp(key, "snd_jit_ms") == 0) {
++		// read by our SDL's OSS backend when the audio opens (SDL_dspaudio.c)
++		char v[16]; snprintf(v, sizeof v, "%d", value);
++		setenv("ASP_SND_JIT_MS", v, 1);
+ 	} else {
+ 		return 0;
+ 	}
+-- 
+2.43.0
+

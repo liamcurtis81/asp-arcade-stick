@@ -1,0 +1,5539 @@
+{
+ "1941": {
+  "title": "1941: Counter Attack (World 900227)",
+  "via": "1941",
+  "year": 1990
+ },
+ "1944": {
+  "title": "1944: The Loop Master (USA 000620)",
+  "via": "1944u",
+  "year": 2000
+ },
+ "19xx": {
+  "title": "19XX: The War Against Destiny (USA 951207)",
+  "via": "19xxu",
+  "year": 1996
+ },
+ "2020bb": {
+  "title": "2020 Super Baseball (set 1)",
+  "via": "2020bb",
+  "year": 1991
+ },
+ "3countb": {
+  "title": "3 Count Bout / Fire Suplex (NGM-043 ~ NGH-043)",
+  "via": "3countb",
+  "year": 1993
+ },
+ "3wonders": {
+  "title": "Three Wonders (World 910520)",
+  "via": "3wonders",
+  "year": 1991
+ },
+ "7thsagatheusfc": {
+  "candidates": 1,
+  "title": "7th Saga, The (USA)",
+  "via": "snes_7thsaga",
+  "year": 1993
+ },
+ "abadoxthedeadlyinnnes": {
+  "candidates": 1,
+  "title": "Abadox: The Deadly Inner War (USA)",
+  "via": "nes_abadox",
+  "year": 1989
+ },
+ "actraiser2sfc": {
+  "candidates": 3,
+  "title": "ActRaiser 2 (USA)",
+  "via": "snes_actraiser2",
+  "year": 1993
+ },
+ "actraisersfc": {
+  "candidates": 5,
+  "title": "Actraiser (Japan)",
+  "via": "snes_actraiserj",
+  "year": 1990
+ },
+ "adventuresoflolo2unes": {
+  "candidates": 1,
+  "title": "Adventures of Lolo 2 (USA)",
+  "via": "nes_advenlol2",
+  "year": 1990
+ },
+ "adventuresoflolo3unes": {
+  "candidates": 1,
+  "title": "Adventures of Lolo 3 (USA)",
+  "via": "nes_advenlol3",
+  "year": 1991
+ },
+ "adventuresoflolounes": {
+  "candidates": 1,
+  "title": "Adventures of Lolo (USA)",
+  "via": "nes_advenlol",
+  "year": 1989
+ },
+ "aerofighterssfc": {
+  "candidates": 1,
+  "title": "Aero Fighters (USA)",
+  "via": "snes_aerofight",
+  "year": 1993
+ },
+ "agallet": {
+  "title": "Air Gallet (Europe)",
+  "via": "agallet",
+  "year": 1996
+ },
+ "airduel": {
+  "title": "Air Duel (World, M82 hardware)",
+  "via": "airduel",
+  "year": 1990
+ },
+ "aladdinsfc": {
+  "candidates": 4,
+  "title": "Disney's Aladdin (USA)",
+  "via": "snes_aladdin",
+  "year": 1993
+ },
+ "aliens": {
+  "title": "Aliens (World set 1)",
+  "via": "aliens",
+  "year": 1990
+ },
+ "alienvspredatorsfc": {
+  "candidates": 2,
+  "title": "Alien vs. Predator (USA)",
+  "via": "snes_alienvspred",
+  "year": 1993
+ },
+ "alpham2": {
+  "title": "Alpha Mission II / ASO II - Last Guardian (NGM-007 ~ NGH-007)",
+  "via": "alpham2",
+  "year": 1991
+ },
+ "alphamis": {
+  "title": "Alpha Mission",
+  "via": "alphamis",
+  "year": 1985
+ },
+ "altbeast": {
+  "title": "Altered Beast (set 8) (8751 317-0078)",
+  "via": "altbeast",
+  "year": 1988
+ },
+ "androdun": {
+  "title": "Andro Dunos (NGM-049 ~ NGH-049)",
+  "via": "androdun",
+  "year": 1992
+ },
+ "aodk": {
+  "title": "Aggressors of Dark Kombat / Tsuukai GANGAN Koushinkyoku (ADM-008 ~ ADH-008)",
+  "via": "aodk",
+  "year": 1994
+ },
+ "aof": {
+  "title": "Art of Fighting / Ryuuko no Ken (NGM-044 ~ NGH-044)",
+  "via": "aof",
+  "year": 1992
+ },
+ "aof2": {
+  "title": "Art of Fighting 2 / Ryuuko no Ken 2 (NGM-056)",
+  "via": "aof2",
+  "year": 1994
+ },
+ "aof3": {
+  "title": "Art of Fighting 3 - The Path of the Warrior / Art of Fighting - Ryuuko no Ken Gaiden",
+  "via": "aof3",
+  "year": 1996
+ },
+ "armwar": {
+  "title": "Armored Warriors (Europe 941024)",
+  "via": "armwar",
+  "year": 1994
+ },
+ "artoffightingsfc": {
+  "candidates": 2,
+  "title": "Art of Fighting (USA)",
+  "via": "snes_aof",
+  "year": 1993
+ },
+ "asterix": {
+  "title": "Asterix (ver EAD)",
+  "via": "asterix",
+  "year": 1992
+ },
+ "astorm": {
+  "title": "Alien Storm (World, 2 Players) (FD1094 317-0154)",
+  "via": "astorm",
+  "year": 1990
+ },
+ "avsp": {
+  "title": "Alien vs. Predator (Europe 940520)",
+  "via": "avsp",
+  "year": 1994
+ },
+ "axelaysfc": {
+  "candidates": 3,
+  "title": "Axelay (USA)",
+  "via": "snes_axelay",
+  "year": 1992
+ },
+ "b2b": {
+  "title": "Bang Bang Busters (2010 NCI release)",
+  "via": "b2b",
+  "year": 2010
+ },
+ "baddudes": {
+  "title": "Bad Dudes vs. Dragonninja (US, revision 1)",
+  "via": "baddudes",
+  "year": 1988
+ },
+ "balloonfightunes": {
+  "candidates": 2,
+  "title": "Balloon Fight (USA)",
+  "via": "nes_balloonfight",
+  "year": 1986
+ },
+ "bangball": {
+  "title": "Bang Bang Ball (v1.05)",
+  "via": "bangball",
+  "year": 1996
+ },
+ "bangbead": {
+  "title": "Bang Bead",
+  "via": "bangbead",
+  "year": 2000
+ },
+ "bangbsnd": {
+  "title": "Bang! (version 0, checksum B61D)",
+  "via": "bangb",
+  "year": 1998
+ },
+ "baseballstarsunes": {
+  "candidates": 1,
+  "title": "Baseball Stars (USA)",
+  "via": "nes_baseballstars",
+  "year": 1989
+ },
+ "batcir": {
+  "title": "Battle Circuit (Europe 970319)",
+  "via": "batcir",
+  "year": 1997
+ },
+ "batmanreturnofthejnes": {
+  "candidates": 1,
+  "title": "Batman: Return of the Joker (USA)",
+  "via": "nes_batmaretjok",
+  "year": 1991
+ },
+ "batmanunes": {
+  "candidates": 3,
+  "title": "Batman: The Video Game (Japan)",
+  "via": "nes_batmavidgamj",
+  "year": 1989
+ },
+ "battletoadsdoublednes": {
+  "title": "Battletoads-Double Dragon (USA)",
+  "via": "nes_battldoudra",
+  "year": 1993
+ },
+ "battletoadsdoubledsfc": {
+  "candidates": 2,
+  "title": "Battletoads & Double Dragon (USA)",
+  "via": "snes_btdd",
+  "year": 1993
+ },
+ "battletoadsinbattlsfc": {
+  "candidates": 3,
+  "title": "Battletoads in Battlemaniacs (USA)",
+  "via": "snes_battletoads",
+  "year": 1993
+ },
+ "battletoadsunes": {
+  "candidates": 1,
+  "title": "Battletoads (USA)",
+  "via": "nes_battletoads",
+  "year": 1991
+ },
+ "bbakraid": {
+  "title": "Battle Bakraid - Unlimited Version (USA) (Tue Jun 8 1999)",
+  "via": "bbakraid",
+  "year": 1999
+ },
+ "bgaregga": {
+  "title": "Battle Garegga (Europe / USA / Japan / Asia) (Sat Feb 3 1996)",
+  "via": "bgaregga",
+  "year": 1996
+ },
+ "biometalsfc": {
+  "candidates": 3,
+  "title": "BioMetal (USA)",
+  "via": "snes_biometal",
+  "year": 1993
+ },
+ "bioniccommandounes": {
+  "candidates": 1,
+  "title": "Bionic Commando (USA)",
+  "via": "nes_bioniccommando",
+  "year": 1988
+ },
+ "bjourney": {
+  "title": "Blue's Journey / Raguy (ALM-001 ~ ALH-001)",
+  "via": "bjourney",
+  "year": 1990
+ },
+ "blackthornesfc": {
+  "candidates": 2,
+  "title": "Blackthorne (USA)",
+  "via": "snes_blackthorne",
+  "year": 1994
+ },
+ "bladesofsteelunes": {
+  "candidates": 1,
+  "title": "Blades of Steel (USA)",
+  "via": "nes_bladesofsteel",
+  "year": 1988
+ },
+ "blastermasterunes": {
+  "candidates": 1,
+  "title": "Blaster Master (USA)",
+  "via": "nes_blastermaster",
+  "year": 1988
+ },
+ "blazstar": {
+  "title": "Blazing Star",
+  "via": "blazstar",
+  "year": 1998
+ },
+ "block": {
+  "title": "Block Block (World 911219 Joystick)",
+  "via": "block",
+  "year": 1991
+ },
+ "blswhstl": {
+  "title": "Bells & Whistles (World, version L)",
+  "via": "blswhstl",
+  "year": 1991
+ },
+ "bombermaniiunes": {
+  "candidates": 2,
+  "title": "Bomberman II (Japan)",
+  "via": "nes_bombermaniij",
+  "year": 1991
+ },
+ "bombermanunes": {
+  "candidates": 2,
+  "title": "Bomberman (Japan)",
+  "via": "nes_bombermanj",
+  "year": 1985
+ },
+ "bonksadventureunes": {
+  "candidates": 1,
+  "title": "Bonk's Adventure (USA)",
+  "via": "nes_bonksadventure",
+  "year": 1993
+ },
+ "brainlordsfc": {
+  "candidates": 2,
+  "title": "Brain Lord (USA)",
+  "via": "snes_brainlord",
+  "year": 1994
+ },
+ "brawlbrotherssfc": {
+  "candidates": 2,
+  "title": "Brawl Brothers (USA)",
+  "via": "snes_brawlbros",
+  "year": 1993
+ },
+ "breakers": {
+  "title": "Breakers",
+  "via": "breakers",
+  "year": 1996
+ },
+ "breakrev": {
+  "title": "Breakers Revenge",
+  "via": "breakrev",
+  "year": 1998
+ },
+ "breathoffireiisfc": {
+  "candidates": 3,
+  "title": "Breath of Fire II (Euro)",
+  "via": "snes_bof2e",
+  "year": 1994
+ },
+ "breathoffiresfc": {
+  "candidates": 2,
+  "title": "Breath of Fire - Ryuu no Senshi (Japan)",
+  "via": "snes_bofj",
+  "year": 1993
+ },
+ "bstars": {
+  "title": "Baseball Stars Professional (NGM-002)",
+  "via": "bstars",
+  "year": 1990
+ },
+ "bstars2": {
+  "title": "Baseball Stars 2",
+  "via": "bstars2",
+  "year": 1992
+ },
+ "btime": {
+  "title": "Burger Time (Data East set 1)",
+  "via": "btime",
+  "year": 1982
+ },
+ "bubblebobblepart2unes": {
+  "candidates": 1,
+  "title": "Bubble Bobble Part 2 (USA)",
+  "via": "nes_bubblbobpar2",
+  "year": 1993
+ },
+ "bubblebobbleunes": {
+  "candidates": 1,
+  "title": "Bubble Bobble (USA)",
+  "via": "nes_bubblebobble",
+  "year": 1988
+ },
+ "bucky": {
+  "title": "Bucky O'Hare (ver EAB)",
+  "via": "bucky",
+  "year": 1992
+ },
+ "buckyohareunes": {
+  "candidates": 2,
+  "title": "Bucky O'Hare (Japan)",
+  "via": "nes_buckyoharej",
+  "year": 1991
+ },
+ "buraifighterunes": {
+  "candidates": 2,
+  "title": "Burai Fighter (Japan)",
+  "via": "nes_buraifighterj",
+  "year": 1990
+ },
+ "burningf": {
+  "title": "Burning Fight (NGM-018 ~ NGH-018)",
+  "via": "burningf",
+  "year": 1991
+ },
+ "bustamovesfc": {
+  "candidates": 1,
+  "title": "Bust-A-Move (USA)",
+  "via": "snes_bustamove",
+  "year": 1995
+ },
+ "cairblad": {
+  "title": "Change Air Blade (Japan)",
+  "via": "cairblad",
+  "year": 1999
+ },
+ "captaincommandosfc": {
+  "candidates": 3,
+  "title": "Captain Commando (USA)",
+  "via": "snes_capcommando",
+  "year": 1995
+ },
+ "captaven": {
+  "title": "Captain America and The Avengers (Asia Rev 1.4)",
+  "via": "captaven",
+  "year": 1991
+ },
+ "captcomm": {
+  "title": "Captain Commando (World 911202)",
+  "via": "captcomm",
+  "year": 1991
+ },
+ "castlevaniadraculasfc": {
+  "candidates": 1,
+  "title": "Castlevania Dracula X (USA)",
+  "via": "snes_castlevaniadx",
+  "year": 1995
+ },
+ "castlevaniaiiidracnes": {
+  "candidates": 1,
+  "title": "Castlevania III: Dracula's Curse (USA)",
+  "via": "nes_castliii",
+  "year": 1990
+ },
+ "castlevaniaiisimonnes": {
+  "candidates": 2,
+  "title": "Castlevania II: Simon's Quest (USA)",
+  "via": "nes_castlii",
+  "year": 1988
+ },
+ "castlevaniaunes": {
+  "candidates": 1,
+  "title": "Castlevania (USA)",
+  "via": "nes_castlevania",
+  "year": 1987
+ },
+ "cawing": {
+  "title": "Carrier Air Wing (World 901012)",
+  "via": "cawing",
+  "year": 1990
+ },
+ "centiped": {
+  "title": "Centipede (revision 4)",
+  "via": "centiped",
+  "year": 1980
+ },
+ "chipndalerescuerannes": {
+  "candidates": 1,
+  "title": "Chip 'n Dale: Rescue Rangers (USA)",
+  "via": "nes_chipndalresra",
+  "year": 1990
+ },
+ "chipndalerescuerannes2": {
+  "candidates": 1,
+  "title": "Chip 'n Dale: Rescue Rangers 2 (USA)",
+  "via": "nes_chipndalresra2",
+  "year": 1994
+ },
+ "chronotriggersfc": {
+  "candidates": 2,
+  "title": "Chrono Trigger (USA)",
+  "via": "snes_chronotrigger",
+  "year": 1995
+ },
+ "clayfightersfc": {
+  "candidates": 3,
+  "title": "Clay Fighter (USA)",
+  "via": "snes_clayfight",
+  "year": 1993
+ },
+ "cobratriangleunes": {
+  "candidates": 1,
+  "title": "Cobra Triangle (USA)",
+  "via": "nes_cobratriangle",
+  "year": 1989
+ },
+ "codenameviperunes": {
+  "candidates": 1,
+  "title": "Code Name: Viper (USA)",
+  "via": "nes_codenam",
+  "year": 1989
+ },
+ "combatribesthesfc": {
+  "candidates": 2,
+  "title": "Combatribes, The (USA)",
+  "via": "snes_ctribes",
+  "year": 1992
+ },
+ "commandounes": {
+  "candidates": 1,
+  "title": "Commando (USA)",
+  "via": "nes_commando",
+  "year": 1986
+ },
+ "conquestofthecrystnes": {
+  "candidates": 1,
+  "title": "Conquest of the Crystal Palace (USA)",
+  "via": "nes_conqucrypal",
+  "year": 1990
+ },
+ "contra3sfc": {
+  "candidates": 1,
+  "title": "Contra III: The Alien Wars (USA)",
+  "via": "snes_contraiii",
+  "year": 1992
+ },
+ "contraunes": {
+  "candidates": 2,
+  "title": "Contra (Japan)",
+  "via": "nes_contraj",
+  "year": 1988
+ },
+ "crashntheboysstreenes": {
+  "candidates": 1,
+  "title": "Crash 'n' the Boys: Street Challenge (USA)",
+  "via": "nes_crashnboy",
+  "year": 1992
+ },
+ "crswd2bl": {
+  "title": "Crossed Swords 2 (bootleg of CD version)",
+  "via": "crswd2bl",
+  "year": 1996
+ },
+ "crsword": {
+  "title": "Crossed Swords (ALM-002 ~ ALH-002)",
+  "via": "crsword",
+  "year": 1991
+ },
+ "crystalisunes": {
+  "candidates": 1,
+  "title": "Crystalis (USA)",
+  "via": "nes_crystalis",
+  "year": 1990
+ },
+ "csclub": {
+  "title": "Capcom Sports Club (Europe 971017)",
+  "via": "csclub",
+  "year": 1997
+ },
+ "ctomaday": {
+  "title": "Captain Tomaday",
+  "via": "ctomaday",
+  "year": 1999
+ },
+ "ctribe": {
+  "title": "The Combatribes (US, rev 2, set 1)",
+  "via": "ctribe",
+  "year": 1990
+ },
+ "cyberlip": {
+  "title": "Cyber-Lip (NGM-010)",
+  "via": "cyberlip",
+  "year": 1990
+ },
+ "cybernatorsfc": {
+  "candidates": 2,
+  "title": "Cybernator (USA)",
+  "via": "snes_cybernator",
+  "year": 1993
+ },
+ "cybots": {
+  "title": "Cyberbots: Fullmetal Madness (Europe 950424)",
+  "via": "cybots",
+  "year": 1995
+ },
+ "cyvern": {
+  "title": "Cyvern - The Dragon Weapons (US)",
+  "via": "cyvern",
+  "year": 1998
+ },
+ "daioh": {
+  "title": "Daioh",
+  "via": "daioh",
+  "year": 1993
+ },
+ "dariusg": {
+  "title": "Darius Gaiden - Silver Hawk (Ver 2.5O 1994/09/19)",
+  "via": "dariusg",
+  "year": 1994
+ },
+ "dariustwinsfc": {
+  "candidates": 3,
+  "title": "Darius Twin (USA)",
+  "via": "snes_dariustwin",
+  "year": 1991
+ },
+ "darkwingduckunes": {
+  "candidates": 1,
+  "title": "Darkwing Duck (USA)",
+  "via": "nes_darkwingduck",
+  "year": 1992
+ },
+ "ddragonu": {
+  "title": "Double Dragon (US set 1)",
+  "via": "ddragonu",
+  "year": 1987
+ },
+ "ddsom": {
+  "title": "Dungeons & Dragons: Shadow over Mystara (Europe 960619)",
+  "via": "ddsom",
+  "year": 1996
+ },
+ "ddtod": {
+  "title": "Dungeons & Dragons: Tower of Doom (Europe 940412)",
+  "via": "ddtod",
+  "year": 1993
+ },
+ "ddux": {
+  "title": "Dynamite Dux (set 3, World) (FD1094 317-0096)",
+  "via": "ddux",
+  "year": 1988
+ },
+ "dejavuunes": {
+  "candidates": 2,
+  "title": "Deja Vu: A Nightmare Comes True!! (Japan)",
+  "via": "nes_dejavuj",
+  "year": 1988
+ },
+ "demonscrestsfc": {
+  "candidates": 2,
+  "title": "Demon's Crest (USA)",
+  "via": "snes_demonscrest",
+  "year": 1994
+ },
+ "desertstrikereturnsfc": {
+  "candidates": 2,
+  "title": "Desert Strike: Return to the Gulf (USA)",
+  "via": "snes_desertstrike",
+  "year": 1992
+ },
+ "digdug": {
+  "title": "Dig Dug (rev 2)",
+  "via": "digdug",
+  "year": 1982
+ },
+ "diggerma": {
+  "title": "Digger Man (prototype)",
+  "via": "diggerma",
+  "year": 2000
+ },
+ "dimahoo": {
+  "title": "Dimahoo (Europe 000121)",
+  "via": "dimahoo",
+  "year": 2000
+ },
+ "dino": {
+  "title": "Cadillacs and Dinosaurs (World 930201)",
+  "via": "dino",
+  "year": 1993
+ },
+ "disneysgooftroopsfc": {
+  "candidates": 4,
+  "title": "Disney's Goof Troop (USA)",
+  "via": "snes_gooftroop",
+  "year": 1993
+ },
+ "dkong": {
+  "title": "Donkey Kong (US set 1)",
+  "via": "dkong",
+  "year": 1981
+ },
+ "dkongjr": {
+  "title": "Donkey Kong Junior (US set F-2)",
+  "via": "dkongjr",
+  "year": 1982
+ },
+ "dmnfrnt": {
+  "title": "Demon Front / Moyu Zhanxian (68k label V105, ROM M105XX 08/05/02) (ARM label V105, ROM 08/05/02 S105XX)",
+  "via": "dmnfrnt",
+  "year": 2002
+ },
+ "dogyuun": {
+  "title": "Dogyuun",
+  "via": "dogyuun",
+  "year": 1992
+ },
+ "donkeykongcountry2sfc": {
+  "candidates": 2,
+  "title": "Donkey Kong Country 2: Diddy's Kong Quest (USA, Rev. 1)",
+  "via": "snes_dkongcntry2",
+  "year": 1995
+ },
+ "donkeykongcountry3sfc": {
+  "candidates": 2,
+  "title": "Donkey Kong Country 3: Dixie Kong's Double Trouble! (USA)",
+  "via": "snes_dkongcntry3",
+  "year": 1996
+ },
+ "donkeykongcountrysfc": {
+  "candidates": 3,
+  "title": "Donkey Kong Country (USA, Rev. 2)",
+  "via": "snes_dkongcntry",
+  "year": 1994
+ },
+ "donpachi": {
+  "title": "DonPachi (USA, ver. 1.12, 95/05/2x)",
+  "via": "donpachi",
+  "year": 1995
+ },
+ "doubledr": {
+  "title": "Double Dragon (Neo-Geo)",
+  "via": "doubledr",
+  "year": 1995
+ },
+ "doubledragoniiithenes": {
+  "candidates": 1,
+  "title": "Double Dragon III: The Sacred Stones (USA)",
+  "via": "nes_doubldraiii",
+  "year": 1991
+ },
+ "doubledragonunes": {
+  "candidates": 2,
+  "title": "Double Dragon (USA)",
+  "via": "nes_doubledragon",
+  "year": 1988
+ },
+ "dragnblz": {
+  "title": "Dragon Blaze",
+  "via": "dragnblz",
+  "year": 2000
+ },
+ "dragonfighterunes": {
+  "candidates": 1,
+  "title": "Dragon Fighter (USA)",
+  "via": "nes_dragonfighter",
+  "year": 1992
+ },
+ "dragonspiritthenewnes": {
+  "candidates": 1,
+  "title": "Dragon Spirit: The New Legend (USA)",
+  "via": "nes_dragospinewleg",
+  "year": 1990
+ },
+ "dragonwarrioriiiunes": {
+  "candidates": 1,
+  "title": "Dragon Warrior III (USA)",
+  "via": "nes_dragowariii",
+  "year": 1992
+ },
+ "dragonwarrioriiunes": {
+  "candidates": 1,
+  "title": "Dragon Warrior II (USA)",
+  "via": "nes_dragowarii",
+  "year": 1990
+ },
+ "dragonwarriorivunes": {
+  "candidates": 1,
+  "title": "Dragon Warrior IV (USA)",
+  "via": "nes_dragowariv",
+  "year": 1992
+ },
+ "drmarioenes": {
+  "candidates": 1,
+  "title": "Dr. Mario (Japan, USA, Rev. A)",
+  "via": "nes_drmario",
+  "year": 1990
+ },
+ "dspirit": {
+  "title": "Dragon Spirit (new version (DS3))",
+  "via": "dspirit",
+  "year": 1987
+ },
+ "dstlk": {
+  "title": "Darkstalkers: The Night Warriors (Europe 940705)",
+  "via": "dstlk",
+  "year": 1994
+ },
+ "ducktales2unes": {
+  "candidates": 2,
+  "title": "DuckTales 2 (USA)",
+  "via": "nes_ducktales2",
+  "year": 1993
+ },
+ "ducktalesunes": {
+  "candidates": 2,
+  "title": "DuckTales (USA)",
+  "via": "nes_ducktales",
+  "year": 1989
+ },
+ "dynwar": {
+  "title": "Dynasty Wars (USA, B-Board 89624B-?)",
+  "via": "dynwar",
+  "year": 1989
+ },
+ "earthboundsfc": {
+  "candidates": 1,
+  "title": "EarthBound (USA)",
+  "via": "snes_earthbound",
+  "year": 1995
+ },
+ "earthjkr": {
+  "title": "U.N. Defense Force: Earth Joker (US / Japan, set 1)",
+  "via": "earthjkr",
+  "year": 1993
+ },
+ "earthwormjim2sfc": {
+  "candidates": 2,
+  "title": "Earthworm Jim 2 (USA)",
+  "via": "snes_earthwormjim2",
+  "year": 1995
+ },
+ "earthwormjimsfc": {
+  "candidates": 3,
+  "title": "Earthworm Jim (USA)",
+  "via": "snes_earthwormjim",
+  "year": 1994
+ },
+ "ecofghtr": {
+  "title": "Eco Fighters (World 931203)",
+  "via": "ecofghtr",
+  "year": 1993
+ },
+ "eightman": {
+  "title": "Eight Man (NGM-025 ~ NGH-025)",
+  "via": "eightman",
+  "year": 1991
+ },
+ "equinoxsfc": {
+  "candidates": 2,
+  "title": "Equinox (USA)",
+  "via": "snes_equinox",
+  "year": 1993
+ },
+ "esprade": {
+  "title": "ESP Ra.De. - A.D.2018 Tokyo (World, 1998 4/22 International Ver.)",
+  "via": "esprade",
+  "year": 1998
+ },
+ "evosearchforedensfc": {
+  "candidates": 1,
+  "title": "E.V.O. - Search for Eden (USA)",
+  "via": "snes_evo",
+  "year": 1993
+ },
+ "excitebikeenes": {
+  "candidates": 1,
+  "title": "Excitebike (Japan, USA)",
+  "via": "nes_excitebike",
+  "year": 1984
+ },
+ "fariaaworldofmystenes": {
+  "candidates": 1,
+  "title": "Faria: A World of Mystery & Danger! (USA)",
+  "via": "nes_faria",
+  "year": 1991
+ },
+ "fatalfury2sfc": {
+  "candidates": 2,
+  "title": "Fatal Fury 2 (USA)",
+  "via": "snes_fatalfury2",
+  "year": 1994
+ },
+ "fatalfurysfc": {
+  "candidates": 2,
+  "title": "Fatal Fury (USA)",
+  "via": "snes_fatalfury",
+  "year": 1993
+ },
+ "fatalfuryspecialsfc": {
+  "candidates": 2,
+  "title": "Fatal Fury Special (USA)",
+  "via": "snes_fatalfurysp",
+  "year": 1994
+ },
+ "fatfursp": {
+  "title": "Fatal Fury Special / Garou Densetsu Special (NGM-058 ~ NGH-058, set 1)",
+  "via": "fatfursp",
+  "year": 1993
+ },
+ "fatfury1": {
+  "title": "Fatal Fury - King of Fighters / Garou Densetsu - Shukumei no Tatakai (NGM-033 ~ NGH-033)",
+  "via": "fatfury1",
+  "year": 1991
+ },
+ "fatfury2": {
+  "title": "Fatal Fury 2 / Garou Densetsu 2 - Arata-naru Tatakai (NGM-047 ~ NGH-047)",
+  "via": "fatfury2",
+  "year": 1992
+ },
+ "fatfury3": {
+  "title": "Fatal Fury 3 - Road to the Final Victory / Garou Densetsu 3 - Haruka-naru Tatakai (NGM-069 ~ NGH-069)",
+  "via": "fatfury3",
+  "year": 1995
+ },
+ "fbfrenzy": {
+  "title": "Football Frenzy (NGM-034 ~ NGH-034)",
+  "via": "fbfrenzy",
+  "year": 1992
+ },
+ "felixthecatunes": {
+  "candidates": 1,
+  "title": "Felix the Cat (USA)",
+  "via": "nes_felixthecat",
+  "year": 1992
+ },
+ "ffight": {
+  "title": "Final Fight (World, set 1)",
+  "via": "ffight",
+  "year": 1989
+ },
+ "fightershistorysfc": {
+  "candidates": 3,
+  "title": "Fighter's History (USA, Rev. 1)",
+  "via": "snes_fighthistory",
+  "year": 1994
+ },
+ "fightfev": {
+  "title": "Fight Fever / Wang Jung Wang (set 1)",
+  "via": "fightfev",
+  "year": 1994
+ },
+ "finalfantasyiiisfc": {
+  "candidates": 1,
+  "title": "Final Fantasy III (USA, Rev. 1)",
+  "via": "snes_finalfantiii",
+  "year": 1994
+ },
+ "finalfantasyiisfc": {
+  "candidates": 1,
+  "title": "Final Fantasy II (USA)",
+  "via": "snes_finalfantii",
+  "year": 1991
+ },
+ "finalfantasymysticsfc": {
+  "candidates": 2,
+  "title": "Final Fantasy: Mystic Quest (USA)",
+  "via": "snes_ffmq",
+  "year": 1992
+ },
+ "finalfantasyunes": {
+  "candidates": 1,
+  "title": "Final Fantasy (USA)",
+  "via": "nes_finalfantasy",
+  "year": 1990
+ },
+ "finalfight2sfc": {
+  "candidates": 3,
+  "title": "Final Fight 2 (USA)",
+  "via": "snes_ffight2",
+  "year": 1993
+ },
+ "finalfight3sfc": {
+  "candidates": 2,
+  "title": "Final Fight 3 (USA)",
+  "via": "snes_ffight3",
+  "year": 1995
+ },
+ "finalfightgsfc": {
+  "candidates": 2,
+  "title": "Final Fight Guy (Japan)",
+  "via": "snes_ffightguyj",
+  "year": 1992
+ },
+ "finalfightsfc": {
+  "candidates": 3,
+  "title": "Final Fight (USA)",
+  "via": "snes_ffight",
+  "year": 1990
+ },
+ "fireniceunes": {
+  "candidates": 1,
+  "title": "Fire 'n Ice (USA)",
+  "via": "nes_firenice",
+  "year": 1993
+ },
+ "firepower2000sfc": {
+  "candidates": 1,
+  "title": "Firepower 2000 (USA)",
+  "via": "snes_firepower2000",
+  "year": 1992
+ },
+ "fixeight": {
+  "title": "FixEight (Europe)",
+  "via": "fixeight",
+  "year": 1992
+ },
+ "flashbackthequestfsfc": {
+  "candidates": 1,
+  "title": "Flashback: The Quest for Identity (USA)",
+  "via": "snes_flashback",
+  "year": 1993
+ },
+ "flipshot": {
+  "title": "Battle Flip Shot",
+  "via": "flipshot",
+  "year": 1998
+ },
+ "flyingwarriorsunes": {
+  "candidates": 1,
+  "title": "Flying Warriors (USA)",
+  "via": "nes_flyingwarriors",
+  "year": 1991
+ },
+ "forgottn": {
+  "title": "Forgotten Worlds (World, newer)",
+  "via": "forgottn",
+  "year": 1988
+ },
+ "frogger": {
+  "title": "Frogger",
+  "via": "frogger",
+  "year": 1981
+ },
+ "fzerosfc": {
+  "candidates": 3,
+  "title": "F-Zero (USA)",
+  "via": "snes_fzero",
+  "year": 1990
+ },
+ "galaga": {
+  "title": "Galaga (Namco rev. B)",
+  "via": "galaga",
+  "year": 1981
+ },
+ "galaga88": {
+  "title": "Galaga '88",
+  "via": "galaga88",
+  "year": 1987
+ },
+ "galaxian": {
+  "title": "Galaxian (Namco set 1)",
+  "via": "galaxian",
+  "year": 1979
+ },
+ "galaxyfg": {
+  "title": "Galaxy Fight - Universal Warriors",
+  "via": "galaxyfg",
+  "year": 1995
+ },
+ "ganryu": {
+  "title": "Ganryu / Musashi Ganryuki",
+  "via": "ganryu",
+  "year": 1999
+ },
+ "ganryusnd": {
+  "title": "Ganryu / Musashi Ganryuki",
+  "via": "ganryu",
+  "year": 1999
+ },
+ "garou": {
+  "title": "Garou - Mark of the Wolves (NGM-2530)",
+  "via": "garou",
+  "year": 1999
+ },
+ "garousnd": {
+  "title": "Garou - Mark of the Wolves (NGM-2530)",
+  "via": "garou",
+  "year": 1999
+ },
+ "gauntlet": {
+  "title": "Gauntlet (rev 14)",
+  "via": "gauntlet",
+  "year": 1985
+ },
+ "gauntletiiunes": {
+  "candidates": 1,
+  "title": "Gauntlet II (USA)",
+  "via": "nes_gauntletii",
+  "year": 1990
+ },
+ "gberet": {
+  "title": "Green Beret",
+  "via": "gberet",
+  "year": 1985
+ },
+ "ghostlop": {
+  "title": "Ghostlop (prototype)",
+  "via": "ghostlop",
+  "year": 1996
+ },
+ "ghostsngoblinsunes": {
+  "candidates": 1,
+  "title": "Ghosts'n Goblins (USA)",
+  "via": "nes_ghostsngoblins",
+  "year": 1986
+ },
+ "ghoulpatrolsfc": {
+  "candidates": 3,
+  "title": "Ghoul Patrol (USA)",
+  "via": "snes_ghoulpatrol",
+  "year": 1994
+ },
+ "ghouls": {
+  "title": "Ghouls'n Ghosts (World)",
+  "via": "ghouls",
+  "year": 1988
+ },
+ "gigawing": {
+  "title": "Giga Wing (USA 990222)",
+  "via": "gigawing",
+  "year": 1999
+ },
+ "gnbarich": {
+  "title": "Gunbarich",
+  "via": "gnbarich",
+  "year": 2001
+ },
+ "goalx3": {
+  "title": "Goal! Goal! Goal!",
+  "via": "goalx3",
+  "year": 1995
+ },
+ "goldnaxe": {
+  "title": "Golden Axe (set 6, US) (8751 317-123A)",
+  "via": "goldnaxe",
+  "year": 1989
+ },
+ "gooniesiitheunes": {
+  "candidates": 2,
+  "title": "Goonies II, The (USA)",
+  "via": "nes_gooniesiithe",
+  "year": 1987
+ },
+ "gowcaizr": {
+  "title": "Voltage Fighter - Gowcaizer / Choujin Gakuen Gowcaizer",
+  "via": "gowcaizr",
+  "year": 1995
+ },
+ "gpilots": {
+  "title": "Ghost Pilots (NGM-020 ~ NGH-020)",
+  "via": "gpilots",
+  "year": 1991
+ },
+ "gradius": {
+  "title": "Gradius (Japan, ROM version)",
+  "via": "gradius",
+  "year": 1985
+ },
+ "gradius2": {
+  "title": "Gradius II: GOFER no Yabou (Japan, new)",
+  "via": "gradius2",
+  "year": 1988
+ },
+ "gradius3": {
+  "title": "Gradius III (World, version R)",
+  "via": "gradius3",
+  "year": 1989
+ },
+ "gradius3sfc": {
+  "candidates": 2,
+  "title": "Gradius III (Japan)",
+  "via": "snes_gradius3j",
+  "year": 1990
+ },
+ "gradiusunes": {
+  "candidates": 2,
+  "title": "Gradius (Japan)",
+  "via": "nes_gradiusj",
+  "year": 1986
+ },
+ "grindstm": {
+  "title": "Grind Stormer",
+  "via": "grindstm",
+  "year": 1992
+ },
+ "growl": {
+  "title": "Growl (World, Rev 1)",
+  "via": "growl",
+  "year": 1990
+ },
+ "gseeker": {
+  "title": "Grid Seeker: Project Storm Hammer (Ver 1.3O)",
+  "via": "gseeker",
+  "year": 1992
+ },
+ "guardianlegendtheunes": {
+  "candidates": 1,
+  "title": "Guardian Legend, The (USA)",
+  "via": "nes_guardleg",
+  "year": 1989
+ },
+ "guerrillawarunes": {
+  "candidates": 1,
+  "title": "Guerrilla War (USA)",
+  "via": "nes_guerrillawar",
+  "year": 1989
+ },
+ "gunbird": {
+  "title": "Gunbird (World)",
+  "via": "gunbird",
+  "year": 1994
+ },
+ "gunbird2": {
+  "title": "Gunbird 2 (set 1)",
+  "via": "gunbird2",
+  "year": 1998
+ },
+ "gundhara": {
+  "title": "Gundhara",
+  "via": "gundhara",
+  "year": 1995
+ },
+ "gunforc2": {
+  "title": "Gun Force II (US)",
+  "via": "gunforc2",
+  "year": 1994
+ },
+ "gunforce": {
+  "title": "Gunforce - Battle Fire Engulfed Terror Island (World)",
+  "via": "gunforce",
+  "year": 1991
+ },
+ "gunforcsfc": {
+  "candidates": 1,
+  "title": "GunForce: Battle Fire Engulfed Terror Island (USA)",
+  "via": "snes_gunforce",
+  "year": 1992
+ },
+ "gunlock": {
+  "title": "Gunlock (Ver 2.3O 1994/01/20)",
+  "via": "gunlock",
+  "year": 1993
+ },
+ "gunnacunes": {
+  "candidates": 2,
+  "title": "Gun Nac (Japan)",
+  "via": "nes_gunnacj",
+  "year": 1990
+ },
+ "gunnail": {
+  "title": "GunNail (28th May. 1992)",
+  "via": "gunnail",
+  "year": 1993
+ },
+ "gunsmokeunes": {
+  "candidates": 1,
+  "title": "Gun.Smoke (USA)",
+  "via": "nes_gunsmoke",
+  "year": 1988
+ },
+ "gururin": {
+  "title": "Gururin",
+  "via": "gururin",
+  "year": 1994
+ },
+ "guwange": {
+  "title": "Guwange (Japan, 1999 6/24 Master Ver 16:55)",
+  "via": "guwange",
+  "year": 1999
+ },
+ "gwar": {
+  "title": "Guerrilla War (US)",
+  "via": "gwar",
+  "year": 1987
+ },
+ "gyrussunes": {
+  "candidates": 1,
+  "title": "Gyruss (USA)",
+  "via": "nes_gyruss",
+  "year": 1989
+ },
+ "haganesfc": {
+  "candidates": 2,
+  "title": "Hagane: The Final Conflict (USA)",
+  "via": "snes_hagane",
+  "year": 1994
+ },
+ "harvestmoonsfc": {
+  "candidates": 2,
+  "title": "Harvest Moon (Euro)",
+  "via": "snes_harvmoone",
+  "year": 1996
+ },
+ "heavybarrelunes": {
+  "candidates": 1,
+  "title": "Heavy Barrel (USA)",
+  "via": "nes_heavybarrel",
+  "year": 1990
+ },
+ "hellfire": {
+  "title": "Hellfire (2P set)",
+  "via": "hellfire",
+  "year": 1989
+ },
+ "hook": {
+  "title": "Hook (World)",
+  "via": "hook",
+  "year": 1992
+ },
+ "hooksfc": {
+  "candidates": 3,
+  "title": "Hook (USA)",
+  "via": "snes_hook",
+  "year": 1992
+ },
+ "hotdogst": {
+  "title": "Hotdog Storm - The First Supersonics (Korea)",
+  "via": "hotdogst",
+  "year": 1996
+ },
+ "hsf2": {
+  "title": "Hyper Street Fighter II: The Anniversary Edition (USA 040202)",
+  "via": "hsf2",
+  "year": 2004
+ },
+ "hudsonsadventureisnes": {
+  "candidates": 1,
+  "title": "Adventure Island (USA)",
+  "via": "nes_adventureisland",
+  "year": 1988
+ },
+ "hudsonsadventureisnes2": {
+  "candidates": 1,
+  "title": "Adventure Island II (USA)",
+  "via": "nes_advenislii",
+  "year": 1991
+ },
+ "hudsonsadventureisnes3": {
+  "candidates": 1,
+  "title": "Adventure Island 3 (USA)",
+  "via": "nes_advenisl3",
+  "year": 1992
+ },
+ "hyperzonesfc": {
+  "candidates": 3,
+  "title": "HyperZone (USA)",
+  "via": "snes_hyperzone",
+  "year": 1991
+ },
+ "iceclimberunes": {
+  "candidates": 2,
+  "title": "Ice Climber (USA, Euro)",
+  "via": "nes_iceclimber",
+  "year": 1985
+ },
+ "ikari": {
+  "title": "Ikari Warriors (US JAMMA)",
+  "via": "ikari",
+  "year": 1986
+ },
+ "ikariiiitherescueunes": {
+  "candidates": 1,
+  "title": "Ikari III (Japan)",
+  "via": "nes_ikariiii",
+  "year": 1990
+ },
+ "illusionofgaiasfc": {
+  "candidates": 1,
+  "title": "Illusion of Gaia (USA)",
+  "via": "snes_illusionofgaia",
+  "year": 1994
+ },
+ "imagefightunes": {
+  "candidates": 2,
+  "title": "Image Fight (Japan)",
+  "via": "nes_imagefightj",
+  "year": 1989
+ },
+ "indianajonesgreatesfc": {
+  "candidates": 3,
+  "title": "Indiana Jones' Greatest Adventures (USA)",
+  "via": "snes_indianajones",
+  "year": 1994
+ },
+ "invaders": {
+  "title": "Space Invaders / Space Invaders M",
+  "via": "invaders",
+  "year": 1978
+ },
+ "ironclad": {
+  "title": "Choutetsu Brikin'ger / Iron Clad (prototype)",
+  "via": "ironclad",
+  "year": 1996
+ },
+ "ironswordwizardswanes": {
+  "candidates": 1,
+  "title": "Ironsword: Wizards & Warriors II (USA)",
+  "via": "nes_irons",
+  "year": 1989
+ },
+ "irrmaze": {
+  "title": "The Irritating Maze / Ultra Denryu Iraira Bou",
+  "via": "irrmaze",
+  "year": 1997
+ },
+ "isolatedwarriorunes": {
+  "candidates": 1,
+  "title": "Isolated Warrior (USA)",
+  "via": "nes_isolatedwarrior",
+  "year": 1991
+ },
+ "ivanironmanstewartnes": {
+  "candidates": 1,
+  "title": "Ivan 'Ironman' Stewart's Super Off Road (USA)",
+  "via": "nes_ivanirostessuoffro",
+  "year": 1990
+ },
+ "jackalunes": {
+  "candidates": 1,
+  "title": "Jackal (USA)",
+  "via": "nes_jackal",
+  "year": 1988
+ },
+ "jackiechansactionknes": {
+  "candidates": 1,
+  "title": "Jackie Chan's Action Kung Fu (USA)",
+  "via": "nes_jackiechan",
+  "year": 1990
+ },
+ "jockeygp": {
+  "title": "Jockey Grand Prix (set 1)",
+  "via": "jockeygp",
+  "year": 2001
+ },
+ "jockeysnd": {
+  "title": "Jockey Grand Prix (set 1)",
+  "via": "jockeygp",
+  "year": 2001
+ },
+ "joenmacsfc": {
+  "title": "Joe & Mac (USA)",
+  "via": "snes_joemac",
+  "year": 1991
+ },
+ "jojo": {
+  "title": "JoJo's Venture (Europe 990128)",
+  "via": "jojo",
+  "year": 1998
+ },
+ "jojoba": {
+  "title": "JoJo's Bizarre Adventure (Europe 991015, NO CD)",
+  "via": "jojoba",
+  "year": 1999
+ },
+ "journeytosiliusunes": {
+  "candidates": 1,
+  "title": "Journey to Silius (USA)",
+  "via": "nes_journsil",
+  "year": 1990
+ },
+ "joyjoy": {
+  "title": "Puzzled / Joy Joy Kid (NGM-021 ~ NGH-021)",
+  "via": "joyjoy",
+  "year": 1990
+ },
+ "junglebookthesfc": {
+  "candidates": 3,
+  "title": "Disney's The Jungle Book (USA)",
+  "via": "snes_junglebook",
+  "year": 1994
+ },
+ "junglestrikesfc": {
+  "candidates": 3,
+  "title": "Jungle Strike (USA)",
+  "via": "snes_junglestrike",
+  "year": 1995
+ },
+ "jurassicparksfc": {
+  "candidates": 7,
+  "title": "Jurassic Park (USA, Rev. 1)",
+  "via": "snes_jpark",
+  "year": 1993
+ },
+ "kabukikl": {
+  "title": "Far East of Eden - Kabuki Klash / Tengai Makyou - Shin Den",
+  "via": "kabukikl",
+  "year": 1995
+ },
+ "kabukiquantumfightnes": {
+  "candidates": 1,
+  "title": "Kabuki - Quantum Fighter (USA)",
+  "via": "nes_kabuki",
+  "year": 1991
+ },
+ "karnovr": {
+  "title": "Karnov's Revenge / Fighter's History Dynamite",
+  "via": "karnovr",
+  "year": 1994
+ },
+ "karnovunes": {
+  "candidates": 2,
+  "title": "Karnov (Japan)",
+  "via": "nes_karnovj",
+  "year": 1987
+ },
+ "kbash": {
+  "title": "Knuckle Bash",
+  "via": "kbash",
+  "year": 1993
+ },
+ "kicklecubicleunes": {
+  "candidates": 1,
+  "title": "Kickle Cubicle (USA)",
+  "via": "nes_kicklecubicle",
+  "year": 1990
+ },
+ "kickmasterunes": {
+  "candidates": 1,
+  "title": "Kick Master (USA)",
+  "via": "nes_kickmaster",
+  "year": 1992
+ },
+ "kidicarusnes": {
+  "candidates": 1,
+  "title": "Kid Icarus (USA, Euro)",
+  "via": "nes_kidicarus",
+  "year": 1987
+ },
+ "killbld": {
+  "title": "The Killing Blade / Ao Jian Kuang Dao (ver. 109, Chinese Board)",
+  "via": "killbld",
+  "year": 1998
+ },
+ "kingdmgp": {
+  "title": "Kingdom Grandprix",
+  "via": "kingdmgp",
+  "year": 1994
+ },
+ "kingofdragonsthesfc": {
+  "candidates": 2,
+  "title": "King of Dragons, The (USA)",
+  "via": "snes_kingdragons",
+  "year": 1994
+ },
+ "kingofthemonsters2sfc": {
+  "candidates": 1,
+  "title": "King of the Monsters 2 (USA)",
+  "via": "snes_kotm2",
+  "year": 1994
+ },
+ "kingofthemonsterssfc": {
+  "candidates": 2,
+  "title": "King of the Monsters (USA)",
+  "via": "snes_kotm",
+  "year": 1992
+ },
+ "kirbysavalanchesfc": {
+  "candidates": 1,
+  "title": "Kirby's Avalanche (USA)",
+  "via": "snes_kirbyav",
+  "year": 1995
+ },
+ "kirbysdreamcoursesfc": {
+  "candidates": 1,
+  "title": "Kirby's Dream Course (USA)",
+  "via": "snes_kirbydcourse",
+  "year": 1995
+ },
+ "kisfc": {
+  "candidates": 2,
+  "title": "Killer Instinct (USA, Rev. 1)",
+  "via": "snes_killinst",
+  "year": 1995
+ },
+ "kizuna": {
+  "title": "Kizuna Encounter - Super Tag Battle / Fu'un Super Tag Battle",
+  "via": "kizuna",
+  "year": 1996
+ },
+ "knights": {
+  "title": "Knights of the Round (World 911127)",
+  "via": "knights",
+  "year": 1991
+ },
+ "knightsoftheroundsfc": {
+  "candidates": 2,
+  "title": "Knights of the Round (USA)",
+  "via": "snes_knightsround",
+  "year": 1994
+ },
+ "kod": {
+  "title": "The King of Dragons (World 910805)",
+  "via": "kod",
+  "year": 1991
+ },
+ "kof00snd": {
+  "title": "The King of Fighters 2000 (NGM-2570 ~ NGH-2570)",
+  "via": "kof2000",
+  "year": 2000
+ },
+ "kof01snd": {
+  "title": "The King of Fighters 2001 (NGM-262?)",
+  "via": "kof2001",
+  "year": 2001
+ },
+ "kof02snd": {
+  "title": "The King of Fighters 2002 (NGM-2650 ~ NGH-2650)",
+  "via": "kof2002",
+  "year": 2002
+ },
+ "kof03snd": {
+  "title": "The King of Fighters 2003 (NGM-2710, Export)",
+  "via": "kof2003",
+  "year": 2003
+ },
+ "kof2000": {
+  "title": "The King of Fighters 2000 (NGM-2570 ~ NGH-2570)",
+  "via": "kof2000",
+  "year": 2000
+ },
+ "kof2001": {
+  "title": "The King of Fighters 2001 (NGM-262?)",
+  "via": "kof2001",
+  "year": 2001
+ },
+ "kof2002": {
+  "title": "The King of Fighters 2002 (NGM-2650 ~ NGH-2650)",
+  "via": "kof2002",
+  "year": 2002
+ },
+ "kof2003": {
+  "title": "The King of Fighters 2003 (NGM-2710, Export)",
+  "via": "kof2003",
+  "year": 2003
+ },
+ "kof94": {
+  "title": "The King of Fighters '94 (NGM-055 ~ NGH-055)",
+  "via": "kof94",
+  "year": 1994
+ },
+ "kof95": {
+  "title": "The King of Fighters '95 (NGM-084)",
+  "via": "kof95",
+  "year": 1995
+ },
+ "kof96": {
+  "title": "The King of Fighters '96 (NGM-214)",
+  "via": "kof96",
+  "year": 1996
+ },
+ "kof97": {
+  "title": "The King of Fighters '97 (NGM-2320)",
+  "via": "kof97",
+  "year": 1997
+ },
+ "kof98": {
+  "title": "The King of Fighters '98 - The Slugfest / King of Fighters '98 - Dream Match Never Ends (NGM-2420)",
+  "via": "kof98",
+  "year": 1998
+ },
+ "kof99": {
+  "title": "The King of Fighters '99 - Millennium Battle (NGM-2510)",
+  "via": "kof99",
+  "year": 1999
+ },
+ "kof99snd": {
+  "title": "The King of Fighters '99 - Millennium Battle (NGM-2510)",
+  "via": "kof99",
+  "year": 1999
+ },
+ "kotm": {
+  "title": "King of the Monsters (set 1)",
+  "via": "kotm",
+  "year": 1991
+ },
+ "kotm2": {
+  "title": "King of the Monsters 2 - The Next Thing (NGM-039 ~ NGH-039)",
+  "via": "kotm2",
+  "year": 1992
+ },
+ "kov": {
+  "title": "Knights of Valour / San Guo Zhan Ji / Sangoku Senki (ver. 117, Hong Kong)",
+  "via": "kov",
+  "year": 1999
+ },
+ "kov2": {
+  "title": "Knights of Valour 2 / Sanguo Zhan Ji 2 / Sangoku Senki 2 (ver. 107, 102, 100HK)",
+  "via": "kov2",
+  "year": 2000
+ },
+ "kungfuheroesunes": {
+  "candidates": 1,
+  "title": "Kung-Fu Heroes (USA)",
+  "via": "nes_kungfuheroes",
+  "year": 1989
+ },
+ "kungfum": {
+  "title": "Kung-Fu Master (World)",
+  "via": "kungfum",
+  "year": 1984
+ },
+ "kungfuunes": {
+  "candidates": 1,
+  "title": "Kung Fu (Japan, USA)",
+  "via": "nes_kungfu",
+  "year": 1985
+ },
+ "lastblad": {
+  "title": "The Last Blade / Bakumatsu Roman - Gekka no Kenshi (NGM-2340)",
+  "via": "lastblad",
+  "year": 1997
+ },
+ "lastbld2": {
+  "title": "The Last Blade 2 / Bakumatsu Roman - Dai Ni Maku Gekka no Kenshi (NGM-2430 ~ NGH-2430)",
+  "via": "lastbld2",
+  "year": 1998
+ },
+ "lasthope": {
+  "title": "Last Hope (bootleg AES to MVS conversion, no coin support)",
+  "via": "lasthope",
+  "year": 2005
+ },
+ "lbowling": {
+  "title": "League Bowling (NGM-019 ~ NGH-019)",
+  "via": "lbowling",
+  "year": 1990
+ },
+ "legacyofthewizardunes": {
+  "candidates": 1,
+  "title": "Legacy of the Wizard (USA)",
+  "via": "nes_legacwiz",
+  "year": 1989
+ },
+ "legendarywingsunes": {
+  "candidates": 1,
+  "title": "Legendary Wings (USA)",
+  "via": "nes_legendarywings",
+  "year": 1988
+ },
+ "legendofthemysticasfc": {
+  "candidates": 3,
+  "title": "Legend of the Mystical Ninja, The (USA)",
+  "via": "snes_legendmninja",
+  "year": 1992
+ },
+ "legendofzeldaalinksfc": {
+  "candidates": 3,
+  "title": "Legend of Zelda, The: A Link to the Past (USA)",
+  "via": "snes_legendofzelda",
+  "year": 1991
+ },
+ "legendofzeldathegcnes": {
+  "candidates": 1,
+  "title": "Legend of Zelda, The (USA, Rev. A)",
+  "via": "nes_legenzel",
+  "year": 1987
+ },
+ "lemmings2thetribessfc": {
+  "candidates": 1,
+  "title": "Lemmings 2 - The Tribes (USA)",
+  "via": "snes_lemmings2",
+  "year": 1994
+ },
+ "lemmingssfc": {
+  "candidates": 3,
+  "title": "Lemmings (Japan)",
+  "via": "snes_lemmingsj",
+  "year": 1991
+ },
+ "lgtnfght": {
+  "title": "Lightning Fighters (World)",
+  "via": "lgtnfght",
+  "year": 1990
+ },
+ "lhcdb": {
+  "title": "Last Hope CD Beta (Neo CD conversion)",
+  "via": "lhcdb",
+  "year": 2007
+ },
+ "lifeforceunes": {
+  "candidates": 1,
+  "title": "Life Force (USA)",
+  "via": "nes_lifeforce",
+  "year": 1988
+ },
+ "littlenemothedreamnes": {
+  "candidates": 1,
+  "title": "Little Nemo: The Dream Master (USA)",
+  "via": "nes_littlnem",
+  "year": 1990
+ },
+ "littleninjabrothernes": {
+  "candidates": 1,
+  "title": "Little Ninja Brothers (USA)",
+  "via": "nes_littlninbro",
+  "year": 1990
+ },
+ "littlesamsonunes": {
+  "candidates": 1,
+  "title": "Little Samson (USA)",
+  "via": "nes_littlesamson",
+  "year": 1992
+ },
+ "loderunnerunes": {
+  "candidates": 1,
+  "title": "Lode Runner (USA)",
+  "via": "nes_loderunner",
+  "year": 1987
+ },
+ "lostvikingsiithesfc": {
+  "candidates": 2,
+  "title": "Lost Vikings II, The (USA)",
+  "via": "snes_lostviking2",
+  "year": 1997
+ },
+ "lostvikingsthesfc": {
+  "candidates": 3,
+  "title": "Lost Vikings, The (USA)",
+  "via": "snes_lostviking",
+  "year": 1992
+ },
+ "lowgmanthelowgravines": {
+  "candidates": 1,
+  "title": "Low G Man - The Low Gravity Man (USA)",
+  "via": "nes_lowgman",
+  "year": 1990
+ },
+ "lresort": {
+  "title": "Last Resort",
+  "via": "lresort",
+  "year": 1992
+ },
+ "lufiaiiriseofthesisfc": {
+  "candidates": 1,
+  "title": "Lufia II: Rise of the Sinistrals (USA)",
+  "via": "snes_lufia2",
+  "year": 1996
+ },
+ "lufiathefortressofsfc": {
+  "candidates": 1,
+  "title": "Lufia & The Fortress of Doom (USA)",
+  "via": "snes_lufia",
+  "year": 1993
+ },
+ "macross": {
+  "title": "Super Spacefortress Macross / Chou-Jikuu Yousai Macross",
+  "via": "macross",
+  "year": 1992
+ },
+ "macross2": {
+  "title": "Super Spacefortress Macross II / Chou-Jikuu Yousai Macross II",
+  "via": "macross2",
+  "year": 1993
+ },
+ "macrossp": {
+  "title": "Macross Plus",
+  "via": "macrossp",
+  "year": 1996
+ },
+ "magdrop2": {
+  "title": "Magical Drop II",
+  "via": "magdrop2",
+  "year": 1996
+ },
+ "magdrop3": {
+  "title": "Magical Drop III",
+  "via": "magdrop3",
+  "year": 1997
+ },
+ "magicofscheherazadnes": {
+  "candidates": 1,
+  "title": "Magic of Scheherazade, The (USA)",
+  "via": "nes_magicsch",
+  "year": 1989
+ },
+ "magicquestsfc": {
+  "candidates": 2,
+  "title": "Magical Quest Starring Mickey Mouse, The (USA)",
+  "via": "snes_magicalquest",
+  "year": 1992
+ },
+ "maglord": {
+  "title": "Magician Lord (NGM-005)",
+  "via": "maglord",
+  "year": 1990
+ },
+ "maniacmansionunes": {
+  "candidates": 1,
+  "title": "Maniac Mansion (USA)",
+  "via": "nes_maniacmansion",
+  "year": 1990
+ },
+ "marblemadnessunes": {
+  "candidates": 1,
+  "title": "Marble Madness (USA)",
+  "via": "nes_marblemadness",
+  "year": 1989
+ },
+ "mariobrosclassicenes": {
+  "title": "Mario Bros. (World)",
+  "via": "nes_mariobros",
+  "year": 1983
+ },
+ "martmast": {
+  "title": "Martial Masters / Xing Yi Quan (ver. 104, 102, 102US)",
+  "via": "martmast",
+  "year": 2001
+ },
+ "marvelsuperheroeswsfc": {
+  "candidates": 3,
+  "title": "Marvel Super Heroes: War of the Gems (USA)",
+  "via": "snes_mshwargems",
+  "year": 1996
+ },
+ "matrim": {
+  "title": "Matrimelee / Shin Gouketsuji Ichizoku Toukon (NGM-2660 ~ NGH-2660)",
+  "via": "matrim",
+  "year": 2003
+ },
+ "matrimsnd": {
+  "title": "Matrimelee / Shin Gouketsuji Ichizoku Toukon (NGM-2660 ~ NGH-2660)",
+  "via": "matrim",
+  "year": 2003
+ },
+ "mauimallardincoldssfc": {
+  "candidates": 1,
+  "title": "Maui Mallard in Cold Shadow (USA)",
+  "via": "snes_mauimallard",
+  "year": 1996
+ },
+ "mazinger": {
+  "title": "Mazinger Z (World)",
+  "via": "mazinger",
+  "year": 1994
+ },
+ "md_ablasters": {
+  "title": "Aero Blasters: Trouble Specialty Raid Unit (Japan)",
+  "via": "md_aeroblst",
+  "year": 1991
+ },
+ "md_aburner2": {
+  "title": "After Burner II (Euro, USA)",
+  "via": "md_aburner2",
+  "year": 1990
+ },
+ "md_adventuresofbatmanan": {
+  "candidates": 2,
+  "title": "Adventures of Batman & Robin, The (Euro)",
+  "via": "md_advbatr",
+  "year": 1995
+ },
+ "md_aladdin": {
+  "title": "Disney's Aladdin (Euro)",
+  "via": "md_aladdin",
+  "year": 1993
+ },
+ "md_alexkiddintheenchant": {
+  "candidates": 3,
+  "title": "Alex Kidd in the Enchanted Castle (USA)",
+  "via": "md_alexkiddu",
+  "year": 1989
+ },
+ "md_aliensoldier": {
+  "candidates": 2,
+  "title": "Alien Soldier (Euro)",
+  "via": "md_aliensol",
+  "year": 1995
+ },
+ "md_alienstorm": {
+  "candidates": 1,
+  "title": "Alien Storm (World)",
+  "via": "md_astorm",
+  "year": 1991
+ },
+ "md_alisiadragoon": {
+  "candidates": 3,
+  "title": "Alisia Dragoon (Euro)",
+  "via": "md_alisiad",
+  "year": 1992
+ },
+ "md_altered": {
+  "candidates": 1,
+  "title": "Altered Beast (Euro, USA)",
+  "via": "md_altbeast",
+  "year": 1989
+ },
+ "md_arcade": {
+  "candidates": 2,
+  "title": "Arcade Classics (Euro, USA)",
+  "via": "md_arcadecl",
+  "year": 1996
+ },
+ "md_artoffighting": {
+  "candidates": 2,
+  "title": "Art of Fighting (Euro)",
+  "via": "md_aof",
+  "year": 1994
+ },
+ "md_atomicrk": {
+  "candidates": 2,
+  "title": "Atomic Robo-Kid (USA)",
+  "via": "md_atomrobo",
+  "year": 1990
+ },
+ "md_atrunner": {
+  "candidates": 2,
+  "title": "Atomic Runner (Euro)",
+  "via": "md_atomrun",
+  "year": 1992
+ },
+ "md_ayrtonsennassupermon": {
+  "candidates": 2,
+  "title": "Ayrton Senna's Super Monaco GP II (Euro, Japan)",
+  "via": "md_smgp2",
+  "year": 1992
+ },
+ "md_beyondoasis": {
+  "candidates": 1,
+  "title": "Beyond Oasis (USA)",
+  "via": "md_beyoasis",
+  "year": 1995
+ },
+ "md_bforce": {
+  "candidates": 3,
+  "title": "Burning Force (Japan)",
+  "via": "md_burnforcj",
+  "year": 1990
+ },
+ "md_biohazardbattle": {
+  "candidates": 1,
+  "title": "Bio Hazard Battle (Euro, USA)",
+  "via": "md_biohazrb",
+  "year": 1992
+ },
+ "md_bladesofvengeance": {
+  "candidates": 1,
+  "title": "Blades of Vengeance (Euro, USA)",
+  "via": "md_bladeven",
+  "year": 1993
+ },
+ "md_bonanza": {
+  "candidates": 3,
+  "title": "Bonanza Bros. (Euro, Japan, Rev. A)",
+  "via": "md_bnzabros",
+  "year": 1991
+ },
+ "md_boogermanapickandfli": {
+  "candidates": 2,
+  "title": "Boogerman: A Pick and Flick Adventure (Euro)",
+  "via": "md_booger",
+  "year": 1994
+ },
+ "md_cadash": {
+  "title": "Cadash (USA, Asia, Korea)",
+  "via": "md_cadash",
+  "year": 1992
+ },
+ "md_cannonfodder": {
+  "candidates": 1,
+  "title": "Cannon Fodder (Euro)",
+  "via": "md_cfodder",
+  "year": 1994
+ },
+ "md_castleofillusionstar": {
+  "candidates": 1,
+  "title": "Castle of Illusion Starring Mickey Mouse (Euro, USA)",
+  "via": "md_castlill",
+  "year": 1990
+ },
+ "md_castlevaniabloodline": {
+  "candidates": 1,
+  "title": "Castlevania - Bloodlines (USA)",
+  "via": "md_cvaniau",
+  "year": 1994
+ },
+ "md_chakantheforeverman": {
+  "title": "Chakan (Euro, USA)",
+  "via": "md_chakan",
+  "year": 1992
+ },
+ "md_chuckrock": {
+  "candidates": 2,
+  "title": "Chuck Rock (Euro)",
+  "via": "md_chuckrck",
+  "year": 1992
+ },
+ "md_columns": {
+  "title": "Columns (World, v1.1)",
+  "via": "md_columns",
+  "year": 1990
+ },
+ "md_comixzone": {
+  "candidates": 3,
+  "title": "Comix Zone (Euro)",
+  "via": "md_comix",
+  "year": 1995
+ },
+ "md_contrahardcorps": {
+  "candidates": 2,
+  "title": "Contra: Hard Corps (USA, Korea)",
+  "via": "md_contra",
+  "year": 1994
+ },
+ "md_coolspot": {
+  "title": "Cool Spot (Euro)",
+  "via": "md_coolspot",
+  "year": 1994
+ },
+ "md_crackdown": {
+  "candidates": 3,
+  "title": "Crack Down (Euro, Japan, Rev. A)",
+  "via": "md_crkdown",
+  "year": 1990
+ },
+ "md_crusaderofcenty": {
+  "candidates": 1,
+  "title": "Crusader of Centy (USA)",
+  "via": "md_crusader",
+  "year": 1994
+ },
+ "md_darius2": {
+  "title": "Darius II (Japan)",
+  "via": "md_darius2",
+  "year": 1990
+ },
+ "md_darwin4081": {
+  "candidates": 1,
+  "title": "Darwin 4081 (Japan, Korea)",
+  "via": "md_darwin",
+  "year": 1990
+ },
+ "md_ddragon": {
+  "title": "Double Dragon (Euro, USA)",
+  "via": "md_ddragon",
+  "year": 1992
+ },
+ "md_ddragon3": {
+  "title": "Double Dragon 3: The Arcade Game (Euro, USA)",
+  "via": "md_ddragon3",
+  "year": 1992
+ },
+ "md_decapattack": {
+  "candidates": 1,
+  "title": "DecapAttack (Euro, USA, Korea)",
+  "via": "md_decapatt",
+  "year": 1991
+ },
+ "md_desertstrikereturnto": {
+  "title": "Desert Strike (Euro, USA)",
+  "via": "md_dstrike",
+  "year": 1992
+ },
+ "md_devilishthenextposse": {
+  "candidates": 1,
+  "title": "Devilish: The Next Possession (USA)",
+  "via": "md_devilish",
+  "year": 1992
+ },
+ "md_dragonsfury": {
+  "candidates": 1,
+  "title": "Dragon's Fury (Euro, USA)",
+  "via": "md_dfury",
+  "year": 1992
+ },
+ "md_dunethebattleforarra": {
+  "candidates": 1,
+  "title": "Dune: The Battle for Arrakis (USA)",
+  "via": "md_duneu",
+  "year": 1993
+ },
+ "md_dynamited": {
+  "candidates": 2,
+  "title": "Dynamite Duke (World, Rev. A)",
+  "via": "md_dynduke",
+  "year": 1990
+ },
+ "md_dynamiteheaddy": {
+  "candidates": 2,
+  "title": "Dynamite Headdy (Euro, USA)",
+  "via": "md_dhead",
+  "year": 1994
+ },
+ "md_earthwormjim": {
+  "candidates": 2,
+  "title": "Earthworm Jim (Euro)",
+  "via": "md_ejim",
+  "year": 1994
+ },
+ "md_earthwormjim2": {
+  "candidates": 3,
+  "title": "Earthworm Jim 2 (Euro)",
+  "via": "md_ejim2",
+  "year": 1995
+ },
+ "md_eccothedolphin": {
+  "candidates": 2,
+  "title": "Ecco the Dolphin (Euro, USA, Korea)",
+  "via": "md_ecco",
+  "year": 1993
+ },
+ "md_eccothetidesoftime": {
+  "candidates": 2,
+  "title": "Ecco: The Tides of Time (Euro)",
+  "via": "md_ecco2",
+  "year": 1994
+ },
+ "md_elementalmaster": {
+  "candidates": 2,
+  "title": "Elemental Master (Japan)",
+  "via": "md_elemastj",
+  "year": 1990
+ },
+ "md_elviento": {
+  "title": "El Viento (USA)",
+  "via": "md_elviento",
+  "year": 1991
+ },
+ "md_eswat": {
+  "title": "ESWAT: City Under Siege (Euro, USA, Rev. A)",
+  "via": "md_eswat",
+  "year": 1990
+ },
+ "md_eternalchampions": {
+  "candidates": 2,
+  "title": "Eternal Champions (Euro)",
+  "via": "md_eternalc",
+  "year": 1994
+ },
+ "md_exile": {
+  "title": "Exile (USA)",
+  "via": "md_exile",
+  "year": 1991
+ },
+ "md_fatalfury2": {
+  "candidates": 1,
+  "title": "Fatal Fury 2 (USA, Korea)",
+  "via": "md_fatfury2",
+  "year": 1994
+ },
+ "md_flashbackthequestfor": {
+  "candidates": 2,
+  "title": "Flashback: The Quest for Identity (USA)",
+  "via": "md_flashbu",
+  "year": 1993
+ },
+ "md_flicky": {
+  "title": "Flicky (Euro, USA)",
+  "via": "md_flicky",
+  "year": 1991
+ },
+ "md_flink": {
+  "title": "Misadventures of Flink, The (Euro)",
+  "via": "md_flink",
+  "year": 1994
+ },
+ "md_forgottenworlds": {
+  "candidates": 2,
+  "title": "Forgotten Worlds (World, Rev. 1)",
+  "via": "md_forgottn",
+  "year": 1989
+ },
+ "md_frogger": {
+  "title": "Frogger (USA)",
+  "via": "md_frogger",
+  "year": 1998
+ },
+ "md_fshark": {
+  "candidates": 3,
+  "title": "Fire Shark (USA)",
+  "via": "md_fireshrku",
+  "year": 1990
+ },
+ "md_gaiares": {
+  "title": "Gaiares (Japan, USA)",
+  "via": "md_gaiares",
+  "year": 1990
+ },
+ "md_gaingrnd": {
+  "candidates": 1,
+  "title": "Gain Ground (World)",
+  "via": "md_gground",
+  "year": 1991
+ },
+ "md_gargoyles": {
+  "title": "Gargoyles (Hack, Spanish v2.0)",
+  "via": "md_gargoyles",
+  "year": 2022
+ },
+ "md_gauntlet": {
+  "candidates": 1,
+  "title": "Gauntlet (Japan)",
+  "via": "md_gauntlt4j",
+  "year": 1993
+ },
+ "md_gauntletiv": {
+  "candidates": 2,
+  "title": "Gauntlet IV (Euro, USA, 199309)",
+  "via": "md_gauntlt4",
+  "year": 1993
+ },
+ "md_generalchaos": {
+  "candidates": 1,
+  "title": "General Chaos (Euro, USA)",
+  "via": "md_genchaos",
+  "year": 1994
+ },
+ "md_ghoulsnghosts": {
+  "candidates": 2,
+  "title": "Ghouls'n Ghosts (Euro, USA, Rev. 2)",
+  "via": "md_ghouls",
+  "year": 1989
+ },
+ "md_gldaxe": {
+  "candidates": 2,
+  "title": "Golden Axe (World, v1.1)",
+  "via": "md_goldnaxe",
+  "year": 1989
+ },
+ "md_gods": {
+  "title": "Gods (Euro)",
+  "via": "md_gods",
+  "year": 1993
+ },
+ "md_goldenaxeii": {
+  "candidates": 1,
+  "title": "Golden Axe II (World)",
+  "via": "md_goldnax2",
+  "year": 1991
+ },
+ "md_granada": {
+  "title": "Granada (Japan, USA, Rev. 1)",
+  "via": "md_granada",
+  "year": 1990
+ },
+ "md_greatcircusmysteryst": {
+  "candidates": 1,
+  "title": "Great Circus Mystery Starring Mickey & Minnie, The (USA)",
+  "via": "md_mickeycm",
+  "year": 1994
+ },
+ "md_gstormer": {
+  "candidates": 1,
+  "title": "Grind Stormer (USA)",
+  "via": "md_grindst",
+  "year": 1994
+ },
+ "md_gunstarheroes": {
+  "candidates": 3,
+  "title": "Gunstar Heroes (Euro)",
+  "via": "md_gunstar",
+  "year": 1993
+ },
+ "md_hauntingstarringpolt": {
+  "candidates": 1,
+  "title": "Haunting Starring Polterguy (Euro, USA)",
+  "via": "md_haunting",
+  "year": 1993
+ },
+ "md_hellfire": {
+  "title": "Hellfire (Euro)",
+  "via": "md_hellfire",
+  "year": 1991
+ },
+ "md_herzogzwei": {
+  "candidates": 2,
+  "title": "Herzog Zwei (Euro, USA)",
+  "via": "md_herzog",
+  "year": 1989
+ },
+ "md_jamespondiicodenamer": {
+  "candidates": 2,
+  "title": "James Pond II: Codename RoboCod (Euro, USA)",
+  "via": "md_robocod",
+  "year": 1991
+ },
+ "md_joemac": {
+  "title": "Joe & Mac (USA)",
+  "via": "md_joemac",
+  "year": 1991
+ },
+ "md_junglebookthe": {
+  "candidates": 2,
+  "title": "Disney's The Jungle Book (Euro)",
+  "via": "md_jungle",
+  "year": 1994
+ },
+ "md_junglestriketheseque": {
+  "title": "Jungle Strike (Euro, USA)",
+  "via": "md_jstrike",
+  "year": 1993
+ },
+ "md_kidchameleon": {
+  "candidates": 1,
+  "title": "Kid Chameleon (Euro, Korea, USA)",
+  "via": "md_kidcham",
+  "year": 1992
+ },
+ "md_klax": {
+  "title": "Klax (Euro, USA)",
+  "via": "md_klax",
+  "year": 1990
+ },
+ "md_landstalkerthetreasu": {
+  "candidates": 2,
+  "title": "Landstalker: The Treasures of King Nole (USA)",
+  "via": "md_landstlku",
+  "year": 1992
+ },
+ "md_lemmings": {
+  "title": "Lemmings (Euro)",
+  "via": "md_lemmings",
+  "year": 1992
+ },
+ "md_lemmings2thetribes": {
+  "candidates": 2,
+  "title": "Lemmings 2: The Tribes (Euro)",
+  "via": "md_lemming2",
+  "year": 1994
+ },
+ "md_lethale": {
+  "candidates": 5,
+  "title": "Lethal Enforcers (Euro)",
+  "via": "md_lethalen",
+  "year": 1993
+ },
+ "md_lightcrusader": {
+  "candidates": 4,
+  "title": "Light Crusader (Euro)",
+  "via": "md_lightc",
+  "year": 1995
+ },
+ "md_lighteningforcequest": {
+  "candidates": 1,
+  "title": "Lightening Force: Quest for the Darkstar (USA)",
+  "via": "md_lightfor",
+  "year": 1992
+ },
+ "md_lionkingthe": {
+  "candidates": 1,
+  "title": "Lion King, The (World)",
+  "via": "md_lionking",
+  "year": 1994
+ },
+ "md_lostvikingsthe": {
+  "candidates": 2,
+  "title": "Lost Vikings, The (USA)",
+  "via": "md_lostviku",
+  "year": 1992
+ },
+ "md_lotusturbochallenge": {
+  "candidates": 1,
+  "title": "Lotus Turbo Challenge (Euro, USA)",
+  "via": "md_lotust",
+  "year": 1992
+ },
+ "md_marvel": {
+  "candidates": 2,
+  "title": "Marvel Land (Japan)",
+  "via": "md_marvlandj",
+  "year": 1991
+ },
+ "md_mazinsagamutantfight": {
+  "candidates": 1,
+  "title": "Mazin Saga: Mutant Fighter (USA)",
+  "via": "md_mazinsagu",
+  "year": 1993
+ },
+ "md_mcdonaldstreasurelan": {
+  "candidates": 3,
+  "title": "McDonald's Treasure Land Adventure (Euro)",
+  "via": "md_mcdonald",
+  "year": 1993
+ },
+ "md_megabomberman": {
+  "candidates": 2,
+  "title": "Mega Bomberman (Euro, Korea)",
+  "via": "md_megabomb",
+  "year": 1994
+ },
+ "md_megamanthewilywars": {
+  "candidates": 2,
+  "title": "Mega Man: The Wily Wars (USA)",
+  "via": "md_megaman",
+  "year": 1994
+ },
+ "md_megaswiv": {
+  "title": "Mega SWIV (Euro)",
+  "via": "md_megaswiv",
+  "year": 1994
+ },
+ "md_megaturrican": {
+  "candidates": 2,
+  "title": "Mega Turrican (Euro)",
+  "via": "md_megaturr",
+  "year": 1994
+ },
+ "md_mercs": {
+  "title": "Mercs (Euro, USA) ~ Senjou no Ookami II (Japan)",
+  "via": "md_mercs",
+  "year": 1991
+ },
+ "md_mickeymaniathetimele": {
+  "candidates": 3,
+  "title": "Mickey Mania: The Timeless Adventures of Mickey Mouse (Euro)",
+  "via": "md_mmania",
+  "year": 1994
+ },
+ "md_micromachines": {
+  "candidates": 6,
+  "title": "Micro Machines (Euro, USA)",
+  "via": "md_micromac",
+  "year": 1993
+ },
+ "md_micromachines2turbot": {
+  "candidates": 2,
+  "title": "Micro Machines 2: Turbo Tournament (Euro, J-Cart)",
+  "via": "md_micromc2",
+  "year": 1994
+ },
+ "md_midnightr": {
+  "candidates": 2,
+  "title": "Midnight Resistance (USA)",
+  "via": "md_midres",
+  "year": 1991
+ },
+ "md_mk": {
+  "title": "Mortal Kombat (World, Rev. 1)",
+  "via": "md_mk",
+  "year": 1993
+ },
+ "md_mk2": {
+  "title": "Mortal Kombat II (World)",
+  "via": "md_mk2",
+  "year": 1994
+ },
+ "md_mmadness": {
+  "candidates": 1,
+  "title": "Marble Madness (Euro, USA)",
+  "via": "md_marble",
+  "year": 1993
+ },
+ "md_monsterworldiv": {
+  "candidates": 1,
+  "title": "Monster World IV (Japan)",
+  "via": "md_mworld4",
+  "year": 1994
+ },
+ "md_mortalkombat3": {
+  "candidates": 2,
+  "title": "Mortal Kombat 3 (Euro)",
+  "via": "md_mk3",
+  "year": 1995
+ },
+ "md_mrnutz": {
+  "title": "Mr. Nutz (Euro)",
+  "via": "md_mrnutz",
+  "year": 1994
+ },
+ "md_mspacman": {
+  "title": "Ms. Pac-Man (Euro, USA)",
+  "via": "md_mspacman",
+  "year": 1991
+ },
+ "md_mushametallicunifram": {
+  "candidates": 1,
+  "title": "M.U.S.H.A. - Metallic Uniframe Super Hybrid Armor (USA)",
+  "via": "md_musha",
+  "year": 1990
+ },
+ "md_mutantleaguefootball": {
+  "candidates": 2,
+  "title": "Mutant League Football (Euro, USA)",
+  "via": "md_mlfootb",
+  "year": 1993
+ },
+ "md_mutantleaguehockey": {
+  "candidates": 1,
+  "title": "Mutant League Hockey (Euro, USA)",
+  "via": "md_mlhockey",
+  "year": 1994
+ },
+ "md_mweapon": {
+  "title": "Master of Weapon (Japan)",
+  "via": "md_mweapon",
+  "year": 1991
+ },
+ "md_nbahang": {
+  "title": "NBA Hang Time (Euro)",
+  "via": "md_nbahang",
+  "year": 1996
+ },
+ "md_nbajam": {
+  "title": "NBA Jam (Euro, USA, Rev 1)",
+  "via": "md_nbajam",
+  "year": 1993
+ },
+ "md_nbajamte": {
+  "title": "NBA Jam Tournament Edition (World)",
+  "via": "md_nbajamte",
+  "year": 1995
+ },
+ "md_offroad": {
+  "title": "Super Off Road (Euro, USA)",
+  "via": "md_superoff",
+  "year": 1994
+ },
+ "md_oozethe": {
+  "candidates": 2,
+  "title": "Ooze, The (Euro)",
+  "via": "md_ooze",
+  "year": 1995
+ },
+ "md_outofthisworld": {
+  "candidates": 1,
+  "title": "Out of This World (USA)",
+  "via": "md_ootw",
+  "year": 1993
+ },
+ "md_outrun": {
+  "title": "OutRun (Euro, USA)",
+  "via": "md_outrun",
+  "year": 1991
+ },
+ "md_outrunners": {
+  "candidates": 2,
+  "title": "OutRunners (USA)",
+  "via": "md_orunners",
+  "year": 1994
+ },
+ "md_pacman2thenewadventu": {
+  "candidates": 1,
+  "title": "Pac-Man 2: The New Adventures (USA)",
+  "via": "md_pacman2",
+  "year": 1994
+ },
+ "md_pacmania": {
+  "title": "Pac-Mania (Euro, USA)",
+  "via": "md_pacmania",
+  "year": 1991
+ },
+ "md_paperboy": {
+  "title": "Paperboy (Euro, USA)",
+  "via": "md_paperboy",
+  "year": 1991
+ },
+ "md_pengo": {
+  "candidates": 1,
+  "title": "Pepenga Pengo (Japan)",
+  "via": "md_ppengo",
+  "year": 1995
+ },
+ "md_phantasystarii": {
+  "candidates": 2,
+  "title": "Phantasy Star II (Euro, USA, Rev. A)",
+  "via": "md_pstar2",
+  "year": 1989
+ },
+ "md_phantasystariiigener": {
+  "candidates": 2,
+  "title": "Phantasy Star III: Generations of Doom (Euro, USA, Korea)",
+  "via": "md_pstar3",
+  "year": 1990
+ },
+ "md_phelios": {
+  "title": "Phelios (Euro)",
+  "via": "md_phelios",
+  "year": 1990
+ },
+ "md_pitfallthemayanadven": {
+  "candidates": 2,
+  "title": "Pitfall: The Mayan Adventure (Euro)",
+  "via": "md_pitfall",
+  "year": 1994
+ },
+ "md_populousiitwotribes": {
+  "title": "Two Tribes - Populous II (Euro)",
+  "via": "md_twotribe",
+  "year": 1993
+ },
+ "md_primalrage": {
+  "candidates": 1,
+  "title": "Primal Rage (Euro, USA)",
+  "via": "md_primal",
+  "year": 1995
+ },
+ "md_princeofpersia": {
+  "candidates": 2,
+  "title": "Prince of Persia (Euro)",
+  "via": "md_ppersia",
+  "year": 1993
+ },
+ "md_psychopinball": {
+  "candidates": 2,
+  "title": "Psycho Pinball (Euro)",
+  "via": "md_psycho",
+  "year": 1994
+ },
+ "md_puggsy": {
+  "title": "Puggsy (Euro)",
+  "via": "md_puggsy",
+  "year": 1993
+ },
+ "md_punisherthe": {
+  "candidates": 2,
+  "title": "Punisher, The (Euro)",
+  "via": "md_punisher",
+  "year": 1994
+ },
+ "md_puyo2": {
+  "title": "Puyo Puyo 2 (Japan, v1.1)",
+  "via": "md_puyopuy2",
+  "year": 1994
+ },
+ "md_quackshotstarringdon": {
+  "candidates": 2,
+  "title": "QuackShot Starring Donald Duck ~ QuackShot: Guruzia Ou no Hihou (World)",
+  "via": "md_quacksht",
+  "year": 1991
+ },
+ "md_raiden": {
+  "title": "Raiden Trad (USA) ~ Raiden Densetsu (Japan)",
+  "via": "md_raiden",
+  "year": 1991
+ },
+ "md_rangerx": {
+  "title": "Ranger-X (Euro)",
+  "via": "md_rangerx",
+  "year": 1993
+ },
+ "md_rastan2": {
+  "title": "Rastan Saga II (USA)",
+  "via": "md_rastan2",
+  "year": 1990
+ },
+ "md_rbislands": {
+  "title": "Rainbow Islands Extra (Hack, Spanish)",
+  "via": "md_rbislands",
+  "year": 2019
+ },
+ "md_revengeofshinobithe": {
+  "candidates": 3,
+  "title": "Revenge of Shinobi, The (Euro, USA, Rev. B)",
+  "via": "md_revshin",
+  "year": 1989
+ },
+ "md_ristar": {
+  "title": "Ristar (Euro, USA, 199409)",
+  "via": "md_ristar",
+  "year": 1994
+ },
+ "md_roadb": {
+  "candidates": 2,
+  "title": "RoadBlasters (USA)",
+  "via": "md_roadblst",
+  "year": 1991
+ },
+ "md_roadrash": {
+  "title": "Road Rash (Euro, USA)",
+  "via": "md_roadrash",
+  "year": 1991
+ },
+ "md_roadrashii": {
+  "candidates": 3,
+  "title": "Road Rash II (Euro, USA, v1.2)",
+  "via": "md_rrash2",
+  "year": 1992
+ },
+ "md_robocopversustheterm": {
+  "candidates": 3,
+  "title": "RoboCop versus The Terminator (Euro)",
+  "via": "md_roboterm",
+  "year": 1994
+ },
+ "md_robotnik": {
+  "title": "Dr. Robotnik's Mean Bean Machine (Euro)",
+  "via": "md_drrobotn",
+  "year": 1993
+ },
+ "md_rocketknightadventur": {
+  "candidates": 3,
+  "title": "Rocket Knight Adventures (Euro)",
+  "via": "md_rocket",
+  "year": 1993
+ },
+ "md_rocknrollracing": {
+  "candidates": 2,
+  "title": "Rock n' Roll Racing (Euro)",
+  "via": "md_rnrracin",
+  "year": 1994
+ },
+ "md_rollingt": {
+  "candidates": 4,
+  "title": "Rolling Thunder 2 (Euro)",
+  "via": "md_rthun2",
+  "year": 1991
+ },
+ "md_rollingthunder3": {
+  "candidates": 1,
+  "title": "Rolling Thunder 3 (USA)",
+  "via": "md_rthun3",
+  "year": 1993
+ },
+ "md_rolototherescue": {
+  "candidates": 1,
+  "title": "Rolo to the Rescue (Euro, USA)",
+  "via": "md_rolo",
+  "year": 1992
+ },
+ "md_samuraishodown": {
+  "candidates": 2,
+  "title": "Samurai Shodown (Euro)",
+  "via": "md_samsho",
+  "year": 1994
+ },
+ "md_secondsamurai": {
+  "candidates": 1,
+  "title": "Second Samurai, The (Euro)",
+  "via": "md_seconds",
+  "year": 1994
+ },
+ "md_sensiblesoccerintern": {
+  "candidates": 1,
+  "title": "Sensible Soccer - International Edition (Euro)",
+  "via": "md_sensibie",
+  "year": 1993
+ },
+ "md_sf2ce": {
+  "title": "Street Fighter II' - Special Champion Edition (Euro)",
+  "via": "md_sf2",
+  "year": 1993
+ },
+ "md_shadowrun": {
+  "candidates": 2,
+  "title": "Shadowrun (Japan)",
+  "via": "md_shadowrnj",
+  "year": 1993
+ },
+ "md_shangon": {
+  "title": "Super Hang-On (World, Rev. A)",
+  "via": "md_shangon",
+  "year": 1989
+ },
+ "md_sharrier2": {
+  "title": "Space Harrier II (Japan, Launch Cart)",
+  "via": "md_sharrierj",
+  "year": 1988
+ },
+ "md_shdancer": {
+  "title": "Shadow Dancer: The Secret of Shinobi (World)",
+  "via": "md_shdancer",
+  "year": 1990
+ },
+ "md_shiningforce": {
+  "candidates": 2,
+  "title": "Shining Force (USA)",
+  "via": "md_shinfrce",
+  "year": 1992
+ },
+ "md_shiningforceii": {
+  "candidates": 2,
+  "title": "Shining Force II (Euro)",
+  "via": "md_shinfrc2",
+  "year": 1994
+ },
+ "md_shininginthedarkness": {
+  "candidates": 3,
+  "title": "Shining in the Darkness (Euro, USA)",
+  "via": "md_shindark",
+  "year": 1991
+ },
+ "md_shinobiiiireturnofth": {
+  "candidates": 2,
+  "title": "Shinobi III: Return of the Ninja Master (Euro)",
+  "via": "md_shinobi3",
+  "year": 1993
+ },
+ "md_sinvaders91": {
+  "candidates": 1,
+  "title": "Space Invaders 91 (USA)",
+  "via": "md_sinv91",
+  "year": 1991
+ },
+ "md_slapf": {
+  "candidates": 1,
+  "title": "Slap Fight MD (Japan)",
+  "via": "md_slapfigh",
+  "year": 1993
+ },
+ "md_smonacogp": {
+  "candidates": 4,
+  "title": "Super Monaco GP (Euro, Japan, Rev. A)",
+  "via": "md_smgp",
+  "year": 1990
+ },
+ "md_snowbros": {
+  "title": "Snow Bros. - Nick & Tom (Japan)",
+  "via": "md_snowbros",
+  "year": 1993
+ },
+ "md_sonic3dblast": {
+  "candidates": 1,
+  "title": "Sonic 3D: Flickies' Island (Euro) ~ Sonic 3D Blast (USA, Korea)",
+  "via": "md_sonic3d",
+  "year": 1996
+ },
+ "md_sonicandknuckles": {
+  "candidates": 1,
+  "title": "Sonic & Knuckles (World)",
+  "via": "md_sk",
+  "year": 1994
+ },
+ "md_sonicandknuckles2": {
+  "title": "Sonic & Knuckles + Sonic the Hedgehog 2 (World)",
+  "via": "md_sks2",
+  "year": 1994
+ },
+ "md_sonicspinball": {
+  "candidates": 4,
+  "title": "Sonic Spinball (Euro)",
+  "via": "md_sspin",
+  "year": 1993
+ },
+ "md_sonicthehedgehog": {
+  "candidates": 2,
+  "title": "Sonic the Hedgehog (Euro, USA)",
+  "via": "md_sonic",
+  "year": 1991
+ },
+ "md_sonicthehedgehog2": {
+  "candidates": 4,
+  "title": "Sonic the Hedgehog 2 (World, Rev. A)",
+  "via": "md_sonic2",
+  "year": 1992
+ },
+ "md_sonicthehedgehog3": {
+  "candidates": 3,
+  "title": "Sonic the Hedgehog 3 (Euro)",
+  "via": "md_sonic3",
+  "year": 1994
+ },
+ "md_sparkster": {
+  "candidates": 3,
+  "title": "Sparkster (Euro)",
+  "via": "md_sparkstr",
+  "year": 1994
+ },
+ "md_speedball2brutaldelu": {
+  "candidates": 1,
+  "title": "Speedball 2: Brutal Deluxe (USA)",
+  "via": "md_speedbl2u",
+  "year": 1991
+ },
+ "md_spidermanandvenommax": {
+  "candidates": 1,
+  "title": "Spider-Man & Venom: Maximum Carnage (World)",
+  "via": "md_spidmaxc",
+  "year": 1994
+ },
+ "md_splatterhouse2": {
+  "candidates": 2,
+  "title": "Splatterhouse 2 (Euro)",
+  "via": "md_splatth2",
+  "year": 1992
+ },
+ "md_splatterhouse3": {
+  "candidates": 1,
+  "title": "Splatterhouse 3 (USA)",
+  "via": "md_splatth3",
+  "year": 1993
+ },
+ "md_spocket": {
+  "candidates": 3,
+  "title": "Side Pocket (Euro)",
+  "via": "md_sidepock",
+  "year": 1992
+ },
+ "md_ssriders": {
+  "title": "Sunset Riders (Euro)",
+  "via": "md_ssriders",
+  "year": 1992
+ },
+ "md_starflight": {
+  "candidates": 2,
+  "title": "Starflight (Euro, USA, Rev. 1)",
+  "via": "md_starfl",
+  "year": 1991
+ },
+ "md_steelempire": {
+  "candidates": 1,
+  "title": "Steel Empire, The (USA)",
+  "via": "md_steelemp",
+  "year": 1992
+ },
+ "md_sthunder": {
+  "candidates": 2,
+  "title": "Super Thunder Blade (Japan, Launch Cart)",
+  "via": "md_stbladj",
+  "year": 1988
+ },
+ "md_streetsofrage": {
+  "candidates": 2,
+  "title": "Streets of Rage (Euro, USA, Rev. A) ~ Bare Knuckle - Ikari no Tetsuken (Japan, Rev. A)",
+  "via": "md_sor",
+  "year": 1991
+ },
+ "md_streetsofrage2": {
+  "candidates": 2,
+  "title": "Streets of Rage 2 (USA)",
+  "via": "md_sor2u",
+  "year": 1992
+ },
+ "md_streetsofrage3": {
+  "candidates": 3,
+  "title": "Streets of Rage 3 (Euro)",
+  "via": "md_sor3",
+  "year": 1994
+ },
+ "md_strider": {
+  "title": "Strider (Euro, USA)",
+  "via": "md_strider",
+  "year": 1990
+ },
+ "md_subterrania": {
+  "candidates": 3,
+  "title": "SubTerrania (USA)",
+  "via": "md_subterru",
+  "year": 1993
+ },
+ "md_superfantasyzone": {
+  "candidates": 2,
+  "title": "Super Fantasy Zone (Japan)",
+  "via": "md_sfzonej",
+  "year": 1992
+ },
+ "md_supersmashtv": {
+  "candidates": 1,
+  "title": "Super Smash TV (Euro, USA)",
+  "via": "md_ssmashtv",
+  "year": 1992
+ },
+ "md_superstreetfighterii": {
+  "candidates": 3,
+  "title": "Super Street Fighter II - The New Challengers (Euro)",
+  "via": "md_ssf2",
+  "year": 1994
+ },
+ "md_svolleyb": {
+  "candidates": 3,
+  "title": "Super Volley Ball (USA)",
+  "via": "md_svolley",
+  "year": 1991
+ },
+ "md_swordofvermilion": {
+  "candidates": 1,
+  "title": "Sword of Vermilion (Euro, USA)",
+  "via": "md_vermil",
+  "year": 1990
+ },
+ "md_syndicate": {
+  "candidates": 1,
+  "title": "Syndicate (Euro, USA)",
+  "via": "md_syndicat",
+  "year": 1994
+ },
+ "md_tazmania": {
+  "title": "Taz-Mania (World)",
+  "via": "md_tazmania",
+  "year": 1992
+ },
+ "md_teenagemutantninjatu": {
+  "candidates": 4,
+  "title": "Teenage Mutant Ninja Turtles: Return of the Shredder (Japan)",
+  "via": "md_tmntshj",
+  "year": 1992
+ },
+ "md_tetris": {
+  "title": "Tetris (Japan)",
+  "via": "md_tetris",
+  "year": 1989
+ },
+ "md_themepark": {
+  "candidates": 1,
+  "title": "Theme Park (Euro, USA)",
+  "via": "md_themeprk",
+  "year": 1995
+ },
+ "md_thunderforceii": {
+  "candidates": 1,
+  "title": "Thunder Force II (Euro, USA)",
+  "via": "md_tf2",
+  "year": 1989
+ },
+ "md_thunderforceiii": {
+  "candidates": 1,
+  "title": "Thunder Force III (Japan, USA)",
+  "via": "md_tf3",
+  "year": 1990
+ },
+ "md_tinytoonadventuresbu": {
+  "candidates": 2,
+  "title": "Tiny Toon Adventures: Buster's Hidden Treasure (Euro)",
+  "via": "md_ttoonbht",
+  "year": 1993
+ },
+ "md_tnzs": {
+  "title": "New Zealand Story, The (Japan)",
+  "via": "md_tnzs",
+  "year": 1990
+ },
+ "md_toejamandearl": {
+  "candidates": 2,
+  "title": "Toe Jam & Earl (World, Rev. A)",
+  "via": "md_toejam",
+  "year": 1992
+ },
+ "md_toejamandearlinpanic": {
+  "candidates": 4,
+  "title": "Toe Jam & Earl in Panic on Funkotron (Euro)",
+  "via": "md_toejam2",
+  "year": 1993
+ },
+ "md_toki": {
+  "title": "Toki: Going Ape Spit ~ JuJu Densetsu (World, Rev. A)",
+  "via": "md_toki",
+  "year": 1991
+ },
+ "md_topgear2": {
+  "title": "Top Gear 2 (USA)",
+  "via": "md_topgear2",
+  "year": 1994
+ },
+ "md_truxton": {
+  "title": "Truxton (Euro, USA) ~ Tatsujin (Japan)",
+  "via": "md_truxton",
+  "year": 1989
+ },
+ "md_twincobradesertattac": {
+  "title": "Twin Cobra (USA)",
+  "via": "md_twincobr",
+  "year": 1991
+ },
+ "md_twocrude": {
+  "title": "Two Crude Dudes (Euro)",
+  "via": "md_twocrude",
+  "year": 1992
+ },
+ "md_umk3": {
+  "title": "Ultimate Mortal Kombat 3 (Euro)",
+  "via": "md_umk3",
+  "year": 1996
+ },
+ "md_uqix": {
+  "candidates": 1,
+  "title": "Ultimate Qix (USA)",
+  "via": "md_ultqix",
+  "year": 1991
+ },
+ "md_urbanstrikethesequel": {
+  "title": "Urban Strike (Euro, USA)",
+  "via": "md_ustrike",
+  "year": 1994
+ },
+ "md_valis": {
+  "title": "Valis (USA)",
+  "via": "md_valis",
+  "year": 1991
+ },
+ "md_valisiii": {
+  "candidates": 2,
+  "title": "Valis III (USA)",
+  "via": "md_valis3",
+  "year": 1991
+ },
+ "md_vaportrail": {
+  "candidates": 1,
+  "title": "Vapor Trail (USA)",
+  "via": "md_vaportr",
+  "year": 1991
+ },
+ "md_vectorman": {
+  "candidates": 1,
+  "title": "Vectorman (Euro, USA)",
+  "via": "md_vecman",
+  "year": 1995
+ },
+ "md_vectorman2": {
+  "candidates": 1,
+  "title": "Vectorman 2 (USA)",
+  "via": "md_vecman2",
+  "year": 1996
+ },
+ "md_vfighter2": {
+  "title": "Virtua Fighter 2 - Genesis (Euro, USA)",
+  "via": "md_vf2",
+  "year": 1997
+ },
+ "md_viewpoint": {
+  "candidates": 1,
+  "title": "Viewpoint (USA)",
+  "via": "md_viewpoin",
+  "year": 1994
+ },
+ "md_virtuaracing": {
+  "candidates": 3,
+  "title": "Virtua Racing (Euro)",
+  "via": "md_vr",
+  "year": 1994
+ },
+ "md_wani": {
+  "title": "Wani Wani World (Japan)",
+  "via": "md_waniwani",
+  "year": 1992
+ },
+ "md_wardner": {
+  "title": "Wardner (USA)",
+  "via": "md_wardner",
+  "year": 1991
+ },
+ "md_warsong": {
+  "title": "Warsong (USA)",
+  "via": "md_warsong",
+  "year": 1991
+ },
+ "md_wboy3": {
+  "title": "Wonder Boy III: Monster Lair (Euro) ~ Monster Lair (Japan)",
+  "via": "md_wboy3",
+  "year": 1991
+ },
+ "md_williams": {
+  "candidates": 1,
+  "title": "Williams Arcade's Greatest Hits (USA)",
+  "via": "md_arcadeghu",
+  "year": 1996
+ },
+ "md_wingsofwor": {
+  "candidates": 1,
+  "title": "Wings of Wor (USA)",
+  "via": "md_wingswor",
+  "year": 1991
+ },
+ "md_wiznliz": {
+  "title": "Wiz'n'Liz: The Frantic Wabbit Wescue (Euro)",
+  "via": "md_wiznliz",
+  "year": 1993
+ },
+ "md_wonderboyinmonsterwo": {
+  "candidates": 1,
+  "title": "Wonder Boy in Monster World (Euro, USA)",
+  "via": "md_wboymw",
+  "year": 1992
+ },
+ "md_worldofillusionstarr": {
+  "candidates": 2,
+  "title": "World of Illusion Starring Mickey Mouse and Donald Duck (Euro)",
+  "via": "md_worldill",
+  "year": 1992
+ },
+ "md_worms": {
+  "title": "Worms (Euro)",
+  "via": "md_worms",
+  "year": 1995
+ },
+ "md_xenon2megablast": {
+  "candidates": 1,
+  "title": "Xenon 2: Megablast (Euro)",
+  "via": "md_xenon2",
+  "year": 1992
+ },
+ "md_xmen2clonewars": {
+  "candidates": 1,
+  "title": "X-Men 2: Clone Wars (Euro, USA)",
+  "via": "md_xmen2",
+  "year": 1995
+ },
+ "md_yuyu": {
+  "title": "Yu Yu Hakusho: Makyou Toitsusen (Japan)",
+  "via": "md_yuyumt",
+  "year": 1994
+ },
+ "md_zerotolerance": {
+  "candidates": 1,
+  "title": "Zero Tolerance (Euro, USA)",
+  "via": "md_zerotol",
+  "year": 1994
+ },
+ "md_zerowing": {
+  "title": "Zero Wing (Euro)",
+  "via": "md_zerowing",
+  "year": 1991
+ },
+ "md_zombiesatemyneighbor": {
+  "candidates": 1,
+  "title": "Zombies Ate My Neighbors (USA)",
+  "via": "md_zombiesu",
+  "year": 1994
+ },
+ "megaman": {
+  "title": "Mega Man: The Power Battle (CPS1, USA 951006)",
+  "via": "megaman",
+  "year": 1995
+ },
+ "megaman2": {
+  "title": "Mega Man 2: The Power Fighters (USA 960708)",
+  "via": "megaman2",
+  "year": 1996
+ },
+ "megaman4nes": {
+  "candidates": 1,
+  "title": "Mega Man IV (USA, Rev. A)",
+  "via": "nes_megaman4",
+  "year": 1992
+ },
+ "megaman7sfc": {
+  "candidates": 2,
+  "title": "Mega Man 7 (USA)",
+  "via": "snes_megaman7",
+  "year": 1995
+ },
+ "megamaniiiunes": {
+  "candidates": 1,
+  "title": "Mega Man III (USA)",
+  "via": "nes_megaman3",
+  "year": 1990
+ },
+ "megamaniiunes": {
+  "candidates": 1,
+  "title": "Mega Man II (USA)",
+  "via": "nes_megaman2",
+  "year": 1989
+ },
+ "megamanunes": {
+  "candidates": 1,
+  "title": "Mega Man (USA)",
+  "via": "nes_megaman",
+  "year": 1987
+ },
+ "megamanviunes": {
+  "candidates": 1,
+  "title": "Mega Man VI (USA)",
+  "via": "nes_megaman6",
+  "year": 1994
+ },
+ "megamanvunes": {
+  "candidates": 1,
+  "title": "Mega Man V (USA)",
+  "via": "nes_megaman5",
+  "year": 1992
+ },
+ "megamxsfc": {
+  "candidates": 2,
+  "title": "Mega Man X (USA, Rev. 1)",
+  "via": "snes_megamanx",
+  "year": 1993
+ },
+ "mercs": {
+  "title": "Mercs (World 900302)",
+  "via": "mercs",
+  "year": 1990
+ },
+ "metalb": {
+  "title": "Metal Black (World)",
+  "via": "metalb",
+  "year": 1991
+ },
+ "metalgearunes": {
+  "candidates": 2,
+  "title": "Metal Gear (Japan)",
+  "via": "nes_metalgearj",
+  "year": 1987
+ },
+ "metalstormunes": {
+  "candidates": 1,
+  "title": "Metal Storm (USA)",
+  "via": "nes_metalstorm",
+  "year": 1991
+ },
+ "metalwarriorssfc": {
+  "candidates": 1,
+  "title": "Metal Warriors (USA)",
+  "via": "snes_metalwarriors",
+  "year": 1994
+ },
+ "metamrph": {
+  "title": "Metamorphic Force (ver EAA)",
+  "via": "metamrph",
+  "year": 1993
+ },
+ "metmqstr": {
+  "title": "Metamoqester (World)",
+  "via": "metmqstr",
+  "year": 1995
+ },
+ "metroidnes": {
+  "candidates": 1,
+  "title": "Metroid (USA)",
+  "via": "nes_metroid",
+  "year": 1987
+ },
+ "mickeymaniathetimesfc": {
+  "candidates": 1,
+  "title": "Mickey Mania: The Timeless Adventures of Mickey Mouse (USA)",
+  "via": "snes_mickeymania",
+  "year": 1994
+ },
+ "micromachinessfc": {
+  "candidates": 2,
+  "title": "Micro Machines (USA)",
+  "via": "snes_micromachines",
+  "year": 1994
+ },
+ "miexchng": {
+  "title": "Money Puzzle Exchanger / Money Idol Exchanger",
+  "via": "miexchng",
+  "year": 1997
+ },
+ "mightybombjackunes": {
+  "candidates": 1,
+  "title": "Mighty Bomb Jack (USA)",
+  "via": "nes_mightybombjack",
+  "year": 1987
+ },
+ "mightyfinalfightunes": {
+  "candidates": 2,
+  "title": "Mighty Final Fight (USA)",
+  "via": "nes_mightfinfig",
+  "year": 1993
+ },
+ "mightymorphinpowersfc": {
+  "candidates": 1,
+  "title": "Mighty Morphin Power Rangers - The Fighting Edition (USA)",
+  "via": "snes_mmprfe",
+  "year": 1995
+ },
+ "mightymorphinpowersfc2": {
+  "candidates": 1,
+  "title": "Mighty Morphin Power Rangers - The Movie (USA)",
+  "via": "snes_mmprmovie",
+  "year": 1995
+ },
+ "mk2sfc": {
+  "candidates": 3,
+  "title": "Mortal Kombat II (USA, Rev. 1)",
+  "via": "snes_mkii",
+  "year": 1994
+ },
+ "mmatrix": {
+  "title": "Mars Matrix: Hyper Solid Shooting (USA 000412)",
+  "via": "mmatrix",
+  "year": 2000
+ },
+ "monsterpartyunes": {
+  "candidates": 1,
+  "title": "Monster Party (USA)",
+  "via": "nes_monsterparty",
+  "year": 1989
+ },
+ "moomesa": {
+  "title": "Wild West C.O.W.-Boys of Moo Mesa (ver EAB)",
+  "via": "moomesa",
+  "year": 1992
+ },
+ "mooncrst": {
+  "title": "Moon Cresta (Nichibutsu)",
+  "via": "mooncrst",
+  "year": 1980
+ },
+ "mortalkombat3sfc": {
+  "candidates": 2,
+  "title": "Mortal Kombat 3 (USA)",
+  "via": "snes_mk3",
+  "year": 1995
+ },
+ "mortalkombatsfc": {
+  "candidates": 2,
+  "title": "Mortal Kombat (USA, Rev. 1)",
+  "via": "snes_mk",
+  "year": 1993
+ },
+ "mrdosfc": {
+  "candidates": 3,
+  "title": "Mr. Do! (USA)",
+  "via": "snes_mrdo",
+  "year": 1995
+ },
+ "mrgimmickenes": {
+  "candidates": 1,
+  "title": "Mr. Gimmick (Euro)",
+  "via": "nes_mrgimmick",
+  "year": 1993
+ },
+ "msh": {
+  "title": "Marvel Super Heroes (Europe 951024)",
+  "via": "msh",
+  "year": 1995
+ },
+ "mshvsf": {
+  "title": "Marvel Super Heroes Vs. Street Fighter (Europe 970625)",
+  "via": "mshvsf",
+  "year": 1997
+ },
+ "mslug": {
+  "title": "Metal Slug - Super Vehicle-001",
+  "via": "mslug",
+  "year": 1996
+ },
+ "mslug2": {
+  "title": "Metal Slug 2 - Super Vehicle-001/II (NGM-2410 ~ NGH-2410)",
+  "via": "mslug2",
+  "year": 1998
+ },
+ "mslug3": {
+  "title": "Metal Slug 3 (NGM-2560)",
+  "via": "mslug3",
+  "year": 2000
+ },
+ "mslug3snd": {
+  "title": "Metal Slug 3 (NGM-2560)",
+  "via": "mslug3",
+  "year": 2000
+ },
+ "mslug4": {
+  "title": "Metal Slug 4 (NGM-2630)",
+  "via": "mslug4",
+  "year": 2002
+ },
+ "mslug4snd": {
+  "title": "Metal Slug 4 (NGM-2630)",
+  "via": "mslug4",
+  "year": 2002
+ },
+ "mslug5": {
+  "title": "Metal Slug 5 (NGM-2680)",
+  "via": "mslug5",
+  "year": 2003
+ },
+ "mslug5snd": {
+  "title": "Metal Slug 5 (NGM-2680)",
+  "via": "mslug5",
+  "year": 2003
+ },
+ "mslugx": {
+  "title": "Metal Slug X - Super Vehicle-001 (NGM-2500 ~ NGH-2500)",
+  "via": "mslugx",
+  "year": 1999
+ },
+ "mspacman": {
+  "title": "Ms. Pac-Man",
+  "via": "mspacman",
+  "year": 1981
+ },
+ "mspacmanunes": {
+  "candidates": 2,
+  "title": "Ms. Pac-Man (USA) (Tengen)",
+  "via": "nes_mspacman",
+  "year": 1990
+ },
+ "msword": {
+  "title": "Magic Sword: Heroic Fantasy (World 900725)",
+  "via": "msword",
+  "year": 1990
+ },
+ "mtwins": {
+  "title": "Mega Twins (World 900619)",
+  "via": "mtwins",
+  "year": 1990
+ },
+ "mutnat": {
+  "title": "Mutation Nation (NGM-014 ~ NGH-014)",
+  "via": "mutnat",
+  "year": 1992
+ },
+ "mvsc": {
+  "title": "Marvel Vs. Capcom: Clash of Super Heroes (Europe 980123)",
+  "via": "mvsc",
+  "year": 1998
+ },
+ "mwalk": {
+  "title": "Michael Jackson's Moonwalker (World) (FD1094/8751 317-0159)",
+  "via": "mwalk",
+  "year": 1990
+ },
+ "mystwarr": {
+  "title": "Mystic Warriors (ver EAA)",
+  "via": "mystwarr",
+  "year": 1993
+ },
+ "nam1975": {
+  "title": "NAM-1975 (NGM-001 ~ NGH-001)",
+  "via": "nam1975",
+  "year": 1990
+ },
+ "nbajamtournamentedsfc": {
+  "candidates": 2,
+  "title": "NBA Jam - Tournament Edition (USA)",
+  "via": "snes_nbajamte",
+  "year": 1994
+ },
+ "nbbatman": {
+  "title": "Ninja Baseball Bat Man (World)",
+  "via": "nbbatman",
+  "year": 1993
+ },
+ "ncombat": {
+  "title": "Ninja Combat (NGM-009)",
+  "via": "ncombat",
+  "year": 1990
+ },
+ "ncommand": {
+  "title": "Ninja Commando",
+  "via": "ncommand",
+  "year": 1992
+ },
+ "nemo": {
+  "title": "Nemo (World 901130)",
+  "via": "nemo",
+  "year": 1990
+ },
+ "neobombe": {
+  "title": "Neo Bomberman",
+  "via": "neobombe",
+  "year": 1997
+ },
+ "neocup98": {
+  "title": "Neo-Geo Cup '98 - The Road to the Victory",
+  "via": "neocup98",
+  "year": 1998
+ },
+ "neodrift": {
+  "title": "Neo Drift Out - New Technology",
+  "via": "neodrift",
+  "year": 1996
+ },
+ "neomrdo": {
+  "title": "Neo Mr. Do!",
+  "via": "neomrdo",
+  "year": 1996
+ },
+ "neopong": {
+  "title": "Neo Pong (HB, v1.1)",
+  "via": "neopong",
+  "year": 2002
+ },
+ "nhl94sfc": {
+  "candidates": 2,
+  "title": "NHL '94 (USA)",
+  "via": "snes_nhl94",
+  "year": 1993
+ },
+ "ninjagaideniiitheanes": {
+  "candidates": 1,
+  "title": "Ninja Gaiden III: The Ancient Ship of Doom (USA)",
+  "via": "nes_ninjagaiiii",
+  "year": 1991
+ },
+ "ninjagaideniithedanes": {
+  "candidates": 1,
+  "title": "Ninja Gaiden II: The Dark Sword of Chaos (USA)",
+  "via": "nes_ninjagaiii",
+  "year": 1990
+ },
+ "ninjagaidentrilogysfc": {
+  "candidates": 1,
+  "title": "Ninja Gaiden Trilogy (USA)",
+  "via": "snes_ninjagaidentril",
+  "year": 1995
+ },
+ "ninjagaidenunes": {
+  "candidates": 1,
+  "title": "Ninja Gaiden (USA)",
+  "via": "nes_ninjagaiden",
+  "year": 1989
+ },
+ "ninjak": {
+  "title": "The Ninja Kids (World)",
+  "via": "ninjak",
+  "year": 1990
+ },
+ "ninjamas": {
+  "title": "Ninja Master's - Haoh-ninpo-cho",
+  "via": "ninjamas",
+  "year": 1996
+ },
+ "nintendoworldcupunes": {
+  "candidates": 1,
+  "title": "Nintendo World Cup (USA)",
+  "via": "nes_ninteworcup",
+  "year": 1990
+ },
+ "nitd": {
+  "title": "Nightmare in the Dark",
+  "via": "nitd",
+  "year": 2000
+ },
+ "nitdsnd": {
+  "title": "Nightmare in the Dark",
+  "via": "nitd",
+  "year": 2000
+ },
+ "nslasheru": {
+  "title": "Night Slashers (US Rev 1.2, DE-0395-1 PCB)",
+  "via": "nslasheru",
+  "year": 1994
+ },
+ "nwarr": {
+  "title": "Night Warriors: Darkstalkers' Revenge (Europe 950316)",
+  "via": "nwarr",
+  "year": 1995
+ },
+ "ogrebattlethemarchsfc": {
+  "candidates": 1,
+  "title": "Ogre Battle: The March of the Black Queen (USA)",
+  "via": "snes_ogrebattle",
+  "year": 1994
+ },
+ "orlegend": {
+  "title": "Oriental Legend / Xiyou Shi E Zhuan (ver. 126)",
+  "via": "orlegend",
+  "year": 1997
+ },
+ "outofthisworldsfc": {
+  "candidates": 1,
+  "title": "Out of This World (USA)",
+  "via": "snes_outofthisworld",
+  "year": 1992
+ },
+ "outzone": {
+  "title": "Out Zone",
+  "via": "outzone",
+  "year": 1990
+ },
+ "overtop": {
+  "title": "Over Top",
+  "via": "overtop",
+  "year": 1996
+ },
+ "pacattacksfc": {
+  "candidates": 2,
+  "title": "Pac-Attack (USA)",
+  "via": "snes_pacattack",
+  "year": 1993
+ },
+ "pacman": {
+  "title": "Pac-Man (Midway)",
+  "via": "pacman",
+  "year": 1980
+ },
+ "pacmanunamcones": {
+  "candidates": 1,
+  "title": "Pac-Man (USA) (Namco)",
+  "via": "nes_pacmanu",
+  "year": 1993
+ },
+ "pang3": {
+  "title": "Pang! 3 (Europe 950601)",
+  "via": "pang3",
+  "year": 1995
+ },
+ "panicbom": {
+  "title": "Panic Bomber",
+  "via": "panicbom",
+  "year": 1994
+ },
+ "panicrestaurantunes": {
+  "candidates": 1,
+  "title": "Panic Restaurant (USA)",
+  "via": "nes_panicrestaurant",
+  "year": 1992
+ },
+ "parasolstarsthestones": {
+  "candidates": 1,
+  "title": "Parasol Stars ~ Rainbow Islands II (Euro)",
+  "via": "nes_parasstaraiislii",
+  "year": 1991
+ },
+ "parodius": {
+  "title": "Parodius Da!: Shinwa kara Owarai e (World, set 1)",
+  "via": "parodius",
+  "year": 1990
+ },
+ "pbobbl2n": {
+  "title": "Puzzle Bobble 2 / Bust-A-Move Again (Neo-Geo)",
+  "via": "pbobbl2n",
+  "year": 1999
+ },
+ "pbobblen": {
+  "title": "Puzzle Bobble / Bust-A-Move (Neo-Geo, NGM-083)",
+  "via": "pbobblen",
+  "year": 1994
+ },
+ "peacekeepersthesfc": {
+  "candidates": 1,
+  "title": "Peace Keepers, The (USA)",
+  "via": "snes_peacekeepers",
+  "year": 1994
+ },
+ "pgoal": {
+  "title": "Pleasure Goal / Futsal - 5 on 5 Mini Soccer (NGM-219)",
+  "via": "pgoal",
+  "year": 1996
+ },
+ "phalanxtheenforcefsfc": {
+  "candidates": 2,
+  "title": "Phalanx (USA)",
+  "via": "snes_phalanx",
+  "year": 1992
+ },
+ "phelios": {
+  "title": "Phelios",
+  "via": "phelios",
+  "year": 1988
+ },
+ "pinballfantasiessfc": {
+  "candidates": 2,
+  "title": "Pinball Fantasies (USA)",
+  "via": "snes_pinballfanta",
+  "year": 1994
+ },
+ "ploksfc": {
+  "candidates": 5,
+  "title": "Plok! (USA)",
+  "via": "snes_plok",
+  "year": 1993
+ },
+ "pnickj": {
+  "title": "Pnickies (Japan 940608)",
+  "via": "pnickj",
+  "year": 1994
+ },
+ "pnyaa": {
+  "title": "Pochi and Nyaa (Ver 2.02)",
+  "via": "pnyaa",
+  "year": 2003
+ },
+ "pnyaasnd": {
+  "title": "Pochi and Nyaa (Ver 2.02)",
+  "via": "pnyaa",
+  "year": 2003
+ },
+ "pockyrocky2sfc": {
+  "candidates": 1,
+  "title": "Pocky & Rocky 2 (USA)",
+  "via": "snes_pockyrocky2",
+  "year": 1994
+ },
+ "pockyrockysfc": {
+  "candidates": 1,
+  "title": "Pocky & Rocky (USA)",
+  "via": "snes_pockyrocky",
+  "year": 1993
+ },
+ "popbounc": {
+  "title": "Pop 'n Bounce / Gapporin",
+  "via": "popbounc",
+  "year": 1997
+ },
+ "popeye": {
+  "title": "Popeye (revision D)",
+  "via": "popeye",
+  "year": 1982
+ },
+ "powerblade2unes": {
+  "candidates": 1,
+  "title": "Power Blade 2 (USA)",
+  "via": "nes_powerblade2",
+  "year": 1992
+ },
+ "powerbladeunes": {
+  "candidates": 1,
+  "title": "Power Blade (USA)",
+  "via": "nes_powerblade",
+  "year": 1991
+ },
+ "powerinstinctsfc": {
+  "candidates": 1,
+  "title": "Power Instinct (USA)",
+  "via": "snes_powinstinct",
+  "year": 1994
+ },
+ "powprisonersofwarunes": {
+  "candidates": 1,
+  "title": "P.O.W. - Prisoners of War (USA)",
+  "via": "nes_pow",
+  "year": 1989
+ },
+ "preis2snd": {
+  "title": "Prehistoric Isle 2",
+  "via": "preisle2",
+  "year": 1999
+ },
+ "preisle2": {
+  "title": "Prehistoric Isle 2",
+  "via": "preisle2",
+  "year": 1999
+ },
+ "primalragesfc": {
+  "candidates": 1,
+  "title": "Primal Rage (USA)",
+  "via": "snes_primalrage",
+  "year": 1995
+ },
+ "princeofpersia2thesfc": {
+  "candidates": 1,
+  "title": "Prince of Persia 2 (USA)",
+  "via": "snes_princepersia2",
+  "year": 1995
+ },
+ "princeofpersiasfc": {
+  "candidates": 2,
+  "title": "Prince of Persia (USA)",
+  "via": "snes_princepersia",
+  "year": 1992
+ },
+ "progear": {
+  "title": "Progear (USA 010117)",
+  "via": "progearu",
+  "year": 2001
+ },
+ "pspikes2": {
+  "title": "Power Spikes II (NGM-068)",
+  "via": "pspikes2",
+  "year": 1994
+ },
+ "pulstar": {
+  "title": "Pulstar",
+  "via": "pulstar",
+  "year": 1995
+ },
+ "punchoutunes": {
+  "candidates": 1,
+  "title": "Punch-Out!! (USA)",
+  "via": "nes_punchout",
+  "year": 1990
+ },
+ "punisher": {
+  "title": "The Punisher (World 930422)",
+  "via": "punisher",
+  "year": 1993
+ },
+ "puzzldpr": {
+  "title": "Puzzle De Pon! R!",
+  "via": "puzzldpr",
+  "year": 1997
+ },
+ "puzzledp": {
+  "title": "Puzzle De Pon!",
+  "via": "puzzledp",
+  "year": 1995
+ },
+ "puzznicunes": {
+  "candidates": 1,
+  "title": "Puzznic (USA)",
+  "via": "nes_puzznic",
+  "year": 1990
+ },
+ "pwingssfc": {
+  "candidates": 3,
+  "title": "Pilotwings (Japan)",
+  "via": "snes_pilotwingsj",
+  "year": 1990
+ },
+ "qbert": {
+  "title": "Q*bert (US set 1)",
+  "via": "qbert",
+  "year": 1982
+ },
+ "radracer2unes": {
+  "candidates": 1,
+  "title": "Rad Racer II (USA)",
+  "via": "nes_radracerii",
+  "year": 1990
+ },
+ "radracerunes": {
+  "candidates": 1,
+  "title": "Rad Racer (USA)",
+  "via": "nes_radracer",
+  "year": 1988
+ },
+ "ragnagrd": {
+  "title": "Ragnagard / Shin-Oh-Ken",
+  "via": "ragnagrd",
+  "year": 1996
+ },
+ "raiden": {
+  "title": "Raiden (Japan)",
+  "via": "raidenj",
+  "year": 1990
+ },
+ "raiden2": {
+  "title": "Raiden II (US, set 1)",
+  "via": "raiden2",
+  "year": 1993
+ },
+ "raidendx": {
+  "title": "Raiden DX (UK)",
+  "via": "raidendx",
+  "year": 1994
+ },
+ "raidentradsfc": {
+  "candidates": 1,
+  "title": "Raiden Trad (USA)",
+  "via": "snes_raiden",
+  "year": 1992
+ },
+ "rainbowislandsthesnes": {
+  "candidates": 1,
+  "title": "Rainbow Islands (USA)",
+  "via": "nes_rainbisltai",
+  "year": 1991
+ },
+ "rampartunes": {
+  "candidates": 1,
+  "title": "Rampart (USA)",
+  "via": "nes_rampart",
+  "year": 1992
+ },
+ "ranmahardbattlesfc": {
+  "title": "Ranma 1/2: Hard Battle (USA)",
+  "via": "snes_ranmahb",
+  "year": 1992
+ },
+ "rbff1": {
+  "title": "Real Bout Fatal Fury / Real Bout Garou Densetsu (NGM-095 ~ NGH-095)",
+  "via": "rbff1",
+  "year": 1995
+ },
+ "rbff2": {
+  "title": "Real Bout Fatal Fury 2 - The Newcomers / Real Bout Garou Densetsu 2 - The Newcomers (NGM-2400)",
+  "via": "rbff2",
+  "year": 1998
+ },
+ "rbffspec": {
+  "title": "Real Bout Fatal Fury Special / Real Bout Garou Densetsu Special",
+  "via": "rbffspec",
+  "year": 1996
+ },
+ "rcproamiiunes": {
+  "candidates": 1,
+  "title": "R.C. Pro-Am II (USA)",
+  "via": "nes_rcproamii",
+  "year": 1992
+ },
+ "redearth": {
+  "title": "Red Earth (Europe 961121)",
+  "via": "redearth",
+  "year": 1996
+ },
+ "renegadeunes": {
+  "candidates": 1,
+  "title": "Renegade (USA)",
+  "via": "nes_renegade",
+  "year": 1988
+ },
+ "ridhero": {
+  "title": "Riding Hero (NGM-006 ~ NGH-006)",
+  "via": "ridhero",
+  "year": 1990
+ },
+ "ringdest": {
+  "title": "Ring of Destruction: Slammasters II (Europe 940902)",
+  "via": "ringdest",
+  "year": 1994
+ },
+ "rivalturfsfc": {
+  "candidates": 1,
+  "title": "Rival Turf (USA)",
+  "via": "snes_rivalturf",
+  "year": 1992
+ },
+ "rivercityransomunes": {
+  "candidates": 1,
+  "title": "River City Ransom (USA)",
+  "via": "nes_rivercitran",
+  "year": 1990
+ },
+ "roboarmy": {
+  "title": "Robo Army",
+  "via": "roboarmy",
+  "year": 1991
+ },
+ "robocop": {
+  "title": "Robocop (World, revision 4)",
+  "via": "robocop",
+  "year": 1988
+ },
+ "robotreksfc": {
+  "candidates": 1,
+  "title": "Robotrek (USA)",
+  "via": "snes_robotrek",
+  "year": 1994
+ },
+ "rockinkatsunes": {
+  "candidates": 1,
+  "title": "Rockin' Kats (USA)",
+  "via": "nes_rockinkats",
+  "year": 1991
+ },
+ "rocknrollracingsfc": {
+  "candidates": 3,
+  "title": "Rock N' Roll Racing (USA)",
+  "via": "snes_rrracing",
+  "year": 1993
+ },
+ "rotd": {
+  "title": "Rage of the Dragons (NGM-2640?)",
+  "via": "rotd",
+  "year": 2002
+ },
+ "rotdsnd": {
+  "title": "Rage of the Dragons (NGM-2640?)",
+  "via": "rotd",
+  "year": 2002
+ },
+ "rshark": {
+  "title": "R-Shark (set 1)",
+  "via": "rshark",
+  "year": 1995
+ },
+ "rthunder": {
+  "title": "Rolling Thunder (rev 3)",
+  "via": "rthunder",
+  "year": 1986
+ },
+ "rtype": {
+  "title": "R-Type (World)",
+  "via": "rtype",
+  "year": 1987
+ },
+ "rtype2": {
+  "title": "R-Type II (World)",
+  "via": "rtype2",
+  "year": 1989
+ },
+ "rtypeiiithethirdlisfc": {
+  "candidates": 3,
+  "title": "R-Type III: The Third Lightning (Japan)",
+  "via": "snes_rtypeiiij",
+  "year": 1993
+ },
+ "rtypeleo": {
+  "title": "R-Type Leo (World)",
+  "via": "rtypeleo",
+  "year": 1992
+ },
+ "s1945": {
+  "title": "Strikers 1945 (World)",
+  "via": "s1945",
+  "year": 1995
+ },
+ "s1945ii": {
+  "title": "Strikers 1945 II",
+  "via": "s1945ii",
+  "year": 1997
+ },
+ "s1945iii": {
+  "title": "Strikers 1945 III (World) / Strikers 1999 (Japan)",
+  "via": "s1945iii",
+  "year": 1999
+ },
+ "s1945p": {
+  "title": "Strikers 1945 Plus",
+  "via": "s1945p",
+  "year": 1999
+ },
+ "s1945psnd": {
+  "title": "Strikers 1945 Plus",
+  "via": "s1945p",
+  "year": 1999
+ },
+ "sailormn": {
+  "title": "Pretty Soldier Sailor Moon (Version 95/03/22B, Europe)",
+  "via": "sailormne",
+  "year": 1995
+ },
+ "salamand": {
+  "title": "Salamander (version D)",
+  "via": "salamand",
+  "year": 1986
+ },
+ "sams5snd": {
+  "title": "Samurai Shodown V / Samurai Spirits Zero (NGM-2700, set 1)",
+  "via": "samsho5",
+  "year": 2003
+ },
+ "samsh5pf": {
+  "title": "Samurai Shodown V Perfect / Samurai Spirits Zero Perfect (bootleg, hack)",
+  "via": "samsh5pf",
+  "year": 2020
+ },
+ "samsh5sp": {
+  "title": "Samurai Shodown V Special / Samurai Spirits Zero Special (NGM-2720)",
+  "via": "samsh5sp",
+  "year": 2004
+ },
+ "samsho": {
+  "title": "Samurai Shodown / Samurai Spirits (NGM-045)",
+  "via": "samsho",
+  "year": 1993
+ },
+ "samsho2": {
+  "title": "Samurai Shodown II / Shin Samurai Spirits - Haohmaru Jigokuhen (NGM-063 ~ NGH-063)",
+  "via": "samsho2",
+  "year": 1994
+ },
+ "samsho3": {
+  "title": "Samurai Shodown III / Samurai Spirits - Zankurou Musouken (NGM-087)",
+  "via": "samsho3",
+  "year": 1995
+ },
+ "samsho4": {
+  "title": "Samurai Shodown IV - Amakusa's Revenge / Samurai Spirits - Amakusa Kourin (NGM-222 ~ NGH-222)",
+  "via": "samsho4",
+  "year": 1996
+ },
+ "samsho5": {
+  "title": "Samurai Shodown V / Samurai Spirits Zero (NGM-2700, set 1)",
+  "via": "samsho5",
+  "year": 2003
+ },
+ "samuraishodownsfc": {
+  "candidates": 1,
+  "title": "Samurai Shodown (USA)",
+  "via": "snes_samshodown",
+  "year": 1994
+ },
+ "saturdaynightslammsfc": {
+  "candidates": 1,
+  "title": "Saturday Night Slam Masters (USA)",
+  "via": "snes_slammasters",
+  "year": 1994
+ },
+ "savagere": {
+  "title": "Savage Reign / Fu'un Mokushiroku - Kakutou Sousei",
+  "via": "savagere",
+  "year": 1995
+ },
+ "sbp": {
+  "title": "Super Bubble Pop",
+  "via": "sbp",
+  "year": 2004
+ },
+ "sdodgeb": {
+  "title": "Super Dodge Ball / Kunio no Nekketsu Toukyuu Densetsu",
+  "via": "sdodgeb",
+  "year": 1996
+ },
+ "secretofevermoresfc": {
+  "candidates": 5,
+  "title": "Secret of Evermore (USA)",
+  "via": "snes_secrever",
+  "year": 1995
+ },
+ "secretofmanasfc": {
+  "candidates": 4,
+  "title": "Secret of Mana (USA)",
+  "via": "snes_secretmana",
+  "year": 1993
+ },
+ "sectionzunes": {
+  "candidates": 1,
+  "title": "Section-Z (USA)",
+  "via": "nes_sectionz",
+  "year": 1987
+ },
+ "sedfsfc": {
+  "title": "Super E.D.F. - Earth Defense Force (USA)",
+  "via": "snes_superedf",
+  "year": 1991
+ },
+ "sengo3snd": {
+  "title": "Sengoku 3 / Sengoku Densho 2001 (set 1)",
+  "via": "sengoku3",
+  "year": 2001
+ },
+ "sengoku": {
+  "title": "Sengoku / Sengoku Denshou (NGM-017 ~ NGH-017)",
+  "via": "sengoku",
+  "year": 1991
+ },
+ "sengoku2": {
+  "title": "Sengoku 2 / Sengoku Denshou 2",
+  "via": "sengoku2",
+  "year": 1993
+ },
+ "sengoku3": {
+  "title": "Sengoku 3 / Sengoku Densho 2001 (set 1)",
+  "via": "sengoku3",
+  "year": 2001
+ },
+ "sf2": {
+  "title": "Street Fighter II: The World Warrior (World 910522)",
+  "via": "sf2",
+  "year": 1991
+ },
+ "sf2ce": {
+  "title": "Street Fighter II': Champion Edition (World 920513)",
+  "via": "sf2ce",
+  "year": 1992
+ },
+ "sf2hf": {
+  "title": "Street Fighter II': Hyper Fighting (World 921209)",
+  "via": "sf2hf",
+  "year": 1992
+ },
+ "sfa": {
+  "title": "Street Fighter Alpha: Warriors' Dreams (Europe 950727)",
+  "via": "sfa",
+  "year": 1995
+ },
+ "sfa2": {
+  "title": "Street Fighter Alpha 2 (Europe 960229)",
+  "via": "sfa2",
+  "year": 1996
+ },
+ "sfa3": {
+  "title": "Street Fighter Alpha 3 (Europe 980904)",
+  "via": "sfa3",
+  "year": 1998
+ },
+ "sfiii": {
+  "title": "Street Fighter III: New Generation (Europe 970204)",
+  "via": "sfiii",
+  "year": 1997
+ },
+ "sfiii2": {
+  "title": "Street Fighter III 2nd Impact: Giant Attack (USA 970930)",
+  "via": "sfiii2",
+  "year": 1997
+ },
+ "sfiii3": {
+  "title": "Street Fighter III 3rd Strike: Fight for the Future (Europe 990608)",
+  "via": "sfiii3",
+  "year": 1999
+ },
+ "sfz2al": {
+  "title": "Street Fighter Zero 2 Alpha (Asia 960826)",
+  "via": "sfz2al",
+  "year": 1996
+ },
+ "sgemf": {
+  "title": "Super Gem Fighter: Mini Mix (USA 970904)",
+  "via": "sgemf",
+  "year": 1997
+ },
+ "shadowgateunes": {
+  "candidates": 5,
+  "title": "Shadowgate (USA)",
+  "via": "nes_shadowgate",
+  "year": 1989
+ },
+ "shadowoftheninjaunes": {
+  "candidates": 1,
+  "title": "Shadow of the Ninja (USA)",
+  "via": "nes_shadonin",
+  "year": 1990
+ },
+ "shadowrunsfc": {
+  "candidates": 2,
+  "title": "Shadowrun (USA)",
+  "via": "snes_shadowrun",
+  "year": 1993
+ },
+ "shadoww": {
+  "title": "Shadow Warriors (World, set 1)",
+  "via": "shadoww",
+  "year": 1988
+ },
+ "shatterhandunes": {
+  "candidates": 1,
+  "title": "Shatterhand (USA)",
+  "via": "nes_shatterhand",
+  "year": 1991
+ },
+ "shdancer": {
+  "title": "Shadow Dancer (World)",
+  "via": "shdancer",
+  "year": 1989
+ },
+ "shinobi": {
+  "title": "Shinobi (set 6, System 16A) (unprotected)",
+  "via": "shinobi",
+  "year": 1987
+ },
+ "shocktr2": {
+  "title": "Shock Troopers - 2nd Squad",
+  "via": "shocktr2",
+  "year": 1998
+ },
+ "shocktro": {
+  "title": "Shock Troopers (set 1)",
+  "via": "shocktro",
+  "year": 1997
+ },
+ "sidmeierscivilizatsfc": {
+  "candidates": 1,
+  "title": "Sid Meier's Civilization (USA)",
+  "via": "snes_civilization",
+  "year": 1995
+ },
+ "silkwormunes": {
+  "candidates": 1,
+  "title": "Silk Worm (USA)",
+  "via": "nes_silkworm",
+  "year": 1990
+ },
+ "silversurferunes": {
+  "candidates": 1,
+  "title": "Silver Surfer (USA)",
+  "via": "nes_silversurfer",
+  "year": 1990
+ },
+ "simcitysfc": {
+  "candidates": 5,
+  "title": "SimCity (USA)",
+  "via": "snes_simcity",
+  "year": 1991
+ },
+ "simpsons2p": {
+  "title": "The Simpsons (2 Players World, set 1)",
+  "via": "simpsons2p",
+  "year": 1991
+ },
+ "simpsonsbartvsthesnes": {
+  "candidates": 1,
+  "title": "Simpsons, The: Bart vs. the Space Mutants (USA, Rev. A)",
+  "via": "nes_simpsbarvsspamu",
+  "year": 1991
+ },
+ "skateordieunes": {
+  "candidates": 1,
+  "title": "Skate or Die (USA)",
+  "via": "nes_skateordie",
+  "year": 1988
+ },
+ "skyblazersfc": {
+  "candidates": 1,
+  "title": "Skyblazer (USA)",
+  "via": "snes_skyblazer",
+  "year": 1993
+ },
+ "skysharkunes": {
+  "candidates": 1,
+  "title": "Sky Shark (USA, Rev. 0A)",
+  "via": "nes_skyshark",
+  "year": 1989
+ },
+ "slammast": {
+  "title": "Saturday Night Slam Masters (World 930713)",
+  "via": "slammast",
+  "year": 1993
+ },
+ "smashtvunes": {
+  "candidates": 1,
+  "title": "Smash T.V. (USA)",
+  "via": "nes_smashtv",
+  "year": 1991
+ },
+ "smwsfc": {
+  "candidates": 3,
+  "title": "Super Mario World ~ Super Mario Bros. 4 (Japan)",
+  "via": "snes_supermarioworldj",
+  "year": 1990
+ },
+ "snakerattlenrollunes": {
+  "candidates": 1,
+  "title": "Snake Rattle n Roll (USA)",
+  "via": "nes_snakeratnrol",
+  "year": 1990
+ },
+ "snakesrevengeunes": {
+  "candidates": 1,
+  "title": "Snake's Revenge (USA)",
+  "via": "nes_snakesrevenge",
+  "year": 1990
+ },
+ "snowbrothersunes": {
+  "candidates": 1,
+  "title": "Snow Brothers (USA)",
+  "via": "nes_snowbrothers",
+  "year": 1991
+ },
+ "socbrawl": {
+  "title": "Soccer Brawl (NGM-031)",
+  "via": "socbrawl",
+  "year": 1991
+ },
+ "solomonskeyunes": {
+  "candidates": 1,
+  "title": "Solomon's Key (USA)",
+  "via": "nes_solomonskey",
+  "year": 1987
+ },
+ "solsticethequestfones": {
+  "candidates": 1,
+  "title": "Solstice: The Quest for the Staff of Demnos (USA)",
+  "via": "nes_solst",
+  "year": 1990
+ },
+ "sonicblastman2sfc": {
+  "candidates": 2,
+  "title": "Sonic Blast Man II (USA)",
+  "via": "snes_sbmanii",
+  "year": 1994
+ },
+ "sonicblastmansfc": {
+  "candidates": 2,
+  "title": "Sonic Blast Man (USA)",
+  "via": "snes_sbman",
+  "year": 1992
+ },
+ "sonicwi2": {
+  "title": "Aero Fighters 2 / Sonic Wings 2",
+  "via": "sonicwi2",
+  "year": 1994
+ },
+ "sonicwi3": {
+  "title": "Aero Fighters 3 / Sonic Wings 3",
+  "via": "sonicwi3",
+  "year": 1995
+ },
+ "soulblazersfc": {
+  "candidates": 1,
+  "title": "Soul Blazer (USA)",
+  "via": "snes_soulblazer",
+  "year": 1992
+ },
+ "spacedx": {
+  "title": "Space Invaders DX (US, v2.1)",
+  "via": "spacedx",
+  "year": 1994
+ },
+ "spacemfsfc": {
+  "candidates": 1,
+  "title": "Space Megaforce (USA)",
+  "via": "snes_spacemforce",
+  "year": 1992
+ },
+ "sparkstersfc": {
+  "candidates": 1,
+  "title": "Sparkster (USA)",
+  "via": "snes_sparkster",
+  "year": 1994
+ },
+ "spelunkerunes": {
+  "candidates": 1,
+  "title": "Spelunker (USA)",
+  "via": "nes_spelunker",
+  "year": 1987
+ },
+ "spf2t": {
+  "title": "Super Puzzle Fighter II Turbo (Europe 960529)",
+  "via": "spf2t",
+  "year": 1996
+ },
+ "spidermanvenommaxisfc": {
+  "candidates": 2,
+  "title": "Spider-Man and Venom: Maximum Carnage (USA)",
+  "via": "snes_maxcarnage",
+  "year": 1994
+ },
+ "spinmast": {
+  "title": "Spin Master / Miracle Adventure",
+  "via": "spinmast",
+  "year": 1993
+ },
+ "splatter": {
+  "title": "Splatterhouse (World, new version (SH3))",
+  "via": "splatter",
+  "year": 1988
+ },
+ "ss5spsnd": {
+  "title": "Samurai Shodown V Special / Samurai Spirits Zero Special (NGM-2720)",
+  "via": "samsh5sp",
+  "year": 2004
+ },
+ "ssf2": {
+  "title": "Super Street Fighter II: The New Challengers (World 931005)",
+  "via": "ssf2",
+  "year": 1993
+ },
+ "ssf2t": {
+  "title": "Super Street Fighter II Turbo (World 940223)",
+  "via": "ssf2t",
+  "year": 1994
+ },
+ "ssf2xj": {
+  "title": "Super Street Fighter II X: Grand Master Challenge (Japan 940311)",
+  "via": "ssf2xj",
+  "year": 1994
+ },
+ "ssideki": {
+  "title": "Super Sidekicks / Tokuten Ou",
+  "via": "ssideki",
+  "year": 1992
+ },
+ "ssideki2": {
+  "title": "Super Sidekicks 2 - The World Championship / Tokuten Ou 2 - Real Fight Football (NGM-061 ~ NGH-061)",
+  "via": "ssideki2",
+  "year": 1994
+ },
+ "ssideki3": {
+  "title": "Super Sidekicks 3 - The Next Glory / Tokuten Ou 3 - Eikou e no Chousen",
+  "via": "ssideki3",
+  "year": 1995
+ },
+ "ssideki4": {
+  "title": "The Ultimate 11 - The SNK Football Championship / Tokuten Ou - Honoo no Libero",
+  "via": "ssideki4",
+  "year": 1996
+ },
+ "ssriders": {
+  "title": "Sunset Riders (4 Players ver EAC)",
+  "via": "ssriders",
+  "year": 1991
+ },
+ "sstriker": {
+  "title": "Sorcer Striker",
+  "via": "sstriker",
+  "year": 1993
+ },
+ "stakwin": {
+  "title": "Stakes Winner / Stakes Winner - GI Kinzen Seiha e no Michi",
+  "via": "stakwin",
+  "year": 1995
+ },
+ "stakwin2": {
+  "title": "Stakes Winner 2",
+  "via": "stakwin2",
+  "year": 1996
+ },
+ "starforceunes": {
+  "candidates": 1,
+  "title": "Star Force (USA)",
+  "via": "nes_starforce",
+  "year": 1987
+ },
+ "starfoxsfc": {
+  "candidates": 2,
+  "title": "Star Fox (USA, Rev. 2)",
+  "via": "snes_starfox",
+  "year": 1993
+ },
+ "starsoldierunes": {
+  "candidates": 1,
+  "title": "Star Soldier (USA)",
+  "via": "nes_starsoldier",
+  "year": 1989
+ },
+ "startropicsunes": {
+  "candidates": 1,
+  "title": "StarTropics (USA)",
+  "via": "nes_startropics",
+  "year": 1990
+ },
+ "starwarstheempiresnes": {
+  "candidates": 1,
+  "title": "Star Wars - The Empire Strikes Back (USA)",
+  "via": "nes_starwaresb",
+  "year": 1992
+ },
+ "starwarsunes": {
+  "candidates": 1,
+  "title": "Star Wars (USA)",
+  "via": "nes_starwars",
+  "year": 1991
+ },
+ "stingerunes": {
+  "candidates": 1,
+  "title": "Stinger (USA)",
+  "via": "nes_stinger",
+  "year": 1987
+ },
+ "streetfighteralphasfc": {
+  "candidates": 2,
+  "title": "Street Fighter Alpha 2 (USA)",
+  "via": "snes_sfalpha2",
+  "year": 1996
+ },
+ "streetfighteriithesfc": {
+  "candidates": 3,
+  "title": "Street Fighter II (USA)",
+  "via": "snes_sf2",
+  "year": 1992
+ },
+ "streetfighteriitursfc": {
+  "candidates": 3,
+  "title": "Street Fighter II Turbo (USA)",
+  "via": "snes_sf2turbo",
+  "year": 1993
+ },
+ "strhoop": {
+  "title": "Street Hoop / Street Slam / Dunk Dream (DEM-004 ~ DEH-004)",
+  "via": "strhoop",
+  "year": 1994
+ },
+ "strider": {
+  "title": "Strider (USA, B-Board 89624B-2)",
+  "via": "strider",
+  "year": 1989
+ },
+ "striderunes": {
+  "candidates": 1,
+  "title": "Strider (USA)",
+  "via": "nes_strider",
+  "year": 1989
+ },
+ "strikegunnerstgsfc": {
+  "candidates": 3,
+  "title": "Strike Gunner S.T.G (USA)",
+  "via": "snes_strikegunnerstg",
+  "year": 1992
+ },
+ "stuntracefxsfc": {
+  "candidates": 2,
+  "title": "Stunt Race FX (USA, Rev. 1)",
+  "via": "snes_stuntfx",
+  "year": 1994
+ },
+ "summercarnival92renes": {
+  "candidates": 1,
+  "title": "Summer Carnival '92 - Recca (Japan)",
+  "via": "nes_summecar92",
+  "year": 1992
+ },
+ "sunsetriderssfc": {
+  "candidates": 1,
+  "title": "Sunset Riders (USA)",
+  "via": "snes_sunsetriders",
+  "year": 1993
+ },
+ "superadventureislasfc": {
+  "candidates": 2,
+  "title": "Super Adventure Island II (USA)",
+  "via": "snes_superadvisland2",
+  "year": 1994
+ },
+ "superadventureislasfc2": {
+  "candidates": 2,
+  "title": "Super Adventure Island (USA)",
+  "via": "snes_superadvisland",
+  "year": 1992
+ },
+ "superbomberman2sfc": {
+  "candidates": 3,
+  "title": "Super Bomberman 2 (USA)",
+  "via": "snes_supbomb2",
+  "year": 1994
+ },
+ "superbombermansfc": {
+  "candidates": 3,
+  "title": "Super Bomberman (USA)",
+  "via": "snes_supbomb",
+  "year": 1993
+ },
+ "superbusterbrossfc": {
+  "candidates": 1,
+  "title": "Super Buster Bros. (USA, Rev. 1)",
+  "via": "snes_superbbros",
+  "year": 1992
+ },
+ "supercastle4sfc": {
+  "candidates": 2,
+  "title": "Super Castlevania IV (USA)",
+  "via": "snes_supercastlevania4",
+  "year": 1991
+ },
+ "supercunes": {
+  "candidates": 1,
+  "title": "Super C (USA)",
+  "via": "nes_superc",
+  "year": 1990
+ },
+ "superdodgeballunes": {
+  "candidates": 2,
+  "title": "Super Dodge Ball (USA)",
+  "via": "nes_superdodgeball",
+  "year": 1989
+ },
+ "superdoubledragonsfc": {
+  "candidates": 2,
+  "title": "Super Double Dragon (USA)",
+  "via": "snes_superdoubledragon",
+  "year": 1992
+ },
+ "supergngsfc": {
+  "candidates": 2,
+  "title": "Super Ghouls'n Ghosts (USA)",
+  "via": "snes_supergng",
+  "year": 1991
+ },
+ "superman": {
+  "title": "Superman (World)",
+  "via": "superman",
+  "year": 1988
+ },
+ "supermarioallstarssfc": {
+  "candidates": 2,
+  "title": "Super Mario All-Stars + Super Mario World (USA)",
+  "via": "snes_smallstarsworld",
+  "year": 1993
+ },
+ "supermarioallstarssfc2": {
+  "candidates": 2,
+  "title": "Super Mario All-Stars (USA)",
+  "via": "snes_smallstars",
+  "year": 1993
+ },
+ "supermariobros2nes": {
+  "candidates": 1,
+  "title": "Super Mario Bros. 2 (USA, Rev. A)",
+  "via": "nes_smb2",
+  "year": 1988
+ },
+ "supermariobros3enes": {
+  "candidates": 2,
+  "title": "Super Mario Bros. 3 (USA, Rev. A)",
+  "via": "nes_smb3",
+  "year": 1988
+ },
+ "supermariokartsfc": {
+  "candidates": 3,
+  "title": "Super Mario Kart (USA)",
+  "via": "snes_supermkart",
+  "year": 1992
+ },
+ "supermarioworld2yosfc": {
+  "candidates": 2,
+  "title": "Super Mario World 2: Yoshi's Island (USA, Rev. 1)",
+  "via": "snes_smw2",
+  "year": 1995
+ },
+ "supermetroidsfc": {
+  "candidates": 2,
+  "title": "Super Metroid (USA, Japan)",
+  "via": "snes_supermetroid",
+  "year": 1994
+ },
+ "supernovasfc": {
+  "candidates": 1,
+  "title": "Super Nova (USA)",
+  "via": "snes_supernova",
+  "year": 1993
+ },
+ "superpac": {
+  "title": "Super Pac-Man",
+  "via": "superpac",
+  "year": 1982
+ },
+ "superpunchoutsfc": {
+  "candidates": 3,
+  "title": "Super Punch-Out!! (USA)",
+  "via": "snes_superpunchout",
+  "year": 1994
+ },
+ "superrtypesfc": {
+  "candidates": 3,
+  "title": "Super R-Type (USA)",
+  "via": "snes_superrtype",
+  "year": 1991
+ },
+ "supersmashtvsfc": {
+  "candidates": 2,
+  "title": "Super Smash T.V. (USA)",
+  "via": "snes_supsmashtv",
+  "year": 1991
+ },
+ "supersoccersfc": {
+  "candidates": 2,
+  "title": "Super Soccer (USA)",
+  "via": "snes_supersoccer",
+  "year": 1992
+ },
+ "superspy": {
+  "title": "The Super Spy (NGM-011 ~ NGH-011)",
+  "via": "superspy",
+  "year": 1990
+ },
+ "superspyhunterunes": {
+  "candidates": 1,
+  "title": "Super Spy Hunter (USA)",
+  "via": "nes_superspyhunter",
+  "year": 1992
+ },
+ "superstarwarsretursfc": {
+  "candidates": 9,
+  "title": "Super Star Wars - Episode IV (USA, Rev. 1)",
+  "via": "snes_superstarwars",
+  "year": 1992
+ },
+ "superstarwarssfc": {
+  "candidates": 9,
+  "title": "Super Star Wars - Episode IV (USA, Rev. 1)",
+  "via": "snes_superstarwars",
+  "year": 1992
+ },
+ "superstarwarstheemsfc": {
+  "candidates": 9,
+  "title": "Super Star Wars - Episode IV (USA, Rev. 1)",
+  "via": "snes_superstarwars",
+  "year": 1992
+ },
+ "superstreetfightersfc": {
+  "candidates": 3,
+  "title": "Super Street Fighter II: The New Challengers (USA)",
+  "via": "snes_ssf2",
+  "year": 1994
+ },
+ "supertennissfc": {
+  "candidates": 2,
+  "title": "Super Tennis (USA)",
+  "via": "snes_supertennis",
+  "year": 1991
+ },
+ "superturrican2sfc": {
+  "candidates": 1,
+  "title": "Super Turrican 2 (USA)",
+  "via": "snes_superturrican2",
+  "year": 1995
+ },
+ "superturricansfc": {
+  "candidates": 1,
+  "title": "Super Turrican (USA)",
+  "via": "snes_superturrican",
+  "year": 1993
+ },
+ "svc": {
+  "title": "SNK vs. Capcom - SVC Chaos (NGM-2690 ~ NGH-2690)",
+  "via": "svc",
+  "year": 2003
+ },
+ "svcsnd": {
+  "title": "SNK vs. Capcom - SVC Chaos (NGM-2690 ~ NGH-2690)",
+  "via": "svc",
+  "year": 2003
+ },
+ "svg": {
+  "title": "S.V.G. - Spectral vs Generation / Sheng Mo Shiji (M68k label V200) (ARM label V200, ROM 10/11/05 S.V.G V201)",
+  "via": "svg",
+  "year": 2005
+ },
+ "swordmasterunes": {
+  "candidates": 1,
+  "title": "Sword Master (USA)",
+  "via": "nes_swordmaster",
+  "year": 1992
+ },
+ "szaxxon": {
+  "title": "Super Zaxxon (315-5013)",
+  "via": "szaxxon",
+  "year": 1982
+ },
+ "t2thearcadegamesfc": {
+  "candidates": 3,
+  "title": "T2 - The Arcade Game (USA)",
+  "via": "snes_t2arcade",
+  "year": 1993
+ },
+ "talespinunes": {
+  "candidates": 1,
+  "title": "TaleSpin (USA)",
+  "via": "nes_talespin",
+  "year": 1991
+ },
+ "tecmosuperbowlunes": {
+  "candidates": 1,
+  "title": "Tecmo Super Bowl (USA)",
+  "via": "nes_tecmosuperbowl",
+  "year": 1991
+ },
+ "teenagemutantninjanes": {
+  "candidates": 1,
+  "title": "Teenage Mutant Ninja Turtles (USA)",
+  "via": "nes_tmnt",
+  "year": 1989
+ },
+ "teenagemutantninjanes2": {
+  "candidates": 2,
+  "title": "Teenage Mutant Ninja Turtles II - The Arcade Game (Japan)",
+  "via": "nes_tmntiiarcgamj",
+  "year": 1990
+ },
+ "teenagemutantninjanes3": {
+  "candidates": 1,
+  "title": "Teenage Mutant Ninja Turtles III - The Manhattan Project (USA)",
+  "via": "nes_tmntiii",
+  "year": 1992
+ },
+ "teenagemutantninjanes4": {
+  "candidates": 1,
+  "title": "Teenage Mutant Ninja Turtles Tournament Fighters (USA)",
+  "via": "nes_tmnttoufig",
+  "year": 1994
+ },
+ "teenagemutantninjasfc": {
+  "candidates": 1,
+  "title": "Teenage Mutant Ninja Turtles: Tournament Fighters (USA)",
+  "via": "snes_tmntfight",
+  "year": 1993
+ },
+ "terminator2judgmensfc": {
+  "candidates": 2,
+  "title": "Terminator 2: Judgment Day (USA)",
+  "via": "snes_terminator2",
+  "year": 1993
+ },
+ "terracrestaunes": {
+  "candidates": 1,
+  "title": "Terra Cresta (USA)",
+  "via": "nes_terracresta",
+  "year": 1990
+ },
+ "tetris2sfc": {
+  "candidates": 2,
+  "title": "Tetris 2 (USA)",
+  "via": "snes_tetris2",
+  "year": 1994
+ },
+ "tetrisattacksfc": {
+  "candidates": 2,
+  "title": "Tetris Attack (USA)",
+  "via": "snes_tetrisattack",
+  "year": 1996
+ },
+ "tetrisdrmariosfc": {
+  "candidates": 2,
+  "title": "Tetris & Dr. Mario (USA)",
+  "via": "snes_tetrisdrmario",
+  "year": 1994
+ },
+ "tetrisunes": {
+  "candidates": 3,
+  "title": "Tetris (BPS) (Japan)",
+  "via": "nes_tetrisj",
+  "year": 1988
+ },
+ "theglad": {
+  "title": "The Gladiator / Shenjian Fumo Lu / Shenjian Fengyun (M68k label V101) (ARM label V107, ROM 06/06/03 SHEN JIAN V107)",
+  "via": "theglad",
+  "year": 2003
+ },
+ "thndrx2": {
+  "title": "Thunder Cross II (World)",
+  "via": "thndrx2",
+  "year": 1991
+ },
+ "thunderspiritssfc": {
+  "candidates": 2,
+  "title": "Thunder Spirits (USA)",
+  "via": "snes_thunderspirits",
+  "year": 1991
+ },
+ "thunderx": {
+  "title": "Thunder Cross (set 1)",
+  "via": "thunderx",
+  "year": 1988
+ },
+ "tigerheliunes": {
+  "candidates": 1,
+  "title": "Tiger-Heli (USA)",
+  "via": "nes_tigerheli",
+  "year": 1987
+ },
+ "timeplt": {
+  "title": "Time Pilot",
+  "via": "timeplt",
+  "year": 1982
+ },
+ "timesold": {
+  "title": "Time Soldiers (US Rev 3)",
+  "via": "timesold",
+  "year": 1987
+ },
+ "tinytoonadventuresnes": {
+  "candidates": 2,
+  "title": "Tiny Toon Adventures (USA)",
+  "via": "nes_tinytooadv",
+  "year": 1991
+ },
+ "tinytoonadventuresnes2": {
+  "candidates": 1,
+  "title": "Tiny Toon Adventures 2: Trouble in Wackyland (USA)",
+  "via": "nes_tinytooadv2trinwa",
+  "year": 1993
+ },
+ "tinytoonadventuressfc": {
+  "candidates": 2,
+  "title": "Tiny Toon Adventures - Buster Busts Loose! (USA)",
+  "via": "snes_tinytoon",
+  "year": 1993
+ },
+ "tmnt": {
+  "title": "Teenage Mutant Ninja Turtles (World 4 Players, version X)",
+  "via": "tmnt",
+  "year": 1989
+ },
+ "tmnt22pu": {
+  "title": "Teenage Mutant Ninja Turtles - Turtles in Time (2 Players ver UDA)",
+  "via": "tmnt22pu",
+  "year": 1991
+ },
+ "tmnt2po": {
+  "title": "Teenage Mutant Ninja Turtles (Oceania 2 Players, version ?)",
+  "via": "tmnt2po",
+  "year": 1989
+ },
+ "tmntitsfc": {
+  "candidates": 1,
+  "title": "Teenage Mutant Ninja Turtles IV: Turtles in Time (USA)",
+  "via": "snes_tmntiv",
+  "year": 1992
+ },
+ "tokiunes": {
+  "candidates": 1,
+  "title": "Toki (USA)",
+  "via": "nes_toki",
+  "year": 1991
+ },
+ "topgear2sfc": {
+  "candidates": 2,
+  "title": "Top Gear 2 (USA)",
+  "via": "snes_topgear2",
+  "year": 1993
+ },
+ "topgear3000sfc": {
+  "candidates": 2,
+  "title": "Top Gear 3000 (USA)",
+  "via": "snes_topgear3000",
+  "year": 1994
+ },
+ "topgearsfc": {
+  "candidates": 2,
+  "title": "Top Gear (USA)",
+  "via": "snes_topgear",
+  "year": 1992
+ },
+ "tophuntr": {
+  "title": "Top Hunter - Roddy & Cathy (NGM-046)",
+  "via": "tophuntr",
+  "year": 1994
+ },
+ "totalcarnagesfc": {
+  "candidates": 1,
+  "title": "Total Carnage (USA)",
+  "via": "snes_totalcarnage",
+  "year": 1993
+ },
+ "toystorysfc": {
+  "candidates": 1,
+  "title": "Disney's Toy Story (USA)",
+  "via": "snes_toystory",
+  "year": 1995
+ },
+ "tpgolf": {
+  "title": "Top Player's Golf (NGM-003 ~ NGH-003)",
+  "via": "tpgolf",
+  "year": 1990
+ },
+ "trackfieldunes": {
+  "candidates": 1,
+  "title": "Track & Field (USA)",
+  "via": "nes_trackfield",
+  "year": 1987
+ },
+ "trally": {
+  "title": "Thrash Rally (ALM-003 ~ ALH-003)",
+  "via": "trally",
+  "year": 1991
+ },
+ "trojanunes": {
+  "candidates": 1,
+  "title": "Trojan (USA)",
+  "via": "nes_trojan",
+  "year": 1987
+ },
+ "truxton": {
+  "title": "Truxton (Europe, US) / Tatsujin (Japan)",
+  "via": "truxton",
+  "year": 1988
+ },
+ "truxton2": {
+  "title": "Truxton II / Tatsujin Oh",
+  "via": "truxton2",
+  "year": 1992
+ },
+ "tuffenuffsfc": {
+  "candidates": 1,
+  "title": "Tuff E Nuff (USA)",
+  "via": "snes_tuffenuff",
+  "year": 1993
+ },
+ "turfmast": {
+  "title": "Neo Turf Masters / Big Tournament Golf",
+  "via": "turfmast",
+  "year": 1996
+ },
+ "twincobraunes": {
+  "candidates": 1,
+  "title": "Twin Cobra (USA)",
+  "via": "nes_twincobra",
+  "year": 1990
+ },
+ "twinspri": {
+  "title": "Twinkle Star Sprites",
+  "via": "twinspri",
+  "year": 1996
+ },
+ "twocrude": {
+  "title": "Two Crude (US FT revision 1)",
+  "via": "twocrude",
+  "year": 1990
+ },
+ "tws96": {
+  "title": "Tecmo World Soccer '96",
+  "via": "twsoc96",
+  "year": 1996
+ },
+ "uccops": {
+  "title": "Undercover Cops (World)",
+  "via": "uccops",
+  "year": 1992
+ },
+ "ultimaexodusunes": {
+  "candidates": 1,
+  "title": "Ultima - Exodus (USA)",
+  "via": "nes_ultimaexodus",
+  "year": 1989
+ },
+ "ultrax": {
+  "title": "Ultra X Weapons / Ultra Keibitai",
+  "via": "ultrax",
+  "year": 1995
+ },
+ "uninvitedunes": {
+  "candidates": 1,
+  "title": "Uninvited (USA)",
+  "via": "nes_uninvited",
+  "year": 1991
+ },
+ "uniracerssfc": {
+  "candidates": 1,
+  "title": "Uniracers (USA)",
+  "via": "snes_uniracers",
+  "year": 1994
+ },
+ "unsquad": {
+  "title": "U.N. Squadron (USA)",
+  "via": "unsquad",
+  "year": 1989
+ },
+ "unsquadsfc": {
+  "candidates": 2,
+  "title": "U.N. Squadron (USA)",
+  "via": "snes_unsquadron",
+  "year": 1991
+ },
+ "urbanstrikesfc": {
+  "candidates": 1,
+  "title": "Urban Strike (USA)",
+  "via": "snes_urbanstrike",
+  "year": 1994
+ },
+ "vangrd2": {
+  "title": "Vanguard II",
+  "via": "vangrd2",
+  "year": 1984
+ },
+ "vanguard": {
+  "title": "Vanguard (SNK)",
+  "via": "vanguard",
+  "year": 1981
+ },
+ "varth": {
+  "title": "Varth: Operation Thunderstorm (World 920714)",
+  "via": "varth",
+  "year": 1992
+ },
+ "vasara": {
+  "title": "Vasara",
+  "via": "vasara",
+  "year": 2000
+ },
+ "vasara2": {
+  "title": "Vasara 2 (set 1)",
+  "via": "vasara2",
+  "year": 2001
+ },
+ "vendetta": {
+  "title": "Vendetta (World, 4 Players, ver. T)",
+  "via": "vendetta",
+  "year": 1991
+ },
+ "vhunt2": {
+  "title": "Vampire Hunter 2: Darkstalkers Revenge (Japan 970929)",
+  "via": "vhunt2",
+  "year": 1997
+ },
+ "viceprojectdoomunes": {
+  "candidates": 1,
+  "title": "Vice - Project Doom (USA)",
+  "via": "nes_vice",
+  "year": 1991
+ },
+ "viewpoin": {
+  "title": "Viewpoint",
+  "via": "viewpoin",
+  "year": 1992
+ },
+ "vigilant": {
+  "title": "Vigilante (World, Rev E)",
+  "via": "vigilant",
+  "year": 1988
+ },
+ "viostorm": {
+  "title": "Violent Storm (ver EAC)",
+  "via": "viostorm",
+  "year": 1993
+ },
+ "vliner": {
+  "title": "V-Liner (v0.7a)",
+  "via": "vliner",
+  "year": 2001
+ },
+ "vsav": {
+  "title": "Vampire Savior: The Lord of Vampire (Europe 970519)",
+  "via": "vsav",
+  "year": 1997
+ },
+ "vsav2": {
+  "title": "Vampire Savior 2: The Lord of Vampire (Japan 970913)",
+  "via": "vsav2",
+  "year": 1997
+ },
+ "wakuwak7": {
+  "title": "Waku Waku 7",
+  "via": "wakuwak7",
+  "year": 1996
+ },
+ "warioswoodssfc": {
+  "candidates": 1,
+  "title": "Wario's Woods (USA)",
+  "via": "snes_wariowoods",
+  "year": 1994
+ },
+ "warioswoodsunes": {
+  "candidates": 1,
+  "title": "Wario's Woods (USA)",
+  "via": "nes_warioswoods",
+  "year": 1994
+ },
+ "weaponlordsfc": {
+  "candidates": 1,
+  "title": "WeaponLord (USA)",
+  "via": "snes_weaponlord",
+  "year": 1995
+ },
+ "wh1": {
+  "title": "World Heroes (ALM-005)",
+  "via": "wh1",
+  "year": 1992
+ },
+ "wh2": {
+  "title": "World Heroes 2 (ALM-006 ~ ALH-006)",
+  "via": "wh2",
+  "year": 1993
+ },
+ "wh2j": {
+  "title": "World Heroes 2 Jet (ADM-007 ~ ADH-007)",
+  "via": "wh2j",
+  "year": 1994
+ },
+ "whompemunes": {
+  "candidates": 1,
+  "title": "Whomp 'Em (USA)",
+  "via": "nes_whompem",
+  "year": 1991
+ },
+ "whp": {
+  "title": "World Heroes Perfect",
+  "via": "whp",
+  "year": 1995
+ },
+ "wildgunssfc": {
+  "candidates": 3,
+  "title": "Wild Guns (USA)",
+  "via": "snes_wildguns",
+  "year": 1994
+ },
+ "willow": {
+  "title": "Willow (World)",
+  "via": "willow",
+  "year": 1989
+ },
+ "willowunes": {
+  "candidates": 2,
+  "title": "Willow (USA)",
+  "via": "nes_willow",
+  "year": 1989
+ },
+ "wizardswarriorsiiines": {
+  "candidates": 1,
+  "title": "Wizards & Warriors III - Kuros: Visions of Power (USA)",
+  "via": "nes_wizarwariii",
+  "year": 1992
+ },
+ "wjammers": {
+  "title": "Windjammers / Flying Power Disc",
+  "via": "wjammers",
+  "year": 1994
+ },
+ "wof": {
+  "title": "Warriors of Fate (World 921031)",
+  "via": "wof",
+  "year": 1992
+ },
+ "wolfenstein3dsfc": {
+  "candidates": 2,
+  "title": "Wolfenstein 3-D (USA)",
+  "via": "snes_wolf3d",
+  "year": 1993
+ },
+ "worldheroes2sfc": {
+  "candidates": 2,
+  "title": "World Heroes 2 (Japan)",
+  "via": "snes_wh2j",
+  "year": 1994
+ },
+ "worldheroessfc": {
+  "candidates": 3,
+  "title": "World Heroes (Japan)",
+  "via": "snes_whj",
+  "year": 1993
+ },
+ "wwfwrestlemaniathesfc": {
+  "candidates": 2,
+  "title": "WWF WrestleMania - The Arcade Game (USA)",
+  "via": "snes_wwfwrestlemaniaarcade",
+  "year": 1995
+ },
+ "xeviousunes": {
+  "candidates": 1,
+  "title": "Xevious - The Avenger (USA)",
+  "via": "nes_xevious",
+  "year": 1988
+ },
+ "xexex": {
+  "title": "Xexex (ver EAA)",
+  "via": "xexex",
+  "year": 1991
+ },
+ "xexyzunes": {
+  "candidates": 1,
+  "title": "Xexyz (USA)",
+  "via": "nes_xexyz",
+  "year": 1990
+ },
+ "xmcota": {
+  "title": "X-Men: Children of the Atom (Europe 950331)",
+  "via": "xmcota",
+  "year": 1994
+ },
+ "xmen": {
+  "title": "X-Men (4 Players ver UBB)",
+  "via": "xmenu",
+  "year": 1992
+ },
+ "xmenmutantapocalypsfc": {
+  "candidates": 3,
+  "title": "X-Men - Mutant Apocalypse (USA)",
+  "via": "snes_xmenma",
+  "year": 1994
+ },
+ "xmvsf": {
+  "title": "X-Men Vs. Street Fighter (Europe 961004)",
+  "via": "xmvsf",
+  "year": 1996
+ },
+ "yoshiscookiesfc": {
+  "candidates": 2,
+  "title": "Yoshi's Cookie (USA)",
+  "via": "snes_yoshicookie",
+  "year": 1993
+ },
+ "yoshiscookieunes": {
+  "candidates": 1,
+  "title": "Yoshi's Cookie (USA)",
+  "via": "nes_yoshiscookie",
+  "year": 1993
+ },
+ "yoshiunes": {
+  "candidates": 1,
+  "title": "Yoshi (USA)",
+  "via": "nes_yoshi",
+  "year": 1992
+ },
+ "zanacunes": {
+  "candidates": 1,
+  "title": "Zanac (USA)",
+  "via": "nes_zanac",
+  "year": 1987
+ },
+ "zaxxon": {
+  "title": "Zaxxon (set 1, rev D)",
+  "via": "zaxxon",
+  "year": 1982
+ },
+ "zedblade": {
+  "title": "Zed Blade / Operation Ragnarok",
+  "via": "zedblade",
+  "year": 1994
+ },
+ "zeldaiitheadventurnes": {
+  "candidates": 1,
+  "title": "Zelda II: The Adventure of Link (USA)",
+  "via": "nes_zeldaii",
+  "year": 1988
+ },
+ "zintrckb": {
+  "title": "Zintrick / Oshidashi Zentrix (bootleg of CD version)",
+  "via": "zintrckb",
+  "year": 1996
+ },
+ "zombienationunes": {
+  "candidates": 1,
+  "title": "Zombie Nation (USA)",
+  "via": "nes_zombienation",
+  "year": 1991
+ },
+ "zombiesatemyneighbsfc": {
+  "candidates": 1,
+  "title": "Zombies Ate My Neighbors (USA)",
+  "via": "snes_zombies",
+  "year": 1993
+ },
+ "zupapa": {
+  "title": "Zupapa!",
+  "via": "zupapa",
+  "year": 2001
+ }
+}

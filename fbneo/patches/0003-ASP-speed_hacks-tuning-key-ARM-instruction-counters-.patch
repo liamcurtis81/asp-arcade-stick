@@ -1,0 +1,219 @@
+From edfd519453633f5a8f85053936e82301315cadbc Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 30 Oct 2026 10:15:11 +0000
+Subject: [PATCH 03/21] ASP: speed_hacks tuning key, ARM instruction counters,
+ driver reset pulse
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/burner/pi/main_pi.cpp | 75 +++++++++++++++++++++++++++++++++++++++
+ src/burner/pi/run_pi.cpp  | 31 ++++++++++++++++
+ src/cpu/arm_intf.cpp      | 19 ++++++++++
+ 3 files changed, 125 insertions(+)
+
+diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
+index cf28bc8..8ab19b4 100755
+--- a/src/burner/pi/main_pi.cpp
++++ b/src/burner/pi/main_pi.cpp
+@@ -302,6 +302,13 @@ extern int asp_aud_rate_override;
+ extern int asp_aud_device_samples;
+ extern int asp_hash_frames;
+ extern int asp_exit_after_frames;
++extern unsigned char *asp_reset_ptr;
++extern int asp_reset_pending;
++
++// -1 = leave the driver's own default alone (every game unless its section
++// says otherwise), 0 = force off, 1 = force on. Applies to any driver that
++// offers a DIP group whose name contains both "speed" and "hack".
++int asp_speed_hacks = -1;
+ 
+ // Returns 1 if the key was recognised and applied, 0 if it is unknown.
+ static int asp_tuning_apply(const char *key, int value)
+@@ -326,6 +333,8 @@ static int asp_tuning_apply(const char *key, int value)
+ 		asp_hash_frames = value;
+ 	} else if (strcmp(key, "exit_after_frames") == 0) {
+ 		asp_exit_after_frames = value;
++	} else if (strcmp(key, "speed_hacks") == 0) {
++		asp_speed_hacks = value;
+ 	} else {
+ 		return 0;
+ 	}
+@@ -410,6 +419,69 @@ static void asp_tuning_load(void)
+ 	fclose(f);
+ }
+ 
++// Arm or disarm a driver's own speed hack by its DIP switch, by name.
++//
++// Night Slashers' driver carries an idle-loop hack (address 0x9e0) behind a
++// "Speed Hacks" DIP that defaults to Off, so on the stick the ARM interpreter
++// has been executing the game's busy-wait loop instruction by instruction
++// every frame. FBNeo's other frontends let the user flip the switch; this one
++// takes DIPs only from command-line arguments, which the launcher builds.
++//
++// Matching on the group's NAME rather than a hardcoded index means the same
++// key works on any driver that offers such a group. The deco32 driver reads
++// the switch only inside DrvDoReset, which already ran during init before any
++// DIP value reached DrvDips - so after setting it, a one-frame reset pulse is
++// queued for the run loop. Returns 1 if a switch was found and set.
++static int asp_apply_speed_hacks(void)
++{
++	if (asp_speed_hacks < 0) return 0;
++
++	const char *want = asp_speed_hacks ? "on" : "off";
++	int dipOffset = 0;
++	int inGroup = 0;
++	BurnDIPInfo bdi;
++
++	for (int i = 0; BurnDrvGetDIPInfo(&bdi, i) == 0; i++) {
++		if (bdi.nFlags == 0xF0) {
++			dipOffset = bdi.nInput;
++			continue;
++		}
++		if (bdi.nFlags & 0x40) {
++			inGroup = bdi.szText
++				&& strcasestr(bdi.szText, "speed") != NULL
++				&& strcasestr(bdi.szText, "hack") != NULL;
++			continue;
++		}
++		if (!inGroup || !bdi.szText || strcasecmp(bdi.szText, want) != 0) {
++			continue;
++		}
++
++		struct GameInp *pgi = GameInp + bdi.nInput + dipOffset;
++		pgi->Input.Constant.nConst =
++			(pgi->Input.Constant.nConst & ~bdi.nMask) | (bdi.nSetting & bdi.nMask);
++
++		// Find the driver's reset line, by its info name, and queue a pulse.
++		BurnInputInfo bii;
++		for (int j = 0; BurnDrvGetInputInfo(&bii, j) == 0; j++) {
++			if (bii.szInfo && strcmp(bii.szInfo, "reset") == 0 && bii.pVal) {
++				asp_reset_ptr = bii.pVal;
++				asp_reset_pending = 2;
++				break;
++			}
++		}
++
++		fprintf(stderr, "asp: speed hacks %s via DIP; %s\n",
++			asp_speed_hacks ? "ON" : "OFF",
++			asp_reset_ptr ? "driver reset queued for the first frame"
++			              : "NO reset input found, the driver may not see it");
++		return 1;
++	}
++
++	fprintf(stderr, "asp: speed_hacks set but this driver has no speed-hack "
++		"DIP switch; ignored\n");
++	return 0;
++}
++
+ // The directory the launcher's ROM argument pointed at, remembered so it can
+ // be put back after ConfigAppLoad overwrites szAppRomPaths from fbneo.ini.
+ static char asp_rom_dir[MAX_PATH];
+@@ -628,6 +700,9 @@ int main(int argc, char *argv[])
+ 	}
+ 
+ #ifdef BUILD_ASP
++	// Before the log closes, so whether it took is on the record.
++	asp_apply_speed_hacks();
++
+ 	// Init succeeded, so there is nothing more worth logging and every
+ 	// further line would be a write to the card during play.
+ 	asp_log_close();
+diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
+index e8ad44c..7702d49 100644
+--- a/src/burner/pi/run_pi.cpp
++++ b/src/burner/pi/run_pi.cpp
+@@ -133,6 +133,11 @@ int asp_hash_frames = 0;
+ // makes two runs exactly comparable, since they cover the same frames rather
+ // than the same wall-clock seconds under a variable-speed emulator.
+ int asp_exit_after_frames = 0;
++
++// Driver reset pulse requested by main_pi; see the InputMake site. 2 = raise
++// the line this frame, 1 = drop it this frame, 0 = idle.
++unsigned char *asp_reset_ptr = NULL;
++int asp_reset_pending = 0;
+ unsigned int asp_hash_state = 2166136261u;
+ unsigned int asp_hash_done = 0;
+ unsigned int asp_hash_marks[6];
+@@ -195,6 +200,19 @@ static int RunFrame(int bDraw, int bPause)
+ 		nFramesEmulated++;
+ 		nCurrentFrame++;
+ 		InputMake(true);
++#ifdef BUILD_ASP
++		// A driver reset requested by main_pi, for settings the driver only
++		// reads inside its reset routine - the deco32 speed hack is armed in
++		// DrvDoReset from DrvDips[3]. DIP values reach DrvDips during
++		// InputMake, so the pulse goes AFTER it and before the frame runs.
++		// Driven explicitly high for one frame and explicitly low on the next,
++		// so an unmapped reset input can never be left stuck at 1 and reset
++		// the game on every frame.
++		if (asp_reset_ptr != NULL && asp_reset_pending > 0) {
++			*asp_reset_ptr = (asp_reset_pending == 2) ? 1 : 0;
++			asp_reset_pending--;
++		}
++#endif
+ 	}
+ 
+ 	if (bDraw) {
+@@ -473,6 +491,19 @@ static void asp_log_framerate(unsigned int ticks, int emulated, int rendered)
+ 			}
+ 		}
+ 
++		{
++			extern unsigned long long asp_arm_insns, asp_arm_idle_hits;
++			extern int asp_speed_hacks;
++			if (asp_arm_insns > 0 && emulated > 0) {
++				fprintf(f, "----- ARM: %llu instructions interpreted, %.0f per "
++					"emulated frame; speed hack %s, %llu idle-loop hits -----\n",
++					asp_arm_insns, (double)asp_arm_insns / (double)emulated,
++					asp_speed_hacks == 1 ? "ON" :
++						(asp_speed_hacks == 0 ? "off (forced)" : "off (driver default)"),
++					asp_arm_idle_hits);
++			}
++		}
++
+ 		fprintf(f, "----- audio catch-up batch sizes:");
+ 		for (int i = 1; i <= 8; i++) {
+ 			if (asp_batch_hist[i]) fprintf(f, " %d:%u", i, asp_batch_hist[i]);
+diff --git a/src/cpu/arm_intf.cpp b/src/cpu/arm_intf.cpp
+index 424ad5b..7fe45a6 100644
+--- a/src/cpu/arm_intf.cpp
++++ b/src/cpu/arm_intf.cpp
+@@ -26,6 +26,18 @@ static UINT8  (*pReadByteHandler)(UINT32) = NULL;
+ UINT32 ArmSpeedHackAddress;
+ static void (*pArmSpeedHackCallback)();
+ 
++#ifdef BUILD_ASP
++// Exact counts, independent of the host: every ARM instruction the interpreter
++// runs passes through ArmFetchLong once, so this is instructions interpreted.
++// Counts rather than times, because qemu's timings mean nothing for this
++// device but a count is the same everywhere. asp_arm_idle_hits counts arrivals
++// at the idle-loop address while a speed hack is armed; with it disarmed the
++// address is ~0 and nothing can match, so the saving shows up instead as the
++// difference in asp_arm_insns between an armed and a disarmed run.
++unsigned long long asp_arm_insns = 0;
++unsigned long long asp_arm_idle_hits = 0;
++#endif
++
+ extern void arm_set_irq_line(INT32 irqline, INT32 state);
+ 
+ static void core_set_irq(INT32 /*cpu*/, INT32 line, INT32 state)
+@@ -231,8 +243,15 @@ UINT32 ArmFetchLong(UINT32 addr)
+ 	bprintf (PRINT_NORMAL, _T("%5.5x, rlo\n"), addr);
+ #endif
+ 
++#ifdef BUILD_ASP
++	asp_arm_insns++;
++#endif
++
+ #if 1
+ 	if (ArmSpeedHackAddress == addr) {
++#ifdef BUILD_ASP
++		asp_arm_idle_hits++;
++#endif
+ 		//bprintf (0, _T("speed hack activated! %d cycles killed!\n"), ArmRemainingCycles());
+ 		if (pArmSpeedHackCallback) {
+ 			pArmSpeedHackCallback();
+-- 
+2.43.0
+

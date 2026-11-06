@@ -1,0 +1,683 @@
+diff --git a/dingux-sdl/sdlmain.cpp b/dingux-sdl/sdlmain.cpp
+index 70280c8..e567528 100644
+--- a/dingux-sdl/sdlmain.cpp
++++ b/dingux-sdl/sdlmain.cpp
+@@ -85,6 +85,16 @@ static void sync() { }
+ #else
+ 	uint8 *keyssnes;
+ #endif
++#ifdef ASP_BUILD
++	/* the ASP reads as a joystick, not as a keyboard like the Dingoo */
++	static SDL_Joystick *asp_joy;
++
++/* Both defined further down, beside the rest of the ASP screen handling, but
++ * needed up here: the sound rate comes out of asp_screen.cfg, so the file has
++ * to be read before S9xInitSound runs. */
++static void asp_read_screen_cfg(void);
++extern int asp_sound_rate_idx;
++#endif
+ 
+ #ifdef NETPLAY_SUPPORT
+ 	static uint32	joypads[8];
+@@ -246,11 +256,81 @@ void S9xReadConfig()
+ 	fclose(fp);
+ }
+ 
++#ifdef ASP_BUILD
++char asp_save_dir[512];
++
++/* Saves go to the directory the firmware passes as argv[2] (normally
++ * /mnt/data/save). Without this snes9x would use $HOME/.snes96_snapshots,
++ * and $HOME is not set to anything writable on this device. */
++static const char *asp_get_save_dir(void)
++{
++	char path[512];
++	int n;
++	if (asp_save_dir[0])
++		return asp_save_dir;
++	n = readlink("/proc/self/exe", path, sizeof(path) - 1);
++	if (n <= 0)
++		return ".";
++	path[n] = 0;
++	while (n > 0 && path[n - 1] != '/') n--;
++	path[n ? n - 1 : 0] = 0;
++	strncpy(asp_save_dir, path, sizeof(asp_save_dir) - 1);
++	return asp_save_dir;
++}
++
++/* The firmware's log.asp.txt is tiny and rewritten every launch, so keep our
++ * own next to the binary. Also note the firmware invokes emulators as
++ *   <emu> "<rom>" /mnt/data/save
++ * so there is always a trailing argument that is not a ROM. */
++static void asp_open_log(void)
++{
++	char path[512];
++	int n = readlink("/proc/self/exe", path, sizeof(path) - 16);
++	if (n <= 0) return;
++	path[n] = 0;
++	while (n > 0 && path[n - 1] != '/') n--;
++	strcpy(path + n, "sfc_log.txt");
++	/* Append rather than truncate, with a cap, and mark each launch. A
++	 * truncating open loses the evidence for any crash as soon as the next
++	 * game is started, which is how one crash report here went unexplained:
++	 * by the time the card could be read, a later launch had overwritten it. */
++	{
++		struct stat lst;
++		const char *mode = "a";
++		if (stat(path, &lst) == 0 && lst.st_size > 512 * 1024)
++			mode = "w";
++		if (freopen(path, mode, stderr) == NULL) return;
++	}
++	setvbuf(stderr, NULL, _IOLBF, 0);
++	dup2(fileno(stderr), fileno(stdout));
++	setvbuf(stdout, NULL, _IOLBF, 0);
++}
++#endif
++
+ extern "C"
+ #undef main
++
+ int main (int argc, char **argv)
+ {
+ 	start = clock();
++#ifdef ASP_BUILD
++	{
++		int i;
++		asp_open_log();
++		fprintf(stderr, "\n===== launch: %s =====\n",
++			(argc > 1 && argv[1]) ? argv[1] : "(no rom)");
++		for (i = 0; i < argc; i++)
++			fprintf(stderr, "asp: argv[%d] = %s\n", i, argv[i]);
++		/* The firmware hands us its save directory here. Keep it for
++		 * S9xGetSnapshotDirectory, then drop it so the ROM parser
++		 * below cannot mistake it for a second ROM. */
++		if (argc > 2 && argv[2] && argv[2][0] == '/') {
++			strncpy(asp_save_dir, argv[2], sizeof(asp_save_dir) - 1);
++			mkdir(asp_save_dir, 0777);
++		}
++		if (argc > 2) argc = 2;
++	}
++#endif
+ 	if (argc < 2) {
+ 		S9xUsage ();
+ 	}
+@@ -258,7 +338,18 @@ int main (int argc, char **argv)
+ 	ZeroMemory (&Settings, sizeof (Settings));
+ 
+ 	Settings.JoystickEnabled = FALSE;
++#ifdef ASP_BUILD
++	/* Rates[6] is 44100. This fork defaults to index 3, 16000, because it was
++	 * written for handhelds that could not keep up; the ASP's audio node is
++	 * wired to 44100 and plays whatever it is given at that rate, so 16000
++	 * came out 2.75x too fast. Feeding it 44100 directly means SDL has no
++	 * resampling to do and the pitch is right by construction. */
++	/* Read before S9xInitSound below, since the rate comes from the file. */
++	asp_read_screen_cfg();
++	Settings.SoundPlaybackRate = asp_sound_rate_idx;
++#else
+ 	Settings.SoundPlaybackRate = 3;
++#endif
+ 	Settings.Stereo = TRUE;
+ 	Settings.SoundSync = TRUE;
+ 	Settings.SoundBufferSize = 256;
+@@ -600,8 +691,118 @@ void S9xExit()
+ }
+ 
+ Uint16 sfc_key[256];
++
++#if defined(ASP_BUILD)
++/* The ASP has no spare control to give up to "quit", and the launcher offers no
++ * way back out of an emulator, so one combination has to serve. Select+Start
++ * pressed together is no good on its own: it is the SNES soft-reset combo and
++ * several games use it, so it has to be a deliberate hold. 1.5 seconds is long
++ * enough that no game asks for it and short enough not to feel broken. */
++/* Options (button 10) returns to the ASP menu, which is what Options already
++ * does in the stock Neo Geo games - so it behaves the same everywhere on the
++ * device. No hold and no chord: Options is not a button any game uses, and the
++ * earlier Select+Start chord was sitting on buttons 6 and 7, which turned out
++ * to be the two white face buttons rather than Select and Start. */
++#define ASP_BTN_OPTIONS 10
++
++/* Input tracing, off unless ASP_INPUT_LOG is set in the environment.
++ *
++ * Written to discover the stick's button numbering and should have come out
++ * once that was known. stderr is line buffered onto the USB card, so with it
++ * on, every press, release and direction change is a synchronous write to
++ * flash, and flash stalls for hundreds of milliseconds while it erases blocks.
++ * That showed up as whole seconds of freeze in a button-heavy game. Turn it
++ * back on for one run when a mapping needs establishing, not for play. */
++static int asp_input_log(void)
++{
++	static int on = -1;
++
++	if (on < 0) {
++		const char *e = getenv("ASP_INPUT_LOG");
++		on = (e != NULL && *e != '0');
++	}
++	return on;
++}
++
++static void asp_check_exit(void)
++{
++	if (!SDL_JoystickGetButton(asp_joy, ASP_BTN_OPTIONS))
++		return;
++
++	fprintf(stderr, "asp: Options pressed, returning to the ASP menu\n");
++	S9xExit();   /* writes SRAM on the way out, so battery saves are kept */
++}
++#endif
++
+ void S9xInitInputDevices ()
+ {
++#if defined(ASP_BUILD)
++	/* Neo Geo Arcade Stick Pro. The stick presents as a single SDL joystick,
++	 * "atc260x-adckeypad", with twelve buttons and NO axes: the four stick
++	 * directions arrive as buttons too, which is why neither of this port's
++	 * existing input paths works. Every control, confirmed from the device's
++	 * own event log:
++	 *
++	 *   0  1  2   top row, left to right
++	 *   3  4  5   bottom row, left to right
++	 *   6         Select            7  Start
++	 *   8  Left   9  Down   10  Right   11  Up
++	 *
++	 * Do not take indices from the device's RetroArch config: that userland
++	 * numbers the same buttons differently, and an earlier build of this
++	 * port used its 12 and 24, which are simply out of range here and left
++	 * Up and A permanently unpressed.
++	 *
++	 * The six face buttons map to the SNES pad the way a fighting stick
++	 * normally does, Y X L over B A R, so the top row is the weak row. */
++	SDL_InitSubSystem(SDL_INIT_JOYSTICK);
++	asp_joy = SDL_JoystickOpen(0);
++	fprintf(stderr, "asp: joysticks=%d opened=%p buttons=%d axes=%d\n",
++		SDL_NumJoysticks(), (void *)asp_joy,
++		asp_joy ? SDL_JoystickNumButtons(asp_joy) : -1,
++		asp_joy ? SDL_JoystickNumAxes(asp_joy) : -1);
++
++	memset(sfc_key, 0, sizeof(sfc_key));
++	/* Real indices, read off the device's own log with every button pressed
++	 * once in a known order. The stick has twelve buttons and SDL reports
++	 * twelve, so NONE of them are the stick directions - those arrive as the
++	 * arrow keysyms, read separately in S9xReadJoypad.
++	 *
++	 *   top row     A red = 0   C green = 2   grey = 3   white = 6
++	 *   bottom row  B yellow = 1 D blue = 5   grey = 4   white = 7
++	 *   side        Select = 8  Start = 9  Options = 10  Turbo = 11
++	 *
++	 * The previous table assumed 8-11 were Left/Down/Right/Up, so pressing
++	 * Select moved Mario left, Start moved him down, and Options and Turbo
++	 * steered him too - which is why some buttons appeared to work and others
++	 * did the wrong thing entirely.
++	 *
++	 * Laid out as a fighting stick expects: Y X L along the top, B A R along
++	 * the bottom, so jump sits under the thumb on the yellow B. */
++	sfc_key[Y_1] = 0;
++	sfc_key[X_1] = 2;
++	sfc_key[L_1] = 3;
++	sfc_key[B_1] = 1;
++	sfc_key[A_1] = 5;
++	sfc_key[R_1] = 4;
++	sfc_key[SELECT_1] = 8;
++	sfc_key[START_1] = 9;
++
++	/* No button index carries a direction. 0xFFFF never matches a real
++	 * button, so the joystick reads below contribute nothing and the arrow
++	 * keysyms are the only source. */
++	sfc_key[LEFT_1] = 0xFFFF;
++	sfc_key[DOWN_1] = 0xFFFF;
++	sfc_key[RIGHT_1] = 0xFFFF;
++	sfc_key[UP_1] = 0xFFFF;
++
++	/* No single button quits. An earlier build put QUIT on Select, which is
++	 * a button games use, so the emulator died on the first press; and an
++	 * instantaneous Select+Start is the soft-reset combo on a real SNES and
++	 * the way several games' title screens are dismissed. Exiting is handled
++	 * instead by holding Select and Start together, see asp_check_exit(). */
++	sfc_key[QUIT] = 0xFFFF;
++#else
+ #ifdef CAANOO
+ 	keyssnes = SDL_JoystickOpen(0);
+ #else
+@@ -641,6 +842,7 @@ void S9xInitInputDevices ()
+ 	sfc_key[UP_1] = DINGOO_BUTTON_UP;
+ 	sfc_key[DOWN_1] = DINGOO_BUTTON_DOWN;
+ #endif
++#endif /* ASP_BUILD */
+ 
+ 	int i = 0;
+ 	char *envp, *j;
+@@ -691,6 +893,10 @@ const char *S9xGetSnapshotDirectory ()
+ 	static char filename [PATH_MAX];
+ 	const char *snapshot;
+ 
++#ifdef ASP_BUILD
++	strcpy (filename, asp_get_save_dir ());
++	return (filename);
++#endif
+ 	if (!(snapshot = getenv ("SNES9X_SNAPSHOT_DIR")) &&
+ 	!(snapshot = getenv ("SNES96_SNAPSHOT_DIR")))
+ 	{
+@@ -821,8 +1027,166 @@ bool8_32 S9xInitUpdate ()
+ 	return (TRUE);
+ }
+ 
++#ifdef ASP_BUILD
++/* Where on the panel the emulated frame is drawn.
++ *
++ * Two separate things decide this, and conflating them is what made the
++ * earlier attempts go round in circles:
++ *
++ * Overscan. The framebuffer really is 1280x720 and we really do fill it, but
++ * the panel does not show all of it, so content near the edges falls off and
++ * the picture reads as "stretched beyond the monitor edge". The cure is to
++ * draw into a smaller, centred rectangle. How much smaller is a property of
++ * the display, not something to be guessed at, so it is read from
++ * asp_screen.cfg beside the binary and can be corrected without a rebuild.
++ *
++ * Aspect. The SNES is a 4:3 system. Scaling it to a 16:9 panel stretches it
++ * horizontally by a third whatever the overscan is, which is the other half of
++ * "stretched". So the frame is fitted to 4:3 inside whatever the overscan
++ * leaves, and the slack ends up as side bars rather than distortion.
++ *
++ * Whatever is left over has to be cleared. An earlier build drew the inset
++ * frame but left the margin alone, so the previous full-screen frame stayed
++ * visible around it - that is the stray texture that was showing up in the
++ * border.
++ */
++static int asp_inset_x = 0, asp_inset_y = 0;
++static int asp_keep_aspect = 1;
++static int asp_calibrate;
++/* Which reading of the display's contradictory geometry to trust;
++ * see asp_fbout.h. 0 picks automatically. */
++static int asp_fb_mode;
++/* What the display physically is, so the frame can be pre-shaped to come out
++ * 4:3 after the display scales the framebuffer onto it. 16:9 means the display
++ * matches the framebuffer and nothing needs correcting. */
++static int asp_panel_w = 16, asp_panel_h = 9;
++/* Index into sdlaudio.cpp's Rates[]: 6 is 44100, the rate the ASP's audio
++ * node is wired to, so nothing needs resampling. Overridable from
++ * asp_screen.cfg because 44100 is 2.75x the APU work this fork was tuned
++ * for, and if that proves too much for the SoC, 22050 (index 4) is an exact
++ * halving that SDL upconverts cheaply. */
++int asp_sound_rate_idx = 6;
++#include "asp_fbout.h"
++#include "asp_calib.h"
++#include "asp_geom.h"
++
++static void asp_read_screen_cfg(void)
++{
++	static int done;
++	char path[512], line[256];
++	FILE *f;
++	int n;
++
++	/* Called once before sound init and again before the first blit; the
++	 * second call has nothing to add. */
++	if (done)
++		return;
++	done = 1;
++
++	n = readlink("/proc/self/exe", path, sizeof(path) - 24);
++	if (n <= 0)
++		return;
++	path[n] = 0;
++	while (n > 0 && path[n - 1] != '/')
++		n--;
++	strcpy(path + n, "asp_screen.cfg");
++
++	f = fopen(path, "r");
++	if (f == NULL) {
++		fprintf(stderr, "asp: no %s, filling the panel\n", path);
++		return;
++	}
++	while (fgets(line, sizeof(line), f) != NULL) {
++		int v, pw, ph;
++		char word[64];
++		if (line[0] == '#' || line[0] == '\n' || line[0] == '\r')
++			continue;
++		if (sscanf(line, "inset_x = %d", &v) == 1 ||
++		    sscanf(line, "inset_x=%d", &v) == 1)
++			asp_inset_x = v;
++		else if (sscanf(line, "inset_y = %d", &v) == 1 ||
++		         sscanf(line, "inset_y=%d", &v) == 1)
++			asp_inset_y = v;
++		else if (sscanf(line, "aspect = %63s", word) == 1 ||
++		         sscanf(line, "aspect=%63s", word) == 1)
++			asp_keep_aspect = (strncmp(word, "fill", 4) != 0);
++		else if (sscanf(line, "calibrate = %d", &v) == 1 ||
++		         sscanf(line, "calibrate=%d", &v) == 1)
++			asp_calibrate = v;
++		else if (sscanf(line, "fb_mode = %d", &v) == 1 ||
++		         sscanf(line, "fb_mode=%d", &v) == 1)
++			asp_fb_mode = v;
++		else if (sscanf(line, "panel_aspect = %d:%d", &pw, &ph) == 2 ||
++		         sscanf(line, "panel_aspect=%d:%d", &pw, &ph) == 2) {
++			if (pw > 0 && ph > 0) { asp_panel_w = pw; asp_panel_h = ph; }
++		}
++		else if (sscanf(line, "sound_rate = %d", &v) == 1 ||
++		         sscanf(line, "sound_rate=%d", &v) == 1) {
++			static const int rates[8] =
++				{ 0, 8192, 11025, 16000, 22050, 32000, 44100, 48000 };
++			int i, best = 6, bestd = -1;
++			for (i = 1; i < 8; i++) {
++				int d = v > rates[i] ? v - rates[i] : rates[i] - v;
++				if (bestd < 0 || d < bestd) { bestd = d; best = i; }
++			}
++			asp_sound_rate_idx = best;
++		}
++	}
++	fclose(f);
++
++	if (asp_inset_x < 0) asp_inset_x = 0;
++	if (asp_inset_y < 0) asp_inset_y = 0;
++	if (asp_inset_x > 320) asp_inset_x = 320;
++	if (asp_inset_y > 180) asp_inset_y = 180;
++
++	fprintf(stderr, "asp: %s -> inset_x=%d inset_y=%d aspect=%s calibrate=%d\n",
++		path, asp_inset_x, asp_inset_y,
++		asp_keep_aspect ? "keep" : "fill", asp_calibrate);
++	fprintf(stderr, "asp: fb_mode=%d panel_aspect=%d:%d\n",
++		asp_fb_mode, asp_panel_w, asp_panel_h);
++	fprintf(stderr, "asp: sound rate index %d\n", asp_sound_rate_idx);
++}
++
++/* The old in-surface scaler lived here. It is gone rather than left
++ * unreferenced: output now goes through asp_fb_present() straight to
++ * the framebuffer at the driver's stride, and keeping a second path
++ * that writes at SDL's half-stride around would only invite somebody
++ * to call it again. See asp_fbout.h. */
++#endif
++
+ bool8_32 S9xDeinitUpdate (int Width, int Height)
+ {
++#ifdef ASP_BUILD
++	{
++		int sh = (Height > 0) ? Height : 224;
++		int sw = (Width  > 0) ? Width  : 256;
++		int ox, oy, dw, dh;
++
++		/* Straight to the framebuffer at the driver's own stride. SDL's
++		 * surface is not used for output at all: on this device it reports
++		 * a pitch half the driver's line_length, and drawing into it put
++		 * every row at the wrong place. See asp_fbout.h. */
++		if (!asp_fb_first_frame_setup())
++			return (TRUE);
++
++		asp_target_rect_fb(&ox, &oy, &dw, &dh);
++		/* Report the source frame once. A game asking for 239 lines when only
++		 * 224 are visible would make the picture ~7% too tall on its own, and
++		 * that is the size of the error left over after the panel correction -
++		 * so it needs ruling in or out rather than compensating for blindly. */
++		{
++			static int told_w, told_h;
++			if (sw != told_w || sh != told_h) {
++				told_w = sw; told_h = sh;
++				fprintf(stderr, "asp: source frame %dx%d (SNES visible is "
++					"normally 256x224)\n", sw, sh);
++			}
++		}
++		asp_fb_present((const unsigned short *)GFX.Screen, sw, sh,
++			GFX.Pitch / 2, ox, oy, dw, dh);
++	}
++	return (TRUE);
++#else
+ 	uint32 spd = (Settings.SupportHiRes ? 256/2 : 0);
+ 	uint32 dpd = (screen->w - 256) / 2;
+ 	uint32 dpo = (screen->w - 256)/4 + (screen->h - 224)/2*screen->w/2;
+@@ -880,6 +1244,7 @@ bool8_32 S9xDeinitUpdate (int Width, int Height)
+ 	SDL_UnlockSurface(screen);
+ 	SDL_Flip(screen);
+ 	return(TRUE);
++#endif
+ }
+ 
+ #ifndef _ZAURUS
+@@ -1089,6 +1454,37 @@ void S9xProcessEvents (bool8_32 block)
+ 	{
+ 		switch(event.type)
+ 		{
++#ifdef ASP_BUILD
++			/* The ASP has no way out of a game except a button combo:
++			 * the handler below is CAANOO-only and this device has no
++			 * keyboard. The emulator's own menu is deliberately NOT
++			 * wired up here - its navigation is CAANOO-only too and
++			 * reads a keyboard, so it would open and then trap the
++			 * user.
++			 *
++			 * Exiting is NOT handled here any more. Acting on the
++			 * button-down event made Select+Start quit the instant both
++			 * were down, and that combo is the SNES soft reset, so
++			 * ordinary play kept killing the emulator. It is now a
++			 * deliberate hold, checked in asp_check_exit() off the
++			 * joypad read. This case only logs. */
++			case SDL_JOYBUTTONDOWN:
++				/* report the real index so the mapping can be
++				 * derived from one test run rather than assumed */
++				if (asp_input_log())
++					fprintf(stderr, "asp-input: joy %d BUTTON %d down\n",
++						(int)event.jbutton.which,
++						(int)event.jbutton.button);
++				break;
++			case SDL_JOYAXISMOTION:
++				if (asp_input_log() &&
++				    (event.jaxis.value < -16384 || event.jaxis.value > 16384))
++					fprintf(stderr, "asp-input: joy %d AXIS %d = %d\n",
++						(int)event.jaxis.which,
++						(int)event.jaxis.axis,
++						(int)event.jaxis.value);
++				break;
++#endif
+ #ifdef CAANOO
+ 			// CAANOO -------------------------------------------------------------
+ 			case SDL_JOYBUTTONDOWN:
+@@ -1116,6 +1512,13 @@ void S9xProcessEvents (bool8_32 block)
+ #else
+ 			//DINGOO ------------------------------------------------------
+ 			case SDL_KEYDOWN:
++#ifdef ASP_BUILD
++				/* if the stick turns out to arrive as key events
++				 * rather than joystick buttons, this names them */
++				if (asp_input_log())
++					fprintf(stderr, "asp-input: KEY %d down\n",
++						(int)event.key.keysym.sym);
++#endif
+ 				keyssnes = SDL_GetKeyState(NULL);
+ 
+ 				//QUIT Emulator
+@@ -1188,7 +1591,55 @@ uint32 S9xReadJoypad (int which1)
+ 	if (which1 > 4)
+ 		return 0;
+ 
+-#ifdef CAANOO
++#if defined(ASP_BUILD)
++	/* every control on the ASP, directions included, is a joystick button */
++	if (asp_joy == NULL) return val;
++	SDL_JoystickUpdate();
++	asp_check_exit();
++	if (SDL_JoystickGetButton(asp_joy, sfc_key[L_1]))		val |= SNES_TL_MASK;
++	if (SDL_JoystickGetButton(asp_joy, sfc_key[R_1]))		val |= SNES_TR_MASK;
++	if (SDL_JoystickGetButton(asp_joy, sfc_key[X_1]))		val |= SNES_X_MASK;
++	if (SDL_JoystickGetButton(asp_joy, sfc_key[Y_1]))		val |= SNES_Y_MASK;
++	if (SDL_JoystickGetButton(asp_joy, sfc_key[B_1]))		val |= SNES_B_MASK;
++	if (SDL_JoystickGetButton(asp_joy, sfc_key[A_1]))		val |= SNES_A_MASK;
++	if (SDL_JoystickGetButton(asp_joy, sfc_key[START_1]))		val |= SNES_START_MASK;
++	if (SDL_JoystickGetButton(asp_joy, sfc_key[SELECT_1]))		val |= SNES_SELECT_MASK;
++	if (SDL_JoystickGetButton(asp_joy, sfc_key[UP_1]))		val |= SNES_UP_MASK;
++	if (SDL_JoystickGetButton(asp_joy, sfc_key[DOWN_1]))		val |= SNES_DOWN_MASK;
++	if (SDL_JoystickGetButton(asp_joy, sfc_key[LEFT_1]))		val |= SNES_LEFT_MASK;
++	if (SDL_JoystickGetButton(asp_joy, sfc_key[RIGHT_1]))		val |= SNES_RIGHT_MASK;
++
++	/* The stick reports its directions three different ways depending on how
++	 * the firmware has it that run, and this port only ever read one of them:
++	 *
++	 *   - joystick buttons 8-11, handled above
++	 *   - keyboard arrow keysyms, handled here. The device's own event log
++	 *     shows the directions arriving as KEY 273-276 while every face
++	 *     button arrives as a joystick button, so reading only the joystick
++	 *     left the stick completely dead while the face buttons worked - the
++	 *     "only one button works" report.
++	 *   - a hat, if a pad is plugged into the other port, handled below
++	 *
++	 * All three are read. A given device only produces one of them, so the
++	 * other two contribute nothing and cost a few reads per frame. */
++	{
++		Uint8 *ks = SDL_GetKeyState(NULL);
++		if (ks != NULL) {
++			if (ks[SDLK_UP])    val |= SNES_UP_MASK;
++			if (ks[SDLK_DOWN])  val |= SNES_DOWN_MASK;
++			if (ks[SDLK_LEFT])  val |= SNES_LEFT_MASK;
++			if (ks[SDLK_RIGHT]) val |= SNES_RIGHT_MASK;
++		}
++	}
++
++	if (SDL_JoystickNumHats(asp_joy) > 0) {
++		Uint8 hat = SDL_JoystickGetHat(asp_joy, 0);
++		if (hat & SDL_HAT_UP)    val |= SNES_UP_MASK;
++		if (hat & SDL_HAT_DOWN)  val |= SNES_DOWN_MASK;
++		if (hat & SDL_HAT_LEFT)  val |= SNES_LEFT_MASK;
++		if (hat & SDL_HAT_RIGHT) val |= SNES_RIGHT_MASK;
++	}
++#elif defined(CAANOO)
+ 	//player1
+ 	if (SDL_JoystickGetButton(keyssnes, sfc_key[L_1]))			val |= SNES_TL_MASK;
+ 	if (SDL_JoystickGetButton(keyssnes, sfc_key[R_1]))			val |= SNES_TR_MASK;
+diff --git a/dingux-sdl/sdlvideo.cpp b/dingux-sdl/sdlvideo.cpp
+index acdab23..b3ead7e 100644
+--- a/dingux-sdl/sdlvideo.cpp
++++ b/dingux-sdl/sdlvideo.cpp
+@@ -67,6 +67,72 @@ SDL_Surface *screen, *gfxscreen;
+ extern uint32 xs, ys, cl, cs;
+ extern bool8_32 Scale;
+ 
++#ifdef ASP_BUILD
++#include <fcntl.h>
++#include <errno.h>
++#include <sys/ioctl.h>
++#include <linux/fb.h>
++
++/* Ask the display driver directly what the framebuffer looks like. SDL's
++ * surface is a report of what SDL believes it negotiated, which on this device
++ * has not always matched: the pixel stride is the one number that, if wrong,
++ * puts every row in the wrong place and produces exactly the shear-and-wrap
++ * that has been showing on the TV. */
++static void asp_fb_report(const char *when)
++{
++	struct fb_var_screeninfo v;
++	struct fb_fix_screeninfo f;
++	int fd = open("/dev/fb0", O_RDONLY);
++
++	if (fd < 0) {
++		fprintf(stderr, "asp-fb (%s): open: %s\n", when, strerror(errno));
++		return;
++	}
++	if (ioctl(fd, FBIOGET_VSCREENINFO, &v) == 0 &&
++	    ioctl(fd, FBIOGET_FSCREENINFO, &f) == 0) {
++		fprintf(stderr, "asp-fb (%s): %ux%u virtual %ux%u offset %u,%u "
++			"bpp %u line_length %u smem_len %u implied_bpp %.2f\n",
++			when, v.xres, v.yres, v.xres_virtual, v.yres_virtual,
++			v.xoffset, v.yoffset, v.bits_per_pixel, f.line_length,
++			f.smem_len,
++			v.xres ? (double)f.line_length * 8.0 / (double)v.xres : 0.0);
++		fprintf(stderr, "asp-fb (%s): masks R %u/%u G %u/%u B %u/%u A %u/%u\n",
++			when, v.red.offset, v.red.length,
++			v.green.offset, v.green.length,
++			v.blue.offset, v.blue.length,
++			v.transp.offset, v.transp.length);
++	} else {
++		fprintf(stderr, "asp-fb (%s): ioctl: %s\n", when, strerror(errno));
++	}
++	close(fd);
++}
++
++/* State the disagreement outright rather than leaving it to be inferred from
++ * two numbers printed several lines apart. */
++static void asp_fb_compare(int sdl_pitch, int sdl_pxbytes)
++{
++	struct fb_var_screeninfo v;
++	struct fb_fix_screeninfo f;
++	int fd = open("/dev/fb0", O_RDONLY);
++
++	if (fd < 0)
++		return;
++	if (ioctl(fd, FBIOGET_VSCREENINFO, &v) == 0 &&
++	    ioctl(fd, FBIOGET_FSCREENINFO, &f) == 0) {
++		if ((unsigned)sdl_pitch != f.line_length)
++			fprintf(stderr, "asp-fb: MISMATCH - SDL pitch %d but driver "
++				"line_length %u. Rows will land %.2f apart from "
++				"where the hardware reads them.\n",
++				sdl_pitch, f.line_length,
++				sdl_pitch ? (double)f.line_length / (double)sdl_pitch : 0.0);
++		else
++			fprintf(stderr, "asp-fb: pitch agrees at %d (%d bytes/pixel)\n",
++				sdl_pitch, sdl_pxbytes);
++	}
++	close(fd);
++}
++#endif
++
+ #ifndef _ZAURUS
+ int S9xMinCommandLineArgs ()
+ {
+@@ -100,6 +166,53 @@ void S9xInitDisplay (int /*argc*/, char ** /*argv*/)
+ 	SDL_ShowCursor(SDL_DISABLE);
+ 
+ 	//screen = SDL_SetVideoMode(xs, ys, 16, SDL_HWSURFACE|SDL_DOUBLEBUF);
++#ifdef ASP_BUILD
++	/* Neo Geo Arcade Stick Pro: the framebuffer is a fixed 1280x720 and its
++	 * display driver does NOT survive a depth change - asking it for a
++	 * different bpp here hung the device hard. So take the mode exactly as
++	 * it is: native geometry, native depth. The frame is stretched to fill
++	 * it in S9xDeinitUpdate, which handles both 16 and 32bpp; anything
++	 * other than 2 or 4 bytes per pixel is refused rather than blitted
++	 * past the end of every row.
++	 *
++	 * The driver's own numbers are reported either side of the mode set.
++	 * They have been inconsistent before - a 1280-wide 16bpp mode with a
++	 * line_length of 5120 cannot be literally true - and whether that
++	 * stride survives SDL_SetVideoMode decides where every pixel lands. */
++	{
++		asp_fb_report("before SDL_SetVideoMode");
++		const SDL_VideoInfo *vi = SDL_GetVideoInfo();
++		int w = (vi && vi->current_w >= 256) ? vi->current_w : 1280;
++		int h = (vi && vi->current_h >= 224) ? vi->current_h : 720;
++		/* Ask for the depth the display already reports rather than 0
++		 * ("any"), which is driver-dependent - SDL's dummy driver
++		 * answers 0 with 8bpp. Logged either side because a depth
++		 * change hangs this driver inside SDL_SetVideoMode, and a hard
++		 * hang leaves no other trace. */
++		int bpp = (vi && vi->vfmt) ? vi->vfmt->BitsPerPixel : 16;
++		const char *force = getenv("ASP_FORCE_BPP");
++		if (force && atoi(force) > 0)
++			bpp = atoi(force);
++		fprintf(stderr, "asp: SDL_SetVideoMode(%d,%d,%d) ...\n", w, h, bpp);
++		screen = SDL_SetVideoMode(w, h, bpp, SDL_SWSURFACE);
++		fprintf(stderr, "asp: SDL_SetVideoMode returned %p\n", (void *)screen);
++		if (screen != NULL && screen->format->BytesPerPixel != 2
++		                   && screen->format->BytesPerPixel != 4) {
++			fprintf(stderr, "asp: native depth %dbpp, retrying at 16\n",
++				screen->format->BitsPerPixel);
++			screen = SDL_SetVideoMode(w, h, 16, SDL_SWSURFACE);
++		}
++		if (screen == NULL)
++			screen = SDL_SetVideoMode(0, 0, 0, SDL_SWSURFACE);
++		if (screen != NULL)
++			fprintf(stderr, "asp: screen %dx%d %dbpp pitch %d\n",
++				screen->w, screen->h,
++				screen->format->BitsPerPixel, screen->pitch);
++		asp_fb_report("after SDL_SetVideoMode");
++		if (screen != NULL)
++			asp_fb_compare(screen->pitch, screen->format->BytesPerPixel);
++	}
++#else
+ 	{
+ 		int i = 0; // 0 - 320x240, 1 - 400x240, 2 - 480x272
+ 		int surfacewidth, surfaceheight;
+@@ -125,6 +238,7 @@ void S9xInitDisplay (int /*argc*/, char ** /*argv*/)
+ 		}
+ 		screen = SDL_SetVideoMode(surfacewidth, surfaceheight, 16, SDL_HWSURFACE|SDL_DOUBLEBUF);
+ 	}
++#endif
+ 
+ 	if (screen == NULL)
+ 	{

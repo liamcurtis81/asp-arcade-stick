@@ -1,0 +1,52 @@
+From 57a2026fcd05dc186be59c4d06d297cef4612eb5 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 2 Nov 2026 10:41:58 +0000
+Subject: [PATCH 18/21] ASP: snd_frag_count/size tuning keys and report line
+ for the actsnd SETFRAGMENT probe
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/burner/pi/main_pi.cpp | 5 +++++
+ src/burner/pi/run_pi.cpp  | 9 +++++++++
+ 2 files changed, 14 insertions(+)
+
+diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
+index eaf0d29..472e002 100755
+--- a/src/burner/pi/main_pi.cpp
++++ b/src/burner/pi/main_pi.cpp
+@@ -351,6 +351,11 @@ static int asp_tuning_apply(const char *key, int value)
+ 	} else if (strcmp(key, "async_draw") == 0) {
+ 		extern int asp_async_mode;
+ 		asp_async_mode = value;
++	} else if (strcmp(key, "snd_frag_count") == 0 || strcmp(key, "snd_frag_size") == 0) {
++		// asks /dev/snd/actsnd for this many fragments of this many bytes
++		// (SNDCTL_DSP_SETFRAGMENT, as the stock emulator does); both needed
++		char v[16]; snprintf(v, sizeof v, "%d", value);
++		setenv(key[9] == 'c' ? "ASP_SND_FRAG_COUNT" : "ASP_SND_FRAG_SIZE", v, 1);
+ 	} else if (strcmp(key, "snd_jit_ms") == 0) {
+ 		// read by our SDL's OSS backend when the audio opens (SDL_dspaudio.c)
+ 		char v[16]; snprintf(v, sizeof v, "%d", value);
+diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
+index 71884a3..249e001 100644
+--- a/src/burner/pi/run_pi.cpp
++++ b/src/burner/pi/run_pi.cpp
+@@ -694,6 +694,15 @@ static void asp_log_framerate(unsigned int ticks, int emulated, int rendered)
+ 			asp_sdl_driver_dsp, asp_sdl_jit_ms, asp_sdl_writes, asp_sdl_write_blocks, asp_sdl_write_max_ms,
+ 			asp_sdl_poll_calls, asp_sdl_poll_waits, asp_sdl_poll_max_ms, asp_sdl_sleeps);
+ 	}
++	{
++		extern int asp_sdl_frag_req, asp_sdl_frag_rc, asp_sdl_frag_errno, asp_sdl_frag_got;
++		extern int asp_sdl_ospace_rc, asp_sdl_ospace_frags, asp_sdl_ospace_total, asp_sdl_ospace_size;
++		if (asp_sdl_frag_req >= 0)
++			fprintf(f, "----- sound fragments: asked %d x %d bytes, SETFRAGMENT rc %d errno %d (now %d x %d); GETOSPACE rc %d: %d of %d fragments of %d bytes free -----\n",
++				asp_sdl_frag_req >> 16, 1 << (asp_sdl_frag_req & 0xffff), asp_sdl_frag_rc, asp_sdl_frag_errno,
++				asp_sdl_frag_got >> 16, 1 << (asp_sdl_frag_got & 0xffff),
++				asp_sdl_ospace_rc, asp_sdl_ospace_frags, asp_sdl_ospace_total, asp_sdl_ospace_size);
++	}
+ 	{
+ 		extern int asp_async_mode, asp_async_live;
+ 		extern unsigned int asp_async_frames, asp_async_waits, asp_async_hash_marks[10], asp_async_hash_done;
+-- 
+2.43.0
+

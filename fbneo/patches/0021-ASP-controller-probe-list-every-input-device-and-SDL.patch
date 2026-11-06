@@ -1,0 +1,206 @@
+From 241d862c351bce5fc29b681375113f364d9a3fe0 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 20:01:52 +0000
+Subject: [PATCH 21/21] ASP: controller probe - list every input device and SDL
+ joystick, trace presses from all of them
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/intf/input/pi/inp_pi.cpp | 109 ++++++++++++++++++++++++++++++++---
+ 1 file changed, 102 insertions(+), 7 deletions(-)
+
+diff --git a/src/intf/input/pi/inp_pi.cpp b/src/intf/input/pi/inp_pi.cpp
+index 70efd79..4f9518f 100644
+--- a/src/intf/input/pi/inp_pi.cpp
++++ b/src/intf/input/pi/inp_pi.cpp
+@@ -69,6 +69,8 @@ static int handleFreeplayHack(int player, int code);
+ // the directions simply stay dead, which is where they were anyway.
+ // ---------------------------------------------------------------------------
+ #include <linux/input.h>
++#include <stdarg.h>
++#include <stdlib.h>
+ #include <fcntl.h>
+ #include <errno.h>
+ #include <sys/ioctl.h>
+@@ -121,6 +123,46 @@ static int asp_evdev_has_arrows(int fd)
+ 	return found;
+ }
+ 
++// Controller probe (Nov 2026, for the 8BitDo pads on a Mayflash adaptor).
++// Every other event node is opened too, read-only, purely to record what it
++// sends in fba_input.log with its device number, so a test session shows
++// which physical button produces which code on which device. Nothing read
++// from these nodes is acted on.
++#define ASP_MAX_PROBE 8
++static int asp_probe_fd[ASP_MAX_PROBE];
++static int asp_probe_count = 0;
++static int asp_probe_num[ASP_MAX_PROBE];   // eventN number of each, for the log
++static int asp_kbd_num[ASP_MAX_KBD];
++
++static void asp_trace_line(const char *fmt, ...);
++
++static void asp_probe_describe(int fd, int num, const char *name)
++{
++	struct input_id id;
++	memset(&id, 0, sizeof(id));
++	ioctl(fd, EVIOCGID, &id);
++	char phys[96] = "";
++	ioctl(fd, EVIOCGPHYS(sizeof(phys)), phys);
++	unsigned char kb[(KEY_MAX / 8) + 1], ab[(ABS_MAX / 8) + 1];
++	memset(kb, 0, sizeof(kb)); memset(ab, 0, sizeof(ab));
++	ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(kb)), kb);
++	ioctl(fd, EVIOCGBIT(EV_ABS, sizeof(ab)), ab);
++	char keys[512] = "", abss[256] = "";
++	int nk = 0;
++	for (int c = 0; c < KEY_MAX && nk < 40; c++)
++		if (kb[c / 8] & (1 << (c % 8))) { char t[12]; snprintf(t, sizeof t, " %d", c); strncat(keys, t, sizeof(keys) - strlen(keys) - 1); nk++; }
++	for (int c = 0; c < ABS_MAX; c++)
++		if (ab[c / 8] & (1 << (c % 8))) {
++			struct input_absinfo ai; memset(&ai, 0, sizeof(ai));
++			ioctl(fd, EVIOCGABS(c), &ai);
++			char t[40]; snprintf(t, sizeof t, " %d[%d..%d]", c, ai.minimum, ai.maximum);
++			strncat(abss, t, sizeof(abss) - strlen(abss) - 1);
++		}
++	asp_trace_line("# device event%d \"%s\" bus %04x vendor %04x product %04x version %04x phys \"%s\"\n#   keys:%s\n#   axes:%s\n",
++		num, name, id.bustype, id.vendor, id.product, id.version, phys, keys, abss);
++	fprintf(stderr, "asp: probe: event%d \"%s\" vendor %04x product %04x\n", num, name, id.vendor, id.product);
++}
++
+ static void asp_evdev_open(void)
+ {
+ 	asp_kbd_count = 0;
+@@ -147,12 +189,21 @@ static void asp_evdev_open(void)
+ 		fprintf(stderr, "asp: %s (%s) reports:", path,
+ 			name[0] ? name : "unnamed");
+ 
++		int num = atoi(e->d_name + 5);
+ 		if (asp_evdev_has_arrows(fd)) {
+ 			fprintf(stderr, " - reading directions from it\n");
++			asp_probe_describe(fd, num, name);
++			asp_kbd_num[asp_kbd_count] = num;
+ 			asp_kbd_fd[asp_kbd_count++] = fd;
+ 		} else {
+-			fprintf(stderr, " no arrows, skipped\n");
+-			close(fd);
++			fprintf(stderr, " no arrows - probe only\n");
++			asp_probe_describe(fd, num, name);
++			if (asp_probe_count < ASP_MAX_PROBE) {
++				asp_probe_num[asp_probe_count] = num;
++				asp_probe_fd[asp_probe_count++] = fd;
++			} else {
++				close(fd);
++			}
+ 		}
+ 	}
+ 	closedir(d);
+@@ -173,7 +224,7 @@ static void asp_evdev_open(void)
+ // two build-and-test rounds already, so this records the first
+ // ASP_TRACE_EVENTS key events - every code, not just arrows - and then stops
+ // writing for good.
+-#define ASP_TRACE_EVENTS 120
++#define ASP_TRACE_EVENTS 800
+ 
+ static FILE *asp_trace = NULL;
+ static int asp_trace_left = ASP_TRACE_EVENTS;
+@@ -195,9 +246,30 @@ static void asp_trace_open(void)
+ 	fprintf(asp_trace, "# value 1=press 2=repeat 0=release\n");
+ }
+ 
+-static void asp_trace_event(const struct input_event *ev)
++static void asp_trace_line(const char *fmt, ...)
++{
++	if (asp_trace_left <= 0) return;
++	if (!asp_trace) asp_trace_open();
++	if (!asp_trace) { asp_trace_left = 0; return; }
++	va_list ap;
++	va_start(ap, fmt);
++	vfprintf(asp_trace, fmt, ap);
++	va_end(ap);
++}
++
++static void asp_trace_event(const struct input_event *ev, int dev)
+ {
+ 	if (asp_trace_left <= 0) return;
++	if (ev->type == EV_ABS) {
++		// a stick at rest jitters; only record hats and big moves
++		static int last[ASP_MAX_PROBE + ASP_MAX_KBD][ABS_MAX + 1];
++		int slot = dev & 15;
++		if (ev->code > ABS_MAX) return;
++		int was = last[slot][ev->code];
++		int is_hat = (ev->code >= ABS_HAT0X && ev->code <= ABS_HAT3Y);
++		if (!is_hat && abs(ev->value - was) < 24) return;
++		last[slot][ev->code] = ev->value;
++	}
+ 	if (!asp_trace) asp_trace_open();
+ 	if (!asp_trace) { asp_trace_left = 0; return; }
+ 
+@@ -213,8 +285,8 @@ static void asp_trace_event(const struct input_event *ev)
+ 	// input_event does not expose .time under these headers, and relative
+ 	// timing is all that matters for spotting a press with no release or a
+ 	// direction that keeps flickering.
+-	fprintf(asp_trace, "%8u ms  code %d%s  value %d\n",
+-		SDL_GetTicks(), ev->code, name, ev->value);
++	fprintf(asp_trace, "%8u ms  event%d %s %d%s  value %d\n",
++		SDL_GetTicks(), dev, ev->type == EV_ABS ? "axis" : "key", ev->code, name, ev->value);
+ 
+ 	if (--asp_trace_left <= 0) {
+ 		fprintf(asp_trace, "# limit reached, no further writes\n");
+@@ -235,7 +307,7 @@ static void asp_evdev_poll(void)
+ 		// Drain everything queued. Non-blocking, so this ends in EAGAIN.
+ 		while ((n = read(asp_kbd_fd[i], &ev, sizeof(ev))) == (ssize_t)sizeof(ev)) {
+ 			if (ev.type != EV_KEY) continue;
+-			asp_trace_event(&ev);
++			asp_trace_event(&ev, asp_kbd_num[i]);
+ 			int d = asp_dir_index(ev.code);
+ 			if (d < 0) continue;
+ 			// value 1 = pressed, 2 = autorepeat, 0 = released
+@@ -244,8 +316,21 @@ static void asp_evdev_poll(void)
+ 	}
+ }
+ 
++static void asp_probe_poll(void)
++{
++	for (int i = 0; i < asp_probe_count; i++) {
++		struct input_event ev;
++		while (read(asp_probe_fd[i], &ev, sizeof(ev)) == (ssize_t)sizeof(ev)) {
++			if (ev.type == EV_KEY || ev.type == EV_ABS)
++				asp_trace_event(&ev, asp_probe_num[i]);
++		}
++	}
++}
++
+ static void asp_evdev_close(void)
+ {
++	for (int i = 0; i < asp_probe_count; i++) close(asp_probe_fd[i]);
++	asp_probe_count = 0;
+ 	for (int i = 0; i < asp_kbd_count && i > -1; i++) {
+ 		close(asp_kbd_fd[i]);
+ 	}
+@@ -340,6 +425,15 @@ static int piInputInit()
+ 	SDL_JoystickEventState(SDL_IGNORE);
+ 
+ #ifdef BUILD_ASP
++	asp_trace_line("# SDL sees %d joystick(s)\n", nJoystickCount);
++	for (int i = 0; i < nJoystickCount; i++) {
++		fprintf(stderr, "asp: SDL joystick %d \"%s\": %d buttons, %d axes, %d hats\n", i, SDL_JoystickName(i),
++			JoyList[i] ? SDL_JoystickNumButtons(JoyList[i]) : -1, JoyList[i] ? SDL_JoystickNumAxes(JoyList[i]) : -1,
++			JoyList[i] ? SDL_JoystickNumHats(JoyList[i]) : -1);
++		asp_trace_line("# SDL joystick %d \"%s\": %d buttons, %d axes, %d hats\n", i, SDL_JoystickName(i),
++			JoyList[i] ? SDL_JoystickNumButtons(JoyList[i]) : -1, JoyList[i] ? SDL_JoystickNumAxes(JoyList[i]) : -1,
++			JoyList[i] ? SDL_JoystickNumHats(JoyList[i]) : -1);
++	}
+ 	asp_evdev_open();
+ #endif
+ 
+@@ -357,6 +451,7 @@ static int piInputStart()
+ 	scanKeyboard();
+ #ifdef BUILD_ASP
+ 	asp_evdev_poll();					// the stick's four directions
++	asp_probe_poll();					// controller probe, log only
+ #endif
+ 
+ 	struct timeval now;
+-- 
+2.43.0
+

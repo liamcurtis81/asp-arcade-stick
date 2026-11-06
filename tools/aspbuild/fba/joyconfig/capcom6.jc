@@ -1,0 +1,28 @@
+# Arcade Stick Pro button map - six-button fighters (CPS1, CPS2, CPS3).
+#
+# Same 1-based indices as default.jc; see that file for the full table.
+#
+# FBNeo asks for these in the order LP MP HP LK MK HK, so they go onto the
+# stick the way an arcade panel is laid out: punches along the top row,
+# kicks along the bottom, light to heavy left to right.
+#
+#   top row:     A (LP)   C (MP)   white (HP)
+#   bottom row:  B (LK)   D (MK)   white (HK)
+
+BUTTON1=1
+BUTTON2=3
+BUTTON3=7
+BUTTON4=2
+BUTTON5=6
+BUTTON6=8
+
+COIN=9
+START=10
+QUIT=11
+
+# Turbo opens the game's test menu (FBNeo's Diagnostic / Service Mode input).
+# CPS2, CPS3 and the Konami and Data East 32-bit boards keep their difficulty
+# there, not on DIP switches; the setting is saved in the board's EEPROM,
+# which the emulator keeps between plays. Leave the menu the way the game says
+# (usually its EXIT line, or Turbo again).
+TEST=12

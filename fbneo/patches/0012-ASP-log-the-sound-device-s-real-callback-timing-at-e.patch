@@ -1,0 +1,74 @@
+From e921afeb700d7f2341247aa50aed74d3beee4fed Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 1 Nov 2026 16:05:14 +0000
+Subject: [PATCH 12/21] ASP: log the sound device's real callback timing at
+ exit
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/burner/pi/run_pi.cpp       |  8 ++++++++
+ src/intf/audio/sdl/aud_sdl.cpp | 26 ++++++++++++++++++++++++++
+ 2 files changed, 34 insertions(+)
+
+diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
+index c3c41c0..720fce7 100644
+--- a/src/burner/pi/run_pi.cpp
++++ b/src/burner/pi/run_pi.cpp
+@@ -678,6 +678,14 @@ static void asp_log_framerate(unsigned int ticks, int emulated, int rendered)
+ 				asp_idle_skippedz80 / 1e3 / (nFramesEmulated ? nFramesEmulated : 1));
+ 		}
+ 	}
++	{
++		extern unsigned int asp_cb_hist[64], asp_cb_calls, asp_cb_lenmin, asp_cb_lenmax;
++		if (asp_cb_calls > 10) {
++			fprintf(f, "----- sound device callbacks: %u calls, %u..%u bytes each; interval ms (count):", asp_cb_calls, asp_cb_lenmin, asp_cb_lenmax);
++			for (int k = 0; k < 64; k++) if (asp_cb_hist[k] * 200 >= asp_cb_calls) fprintf(f, " %d%s:%u", k, k == 63 ? "+" : "", asp_cb_hist[k]);
++			fprintf(f, " -----\n");
++		}
++	}
+ 	{
+ 		// Generic per-driver draw split (asp_ds_* filled by a driver's draw).
+ 		extern unsigned long long asp_ds_t[8];
+diff --git a/src/intf/audio/sdl/aud_sdl.cpp b/src/intf/audio/sdl/aud_sdl.cpp
+index c300fdd..c74f03a 100644
+--- a/src/intf/audio/sdl/aud_sdl.cpp
++++ b/src/intf/audio/sdl/aud_sdl.cpp
+@@ -34,8 +34,34 @@ static int nSDLPlayPos;
+ static int nSDLFillSeg;
+ static int nAudLoopLen;
+ 
++#ifdef BUILD_ASP
++/* How the sound device really pulls audio: the interval between callbacks and
++ * how much each takes. If the driver below SDL buffers in big lumps, it is
++ * hidden latency and the reason the ring refills three segments at a time
++ * even on games that are nowhere near their frame budget. */
++#include <time.h>
++unsigned int asp_cb_hist[64], asp_cb_calls = 0, asp_cb_lenmin = 1u << 30, asp_cb_lenmax = 0;
++unsigned long long asp_cb_bytes = 0;
++static unsigned long long asp_cb_last = 0;
++#endif
++
+ void audiospec_callback(void* /* data */, Uint8* stream, int len)
+ {
++#ifdef BUILD_ASP
++	{
++		struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
++		unsigned long long now = (unsigned long long)ts.tv_sec * 1000000000ull + ts.tv_nsec;
++		if (asp_cb_last) {
++			unsigned long long ms = (now - asp_cb_last) / 1000000ull;
++			asp_cb_hist[ms > 63 ? 63 : ms]++;
++		}
++		asp_cb_last = now;
++		asp_cb_calls++;
++		asp_cb_bytes += len;
++		if ((unsigned)len < asp_cb_lenmin) asp_cb_lenmin = len;
++		if ((unsigned)len > asp_cb_lenmax) asp_cb_lenmax = len;
++	}
++#endif
+ #ifdef BUILD_SDL2
+ 	SDL_memset(stream, 0, len);
+ #endif
+-- 
+2.43.0
+

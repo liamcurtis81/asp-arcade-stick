@@ -1,0 +1,890 @@
+diff --git a/platform/common/emu.c b/platform/common/emu.c
+index 8e6ad54..a507af2 100644
+--- a/platform/common/emu.c
++++ b/platform/common/emu.c
+@@ -680,7 +680,29 @@ void emu_prep_defconfig(void)
+ 	defaultConfig.input_dev1 = PICO_INPUT_PAD_3BTN;
+ 	defaultConfig.volume = 50;
+ 	defaultConfig.gamma = 100;
++#ifdef ASP_BUILD
++	/* "HW scaling" means the platform layer scales, which on the ASP is
++	 * the fractional fill in plat_video_flip. Without this the core keeps
++	 * the full 1280x720 as its own buffer and centres a 320x224 image in
++	 * it, so the platform only ever gets a 1:1 copy to do and the picture
++	 * sits small in the middle of the panel. */
++	defaultConfig.scaling = EOPT_SCALE_HW;
++	defaultConfig.vscaling = EOPT_SCALE_HW;
++	/* The stick has six face buttons, so present a six-button pad. On the
++	 * stock three-button default the top row (A, C and the grey one, bound
++	 * to X, Y and Z) reaches the console as nothing at all, which reads as
++	 * half the buttons being unmapped. Games that only know the three-button
++	 * pad are unaffected; they ignore the extra reads. The few that read the
++	 * pad in a way a six-button one breaks can be set back to three in
++	 * Options -> Input device 1.
++	 *
++	 * This is the default, so a config already saved on the card wins over
++	 * it. Check for one when installing. */
++	defaultConfig.input_dev0 = PICO_INPUT_PAD_6BTN;
++	defaultConfig.input_dev1 = PICO_INPUT_PAD_6BTN;
++#else
+ 	defaultConfig.scaling = 0;
++#endif
+ 	defaultConfig.turbo_rate = 15;
+ 	defaultConfig.msh2_khz = PICO_MSH2_HZ / 1000;
+ 	defaultConfig.ssh2_khz = PICO_SSH2_HZ / 1000;
+diff --git a/platform/common/inputmap_kbd.c b/platform/common/inputmap_kbd.c
+index cf5adf5..672db9c 100644
+--- a/platform/common/inputmap_kbd.c
++++ b/platform/common/inputmap_kbd.c
+@@ -35,6 +35,53 @@ const struct in_default_bind _in_sdl_defbinds[] = {
+ 	{ SDLK_F12,    IN_BINDTYPE_EMU, PEVB_SWITCH_KBD },
+ 	{ SDLK_BACKSPACE, IN_BINDTYPE_EMU, PEVB_FF },
+ 
++#ifdef ASP_BUILD
++	/* Neo Geo Arcade Stick Pro. libpicofe reports SDL joystick button N as
++	 * SDLK_WORLD_0+N. The stick sends its DIRECTIONS AS BUTTONS, not axes,
++	 * so the axis path in in_sdl.c never fires and these entries are the
++	 * only thing that makes the stick work at all.
++	 *
++	 * Indices confirmed from the device's own event log - every control
++	 * pressed once, with each index printed as it arrived:
++	 *
++	 *    0  1  2    top row, left to right
++	 *    3  4  5    bottom row, left to right
++	 *    6  Select        7  Start
++	 *    8  Left   9  Down   10  Right   11  Up
++	 *
++	 * Only 0 to 11 exist. Do NOT take these from the device's RetroArch
++	 * config, which is where an earlier version of this table came from:
++	 * that userland numbers the same buttons differently, and its 12 and 24
++	 * are out of range here, so Up and C were permanently unpressed while
++	 * every other button sat under the wrong key.
++	 *
++	 * The six face buttons follow the Mega Drive 6-button pad as it is laid
++	 * out on the hardware: X Y Z along the top, A B C along the bottom.
++	 *
++	 * Select opens PicoDrive's menu rather than acting as MODE. A real Mega
++	 * Drive pad has no Select at all, MODE is needed by almost nothing, and
++	 * without a menu button the stick has no way to reach the controls or
++	 * leave the emulator. */
++	/* Six-button Mega Drive pad across the two rows: X Y Z along the top,
++	 * A B C along the bottom, matching how the hardware pad is laid out.
++	 *
++	 * The directions are NOT here. The stick has twelve buttons and SDL
++	 * reports twelve, so none of them is a direction; they arrive as the
++	 * arrow keysyms, which the stock SDLK_UP/DOWN/LEFT/RIGHT binds at the top
++	 * of this table already cover. An earlier version of this table bound
++	 * 8-11 as the directions, which meant Select, Start, Options and Turbo
++	 * were steering the game. */
++	{ SDLK_WORLD_0 + 0,  IN_BINDTYPE_PLAYER12, GBTN_X },      /* A red     */
++	{ SDLK_WORLD_0 + 2,  IN_BINDTYPE_PLAYER12, GBTN_Y },      /* C green   */
++	{ SDLK_WORLD_0 + 3,  IN_BINDTYPE_PLAYER12, GBTN_Z },      /* grey top  */
++	{ SDLK_WORLD_0 + 1,  IN_BINDTYPE_PLAYER12, GBTN_A },      /* B yellow  */
++	{ SDLK_WORLD_0 + 5,  IN_BINDTYPE_PLAYER12, GBTN_B },      /* D blue    */
++	{ SDLK_WORLD_0 + 4,  IN_BINDTYPE_PLAYER12, GBTN_C },      /* grey bot  */
++	{ SDLK_WORLD_0 + 9,  IN_BINDTYPE_PLAYER12, GBTN_START },  /* Start     */
++	{ SDLK_WORLD_0 + 8,  IN_BINDTYPE_PLAYER12, GBTN_MODE },   /* Select    */
++	{ SDLK_WORLD_0 + 10, IN_BINDTYPE_EMU, PEVB_MENU },        /* Options   */
++#endif
++
+ 	{ 0, 0, 0 }
+ };
+ 
+@@ -151,11 +198,27 @@ const struct menu_keymap _in_sdl_joy_map[] = {
+ 	{ SDLK_DOWN,	PBTN_DOWN },
+ 	{ SDLK_LEFT,	PBTN_LEFT },
+ 	{ SDLK_RIGHT,	PBTN_RIGHT },
++#ifdef ASP_BUILD
++	/* ASP menu navigation: the stick's directions arrive as buttons, so the
++	 * four SDLK_* entries above are never produced and these are what make
++	 * the menu navigable at all. Same confirmed indices as the gameplay
++	 * table above - 0 to 11 only, and 12 and 24 do not exist. Confirm goes
++	 * on the bottom-left face button, where the thumb already is. */
++	/* Menu navigation. The four SDLK_* direction entries above do the moving,
++	 * since the stick's directions arrive as keysyms; these are the actions. */
++	{ SDLK_WORLD_0 + 1,	PBTN_MOK },     /* B yellow confirms  */
++	{ SDLK_WORLD_0 + 5,	PBTN_MBACK },   /* D blue goes back   */
++	{ SDLK_WORLD_0 + 0,	PBTN_MA2 },     /* A red              */
++	{ SDLK_WORLD_0 + 2,	PBTN_MA3 },     /* C green            */
++	{ SDLK_WORLD_0 + 3,	PBTN_L },       /* greys page up/down */
++	{ SDLK_WORLD_0 + 4,	PBTN_R },
++#else
+ 	/* joystick */
+ 	{ SDLK_WORLD_0,	PBTN_MOK },
+ 	{ SDLK_WORLD_1,	PBTN_MBACK },
+ 	{ SDLK_WORLD_2,	PBTN_MA2 },
+ 	{ SDLK_WORLD_3,	PBTN_MA3 },
++#endif
+ };
+ const int in_sdl_joy_map_sz = sizeof(_in_sdl_joy_map) / sizeof(_in_sdl_joy_map[0]);
+ const struct menu_keymap *in_sdl_joy_map = _in_sdl_joy_map;
+diff --git a/platform/common/main.c b/platform/common/main.c
+index 8e6987e..1289398 100644
+--- a/platform/common/main.c
++++ b/platform/common/main.c
+@@ -1,164 +1,209 @@
+-/*
+- * PicoDrive
+- * (C) notaz, 2006-2010
+- *
+- * This work is licensed under the terms of MAME license.
+- * See COPYING file in the top-level directory.
+- */
+-
+-#include <stdio.h>
+-#include <stdlib.h>
+-#include <string.h>
+-#include <strings.h>
+-#ifdef USE_SDL
+-#include <SDL.h>
+-#endif
+-
+-#include "../libpicofe/input.h"
+-#include "../libpicofe/plat.h"
+-#include "menu_pico.h"
+-#include "emu.h"
+-#include "version.h"
+-#include <cpu/debug.h>
+-
+-static int load_state_slot = -1;
+-char **g_argv;
+-
+-void parse_cmd_line(int argc, char *argv[])
+-{
+-	int x, unrecognized = 0;
+-
+-	for (x = 1; x < argc && !unrecognized; x++)
+-	{
+-		if (argv[x][0] == '-')
+-		{
+-			if (strcasecmp(argv[x], "-config") == 0) {
+-				if (x+1 < argc) { ++x; PicoConfigFile = argv[x]; }
+-			}
+-			else if (strcasecmp(argv[x], "-loadstate") == 0
+-				 || strcasecmp(argv[x], "-load") == 0)
+-			{
+-				if (x+1 < argc) { ++x; load_state_slot = atoi(argv[x]); }
+-			}
+-			else if (strcasecmp(argv[x], "-pdb") == 0) {
+-				if (x+1 < argc) { ++x; pdb_command(argv[x]); }
+-			}
+-			else if (strcasecmp(argv[x], "-pdb_connect") == 0) {
+-				if (x+2 < argc) { pdb_net_connect(argv[x+1], argv[x+2]); x += 2; }
+-			}
+-			else {
+-				unrecognized = plat_parse_arg(argc, argv, &x);
+-			}
+-		} else {
+-			FILE *f = fopen(argv[x], "rb");
+-			if (f) {
+-				fclose(f);
+-				rom_fname_reload = argv[x];
+-			}
+-			else
+-				unrecognized = 1;
+-			break;
+-		}
+-	}
+-
+-	if (unrecognized) {
+-		printf("\n\n\nPicoDrive v" VERSION " (c) notaz, 2006-2009,2013\n");
+-		printf("usage: %s [options] [romfile]\n", argv[0]);
+-		printf("options:\n"
+-			" -config <file>    use specified config file instead of default 'config.cfg'\n"
+-			" -loadstate <num>  if ROM is specified, try loading savestate slot <num>\n");
+-		exit(1);
+-	}
+-}
+-
+-
+-int main(int argc, char *argv[])
+-{
+-	g_argv = argv;
+-
+-	plat_early_init();
+-
+-	in_init();
+-	//in_probe();
+-
+-	plat_target_init();
+-	if (argc > 1)
+-		parse_cmd_line(argc, argv);
+-
+-	plat_init();
+-	menu_init();
+-
+-	emu_prep_defconfig(); // depends on input
+-	emu_read_config(NULL, 0);
+-
+-	emu_init();
+-
+-	engineState = rom_fname_reload ? PGS_ReloadRom : PGS_Menu;
+-	plat_video_menu_enter(0);
+-
+-	if (engineState == PGS_ReloadRom)
+-	{
+-		plat_video_menu_begin();
+-		if (emu_reload_rom(rom_fname_reload)) {
+-			engineState = PGS_Running;
+-			if (load_state_slot >= 0) {
+-				state_slot = load_state_slot;
+-				emu_save_load_game(1, 0);
+-			}
+-		}
+-		plat_video_menu_end();
+-	}
+-	plat_video_menu_leave();
+-
+-	for (;;)
+-	{
+-		switch (engineState)
+-		{
+-			case PGS_Menu:
+-				menu_loop();
+-				break;
+-
+-			case PGS_TrayMenu:
+-				menu_loop_tray();
+-				break;
+-
+-			case PGS_ReloadRom:
+-				if (emu_reload_rom(rom_fname_reload))
+-					engineState = PGS_Running;
+-				else {
+-					printf("PGS_ReloadRom == 0\n");
+-					engineState = PGS_Menu;
+-				}
+-				break;
+-
+-			case PGS_RestartRun:
+-				engineState = PGS_Running;
+-				/* vvv fallthrough */
+-
+-			case PGS_Running:
+-#ifdef GPERF
+-	ProfilerStart("gperf.out");
+-#endif
+-				emu_loop();
+-#ifdef GPERF
+-	ProfilerStop();
+-#endif
+-				break;
+-
+-			case PGS_Quit:
+-				goto endloop;
+-
+-			default:
+-				printf("engine got into unknown state (%i), exitting\n", engineState);
+-				goto endloop;
+-		}
+-	}
+-
+-	endloop:
+-
+-	emu_finish();
+-	plat_finish();
+-	plat_target_finish();
+-
+-	return 0;
+-}
++/*
++ * PicoDrive
++ * (C) notaz, 2006-2010
++ *
++ * This work is licensed under the terms of MAME license.
++ * See COPYING file in the top-level directory.
++ */
++
++#include <stdio.h>
++#include <sys/stat.h>
++#include <stdlib.h>
++#include <string.h>
++#include <strings.h>
++#include <unistd.h>
++#ifdef USE_SDL
++#include <SDL.h>
++#endif
++
++#include "../libpicofe/input.h"
++#include "../libpicofe/plat.h"
++#include "menu_pico.h"
++#include "emu.h"
++#include "version.h"
++#include <cpu/debug.h>
++
++static int load_state_slot = -1;
++char **g_argv;
++
++void parse_cmd_line(int argc, char *argv[])
++{
++	int x, unrecognized = 0;
++
++	for (x = 1; x < argc && !unrecognized; x++)
++	{
++		if (argv[x][0] == '-')
++		{
++			if (strcasecmp(argv[x], "-config") == 0) {
++				if (x+1 < argc) { ++x; PicoConfigFile = argv[x]; }
++			}
++			else if (strcasecmp(argv[x], "-loadstate") == 0
++				 || strcasecmp(argv[x], "-load") == 0)
++			{
++				if (x+1 < argc) { ++x; load_state_slot = atoi(argv[x]); }
++			}
++			else if (strcasecmp(argv[x], "-pdb") == 0) {
++				if (x+1 < argc) { ++x; pdb_command(argv[x]); }
++			}
++			else if (strcasecmp(argv[x], "-pdb_connect") == 0) {
++				if (x+2 < argc) { pdb_net_connect(argv[x+1], argv[x+2]); x += 2; }
++			}
++			else {
++				unrecognized = plat_parse_arg(argc, argv, &x);
++			}
++		} else {
++			FILE *f = fopen(argv[x], "rb");
++			if (f) {
++				fclose(f);
++				rom_fname_reload = argv[x];
++			}
++			else
++				unrecognized = 1;
++			break;
++		}
++	}
++
++	if (unrecognized) {
++		printf("\n\n\nPicoDrive v" VERSION " (c) notaz, 2006-2009,2013\n");
++		printf("usage: %s [options] [romfile]\n", argv[0]);
++		printf("options:\n"
++			" -config <file>    use specified config file instead of default 'config.cfg'\n"
++			" -loadstate <num>  if ROM is specified, try loading savestate slot <num>\n");
++		exit(1);
++	}
++}
++
++
++#ifdef ASP_BUILD
++/* The ASP firmware's own log.asp.txt is a couple of KB and is rewritten on
++ * every launch, so anything this emulator prints is gone by the time the
++ * card is back on a PC. Keep our own copy next to the binary instead. */
++static void asp_open_log(void)
++{
++	char path[512];
++	int n = readlink("/proc/self/exe", path, sizeof(path) - 16);
++	if (n <= 0)
++		return;
++	path[n] = 0;
++	while (n > 0 && path[n - 1] != '/')
++		n--;
++	strcpy(path + n, "md_log.txt");
++	/* Append rather than truncate, with a cap, and mark each launch. A
++	 * truncating open loses the evidence for any crash as soon as the next
++	 * game is started, which is how one crash report here went unexplained:
++	 * by the time the card could be read, a later launch had overwritten it. */
++	{
++		struct stat lst;
++		const char *mode = "a";
++		if (stat(path, &lst) == 0 && lst.st_size > 512 * 1024)
++			mode = "w";
++		if (freopen(path, mode, stderr) == NULL) return;
++	}
++	setvbuf(stderr, NULL, _IOLBF, 0);
++	dup2(fileno(stderr), fileno(stdout));
++	setvbuf(stdout, NULL, _IOLBF, 0);
++	fprintf(stderr, "asp: PicoDrive log, argc=%d\n", 0);
++}
++#endif
++
++int main(int argc, char *argv[])
++{
++	g_argv = argv;
++
++#ifdef ASP_BUILD
++	{
++		int i;
++		asp_open_log();
++		fprintf(stderr, "\n===== launch: %s =====\n",
++			(argc > 1 && argv[1]) ? argv[1] : "(no rom)");
++		for (i = 0; i < argc; i++)
++			fprintf(stderr, "asp: argv[%d] = %s\n", i, argv[i]);
++	}
++#endif
++
++	plat_early_init();
++
++	in_init();
++	//in_probe();
++
++	plat_target_init();
++	if (argc > 1)
++		parse_cmd_line(argc, argv);
++
++	plat_init();
++	menu_init();
++
++	emu_prep_defconfig(); // depends on input
++	emu_read_config(NULL, 0);
++
++	emu_init();
++
++	engineState = rom_fname_reload ? PGS_ReloadRom : PGS_Menu;
++	plat_video_menu_enter(0);
++
++	if (engineState == PGS_ReloadRom)
++	{
++		plat_video_menu_begin();
++		if (emu_reload_rom(rom_fname_reload)) {
++			engineState = PGS_Running;
++			if (load_state_slot >= 0) {
++				state_slot = load_state_slot;
++				emu_save_load_game(1, 0);
++			}
++		}
++		plat_video_menu_end();
++	}
++	plat_video_menu_leave();
++
++	for (;;)
++	{
++		switch (engineState)
++		{
++			case PGS_Menu:
++				menu_loop();
++				break;
++
++			case PGS_TrayMenu:
++				menu_loop_tray();
++				break;
++
++			case PGS_ReloadRom:
++				if (emu_reload_rom(rom_fname_reload))
++					engineState = PGS_Running;
++				else {
++					printf("PGS_ReloadRom == 0\n");
++					engineState = PGS_Menu;
++				}
++				break;
++
++			case PGS_RestartRun:
++				engineState = PGS_Running;
++				/* vvv fallthrough */
++
++			case PGS_Running:
++#ifdef GPERF
++	ProfilerStart("gperf.out");
++#endif
++				emu_loop();
++#ifdef GPERF
++	ProfilerStop();
++#endif
++				break;
++
++			case PGS_Quit:
++				goto endloop;
++
++			default:
++				printf("engine got into unknown state (%i), exitting\n", engineState);
++				goto endloop;
++		}
++	}
++
++	endloop:
++
++	emu_finish();
++	plat_finish();
++	plat_target_finish();
++
++	return 0;
++}
+diff --git a/platform/common/plat_sdl.c b/platform/common/plat_sdl.c
+index 4f8249f..8a0bbb8 100644
+--- a/platform/common/plat_sdl.c
++++ b/platform/common/plat_sdl.c
+@@ -176,6 +176,200 @@ void rgb565_to_uyvy(void *d, const void *s, int w, int h, int pitch, int dpitch,
+ 	}
+ }
+ 
++#ifdef ASP_FULLSCREEN_FILL
++/* Nearest-neighbour stretch of a 16bpp image to fill the whole destination.
++ * The ASP framebuffer is a fixed 1280x720 and has no usable hw scaler or
++ * overlay, so integer scaling would letterbox a 320x224 Mega Drive frame to
++ * 960x672. This fills the panel instead. Rows that map to the same source
++ * line are memcpy'd from the previous destination row, so for 224->720 only
++ * 224 of the 720 rows are actually built. */
++/* Where on the panel the emulated frame goes. Two independent corrections:
++ *
++ * Overscan - the framebuffer is 1280x720 and we fill it, but the panel shows
++ * less than all of it, so edge content falls off and the picture reads as
++ * running past the screen edge. Drawing into a smaller centred rectangle is
++ * the cure; how much smaller belongs to the display, so it comes from
++ * asp_screen.cfg beside the binary and can be corrected without a rebuild.
++ *
++ * Aspect - the Mega Drive is a 4:3 system whether the mode is 256 or 320
++ * pixels wide. Scaling it to 16:9 stretches it sideways by a third regardless
++ * of overscan, so fit 4:3 inside what the overscan leaves and let the slack be
++ * side bars instead of distortion.
++ */
++static int asp_inset_x, asp_inset_y;
++static int asp_keep_aspect = 1;
++static int asp_calibrate;
++/* Which reading of the display's contradictory geometry to trust;
++ * see asp_fbout.h. 0 picks automatically. */
++static int asp_fb_mode;
++/* What the display physically is, so the frame can be pre-shaped to come out
++ * 4:3 after the display scales the framebuffer onto it. 16:9 means the display
++ * matches the framebuffer and nothing needs correcting. */
++static int asp_panel_w = 16, asp_panel_h = 9;
++static void asp_read_screen_cfg(void);
++#include "asp_fbout.h"
++#include "asp_calib.h"
++#include "asp_geom.h"
++
++static void asp_read_screen_cfg(void)
++{
++	char path[512], line[256];
++	FILE *f;
++	int n;
++
++	n = readlink("/proc/self/exe", path, sizeof(path) - 24);
++	if (n <= 0)
++		return;
++	path[n] = 0;
++	while (n > 0 && path[n - 1] != '/')
++		n--;
++	strcpy(path + n, "asp_screen.cfg");
++
++	f = fopen(path, "r");
++	if (f == NULL) {
++		fprintf(stderr, "asp: no %s, filling the panel\n", path);
++		return;
++	}
++	while (fgets(line, sizeof(line), f) != NULL) {
++		int v, pw, ph;
++		char word[64];
++		if (line[0] == '#' || line[0] == '\n' || line[0] == '\r')
++			continue;
++		if (sscanf(line, "inset_x = %d", &v) == 1 ||
++		    sscanf(line, "inset_x=%d", &v) == 1)
++			asp_inset_x = v;
++		else if (sscanf(line, "inset_y = %d", &v) == 1 ||
++		         sscanf(line, "inset_y=%d", &v) == 1)
++			asp_inset_y = v;
++		else if (sscanf(line, "aspect = %63s", word) == 1 ||
++		         sscanf(line, "aspect=%63s", word) == 1)
++			asp_keep_aspect = (strncmp(word, "fill", 4) != 0);
++		else if (sscanf(line, "calibrate = %d", &v) == 1 ||
++		         sscanf(line, "calibrate=%d", &v) == 1)
++			asp_calibrate = v;
++		else if (sscanf(line, "fb_mode = %d", &v) == 1 ||
++		         sscanf(line, "fb_mode=%d", &v) == 1)
++			asp_fb_mode = v;
++		else if (sscanf(line, "panel_aspect = %d:%d", &pw, &ph) == 2 ||
++		         sscanf(line, "panel_aspect=%d:%d", &pw, &ph) == 2) {
++			if (pw > 0 && ph > 0) { asp_panel_w = pw; asp_panel_h = ph; }
++		}
++	}
++	fclose(f);
++
++	if (asp_inset_x < 0) asp_inset_x = 0;
++	if (asp_inset_y < 0) asp_inset_y = 0;
++	if (asp_inset_x > 320) asp_inset_x = 320;
++	if (asp_inset_y > 180) asp_inset_y = 180;
++
++	fprintf(stderr, "asp: %s -> inset_x=%d inset_y=%d aspect=%s calibrate=%d\n",
++		path, asp_inset_x, asp_inset_y,
++		asp_keep_aspect ? "keep" : "fill", asp_calibrate);
++	fprintf(stderr, "asp: fb_mode=%d panel_aspect=%d:%d\n",
++		asp_fb_mode, asp_panel_w, asp_panel_h);
++}
++
++/* The surface-based target-rect helper lived here. It is replaced by
++ * asp_target_rect_fb() in asp_geom.h, which works against the real
++ * framebuffer geometry rather than the SDL surface whose pitch is half
++ * the driver's line_length on this device. */
++
++void copy_fracscale(void *dst, int w, int h, int pp, void *src, int sw, int sh, int spp)
++{
++	static unsigned short xmap[2048];
++	static int cache_w, cache_sw;
++	unsigned short *p = (unsigned short *)dst;
++	unsigned short *q = (unsigned short *)src;
++	unsigned short *prev_row = NULL;
++	int i, j, prev_sy = -1;
++
++	if (w > 2048)
++		w = 2048;
++	if (w <= 0 || h <= 0 || sw <= 0 || sh <= 0)
++		return;
++
++	if (w != cache_w || sw != cache_sw) {
++		for (j = 0; j < w; j++)
++			xmap[j] = (unsigned short)(((unsigned)j * sw) / w);
++		cache_w = w;
++		cache_sw = sw;
++	}
++
++	for (i = 0; i < h; i++, p += pp) {
++		int sy = (int)(((unsigned)i * sh) / h);
++		if (sy == prev_sy && prev_row != NULL) {
++			memcpy(p, prev_row, w * 2);
++			continue;
++		}
++		{
++			unsigned short *s = q + sy * spp;
++			for (j = 0; j < w; j++)
++				p[j] = s[xmap[j]];
++		}
++		prev_sy = sy;
++		prev_row = p;
++	}
++}
++
++/* Same stretch, but writing 32bpp. The ASP framebuffer may be 32bpp: in
++ * stock PicoDrive the surface is forced to 16bpp inside
++ * plat_sdl_change_video_mode, which the fill path above deliberately never
++ * calls, so the surface keeps whatever depth the framebuffer has and the
++ * RGB565 frame has to be expanded here instead. Shifts come from the
++ * surface so the channel order is whatever SDL reports. */
++void copy_fracscale32(void *dst, int w, int h, int pp, void *src, int sw, int sh,
++		      int spp, const SDL_PixelFormat *fmt)
++{
++	static unsigned short xmap[2048];
++	static int cache_w, cache_sw;
++	unsigned int *p = (unsigned int *)dst;
++	unsigned short *q = (unsigned short *)src;
++	unsigned int *prev_row = NULL;
++	int i, j, prev_sy = -1;
++	unsigned int r5[32], g6[64], b5[32];
++
++	if (w > 2048)
++		w = 2048;
++	if (w <= 0 || h <= 0 || sw <= 0 || sh <= 0)
++		return;
++
++	/* RGB565 component -> 8 bit, pre-shifted into place */
++	for (i = 0; i < 32; i++) {
++		unsigned int v = (unsigned int)((i * 255 + 15) / 31);
++		r5[i] = (v >> fmt->Rloss) << fmt->Rshift;
++		b5[i] = (v >> fmt->Bloss) << fmt->Bshift;
++	}
++	for (i = 0; i < 64; i++) {
++		unsigned int v = (unsigned int)((i * 255 + 31) / 63);
++		g6[i] = (v >> fmt->Gloss) << fmt->Gshift;
++	}
++
++	if (w != cache_w || sw != cache_sw) {
++		for (j = 0; j < w; j++)
++			xmap[j] = (unsigned short)(((unsigned)j * sw) / w);
++		cache_w = w;
++		cache_sw = sw;
++	}
++
++	for (i = 0; i < h; i++, p += pp) {
++		int sy = (int)(((unsigned)i * sh) / h);
++		if (sy == prev_sy && prev_row != NULL) {
++			memcpy(p, prev_row, w * 4);
++			continue;
++		}
++		{
++			unsigned short *s = q + sy * spp;
++			for (j = 0; j < w; j++) {
++				unsigned int c = s[xmap[j]];
++				p[j] = r5[c >> 11] | g6[(c >> 5) & 0x3f] | b5[c & 0x1f];
++			}
++		}
++		prev_sy = sy;
++		prev_row = p;
++	}
++}
++#endif
++
+ void copy_intscale(void *dst, int w, int h, int pp, void *src, int sw, int sh, int spp)
+ {
+ 	int xf = w / sw, yf = h / sh, f = xf < yf ? xf : yf;
+@@ -226,6 +420,19 @@ void plat_video_set_size(int w, int h)
+ 	if (area.w != w || area.h != h) {
+ 		area = (struct area) { w, h };
+ 
++#ifdef ASP_FULLSCREEN_FILL
++		/* Never renegotiate the video mode: the ASP framebuffer is a
++		 * fixed 1280x720 and SDL_SetVideoMode failing here would leave
++		 * plat_sdl_screen NULL. Render into the shadow buffer at the
++		 * emulated size and stretch it to the panel on flip. */
++		if (!plat_sdl_overlay && !plat_sdl_gl_active) {
++			g_screen_width = area.w;
++			g_screen_height = area.h;
++			g_screen_ppitch = area.w;
++			g_screen_ptr = shadow_fb;
++			return;
++		}
++#endif
+ 		if (plat_sdl_overlay || plat_sdl_gl_active || !plat_sdl_is_windowed()) {
+ 			// create surface for overlays, or try using a hw scaler
+ 			if (plat_sdl_change_video_mode(w, h, 0) < 0) {
+@@ -288,12 +495,69 @@ void plat_video_flip(void)
+ 	else {
+ 		int copy = g_screen_ptr != plat_sdl_screen->pixels;
+ 		if (copy)
++#ifdef ASP_FULLSCREEN_FILL
++		{
++			static int told, told_bad;
++			const SDL_PixelFormat *fmt = plat_sdl_screen->format;
++			if (!told) {
++				told = 1;
++				fprintf(stderr, "asp: screen %dx%d %dbpp pitch %d "
++					"masks %08x/%08x/%08x\n",
++					plat_sdl_screen->w, plat_sdl_screen->h,
++					fmt->BitsPerPixel, plat_sdl_screen->pitch,
++					(unsigned)fmt->Rmask, (unsigned)fmt->Gmask,
++					(unsigned)fmt->Bmask);
++			}
++			/* Straight to the framebuffer at the driver's own stride. The
++			 * SDL surface above is reported only for the record; it is not
++			 * written to. Its pitch is half the driver's line_length on this
++			 * device, so anything drawn into it lands at the wrong row. See
++			 * asp_fbout.h. */
++			int ox, oy, dw, dh;
++			(void)told_bad;
++			if (!asp_fb_first_frame_setup())
++				return;
++			asp_target_rect_fb(&ox, &oy, &dw, &dh);
++			asp_fb_wait_vsync();
++			asp_fb_present((const unsigned short *)shadow_fb,
++				g_screen_width, g_screen_height, g_screen_ppitch,
++				ox, oy, dw, dh);
++
++			/* Done - and deliberately before SDL_Flip.
++			 *
++			 * The frame is already on the panel. SDL_Flip would pan the
++			 * display to its second page, which nothing here ever writes
++			 * to, so every other frame showed a page holding whatever was
++			 * in it at startup. That is the Mega Drive flicker. Leaving
++			 * the surface untouched also means the coverage logging that
++			 * used to sit here could only ever read zeroes, so it is gone
++			 * too; asp_fb_present reports its own target rectangle. */
++			return;
++		}
++#else
+ 			copy_intscale(plat_sdl_screen->pixels, plat_sdl_screen->w,
+ 				plat_sdl_screen->h, plat_sdl_screen->pitch/2,
+ 				shadow_fb, g_screen_width, g_screen_height, g_screen_ppitch);
++#endif
+ 
+ 		if (SDL_MUSTLOCK(plat_sdl_screen))
+ 			SDL_UnlockSurface(plat_sdl_screen);
++#ifdef ASP_FULLSCREEN_FILL
++		/* Test hook: ASP_DUMP_FRAME=<n> writes frame n to a BMP next
++		 * to the binary, so the scaled output can be inspected off the
++		 * device. Never fires unless the variable is set. */
++		{
++			static int frameno, want = -2;
++			if (want == -2) {
++				const char *e = getenv("ASP_DUMP_FRAME");
++				want = e ? atoi(e) : -1;
++			}
++			if (want >= 0 && frameno++ == want) {
++				SDL_SaveBMP(plat_sdl_screen, "asp_frame.bmp");
++				fprintf(stderr, "asp: wrote asp_frame.bmp\n");
++			}
++		}
++#endif
+ 		SDL_Flip(plat_sdl_screen);
+ 
+ 		// take over resized settings for the physical SDL surface
+@@ -355,6 +619,13 @@ void plat_video_clear_buffers(void)
+ 	if (plat_sdl_overlay)
+ 		plat_sdl_overlay_clear();
+ 	memset(plat_sdl_screen->pixels, 0, plat_sdl_screen->pitch*plat_sdl_screen->h);
++#ifdef ASP_FULLSCREEN_FILL
++	/* Clearing SDL's surface blanks nothing on this device, since nothing
++	 * is drawn through it. Without this the last game frame stays on the
++	 * panel underneath the menu. No-op before the first frame, which has
++	 * already cleared the whole mapping. */
++	asp_fb_clear();
++#endif
+ 	clear_buf_cnt = 3; // do it thrice in case of triple buffering
+ }
+ 
+@@ -375,8 +646,17 @@ void plat_video_menu_update(void)
+ 	// update pitch as it is needed by the menu bg scaler
+ 	if (plat_sdl_overlay || plat_sdl_gl_active)
+ 		g_menuscreen_pp = g_menuscreen_w;
++#ifdef ASP_FULLSCREEN_FILL
++	/* The menu is drawn into the 16bpp shadow buffer (see
++	 * plat_video_menu_begin), which is exactly g_menuscreen_w wide. Taking
++	 * the stride from the surface pitch instead would describe a buffer
++	 * that is not the one being written. */
++	else
++		g_menuscreen_pp = g_menuscreen_w;
++#else
+ 	else
+ 		g_menuscreen_pp = plat_sdl_screen->pitch / 2;
++#endif
+ 
+ 	resize_buffers();
+ }
+@@ -391,6 +671,18 @@ void plat_video_menu_begin(void)
+ {
+ 	plat_video_menu_update(); // just in case
+ 
++#ifdef ASP_FULLSCREEN_FILL
++	/* The menu draws RGB565 like the game does, and takes the same route
++	 * out: shadow buffer here, straight to /dev/fb0 in
++	 * plat_video_menu_end. Drawing it into SDL's surface instead put it at
++	 * SDL's stride while the game was going out at the driver's, which is
++	 * why the menu appeared in the wrong place over a correct picture. */
++	if (plat_sdl_screen != NULL && !plat_sdl_overlay && !plat_sdl_gl_active) {
++		resize_buffers();
++		g_menuscreen_ptr = shadow_fb;
++		return;
++	}
++#endif
+ 	if (plat_sdl_overlay || plat_sdl_gl_active)
+ 		g_menuscreen_ptr = shadow_fb;
+ 	else {
+@@ -419,6 +711,20 @@ void plat_video_menu_end(void)
+ 	else if (plat_sdl_gl_active) {
+ 		gl_flip(g_menuscreen_ptr, g_menuscreen_pp, g_menuscreen_h);
+ 	}
++#ifdef ASP_FULLSCREEN_FILL
++	else if (g_menuscreen_ptr == shadow_fb) {
++		/* Out through the same path as the game, so both land at the
++		 * same stride on the same page. Drawn to the full panel rather
++		 * than the game's 4:3 rectangle: the menu is interface, not
++		 * console output, and nothing here should sit in a letterbox. */
++		if (asp_fb_first_frame_setup()) {
++			asp_fb_wait_vsync();
++			asp_fb_present((const unsigned short *)shadow_fb,
++				g_menuscreen_w, g_menuscreen_h, g_menuscreen_pp,
++				0, 0, asp_fb_w, asp_fb_h);
++		}
++	}
++#endif
+ 	else {
+ 		if (SDL_MUSTLOCK(plat_sdl_screen))
+ 			SDL_UnlockSurface(plat_sdl_screen);
+@@ -437,8 +743,18 @@ void plat_video_loop_prepare(void)
+ 
+ 	// take over any new vout settings
+ 	area = (struct area) { 0, 0 };
++#ifdef ASP_FULLSCREEN_FILL
++	/* Do NOT renegotiate the mode here. This is the call that was quietly
++	 * undoing the surface set up at init: the mode was established once,
++	 * then this re-set it and the surface came back with the hardware's
++	 * 5120-byte line length while still reporting the old width, so every
++	 * blit landed in a fraction of each row. The mode is set exactly once,
++	 * in plat_sdl_init, and nothing else touches it. */
++	resize_buffers();
++#else
+ 	plat_sdl_change_video_mode(0, 0, 0);
+ 	resize_buffers();
++#endif
+ 
+ 	// switch over to scaled output if available, but keep the aspect ratio
+ 	if (plat_sdl_overlay || plat_sdl_gl_active)
+diff --git a/platform/libpicofe b/platform/libpicofe
+--- a/platform/libpicofe
++++ b/platform/libpicofe
+@@ -1 +1 @@
+-Subproject commit c3031dbfda557f7058756583b329b59ea92a72dc
++Subproject commit c3031dbfda557f7058756583b329b59ea92a72dc-dirty

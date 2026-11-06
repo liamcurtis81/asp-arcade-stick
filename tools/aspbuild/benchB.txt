@@ -1,0 +1,11 @@
+===== launch: metamrph =====
+asp: tuning: per-game draw_every_n = 1
+asp: tuning: per-game exit_after_frames = 1200
+asp: tuning: per-game present_thread = 0
+----- metamrph: 35.0s, emulated 2072 frames (59.1 fps), rendered 1200 frames (34.2 fps), target 59.18 -----
+----- cost per frame: emulate 10.27 ms (n=872), emulate+blit 16.31 ms (n=1200), present 2.66 ms (n=1199); drawing adds 8.70 ms, so every-frame would be 52.7 fps against a 16.90 ms budget -----
+----- emulate+blit spread (n=1200): p50 16.78, p95 19.92, p99 22.02 ms, worst 30.55 ms -----
+----- present spread (n=1199): p50 3.15, p95 3.15, p99 3.67 ms, worst 4.97 ms -----
+----- frame gap spread (n=1198): p50 28.84, p95 45.61, p99 46.14 ms, worst 48.32 ms -----
+----- present: inline on the emulation thread -----
+----- audio catch-up batch sizes: 1:523 2:482 3:195 of 5 segments; 0 of 1200 batches (0%) at the 4-segment limit (shallow ring: the limit is also the normal maximum, so this is not by itself starvation)) -----

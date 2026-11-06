@@ -1,0 +1,2312 @@
+diff --git a/trunk/SConstruct b/trunk/SConstruct
+index be84421..bc99555 100644
+--- a/trunk/SConstruct
++++ b/trunk/SConstruct
+@@ -46,30 +46,32 @@ if platform.system == "ppc":
+ # Default compiler flags:
+ env.Append(CCFLAGS = ['-Wall', '-Wno-write-strings', '-Wno-sign-compare'])
+ 
+-if os.environ.has_key('PLATFORM'):
++# let sub-commands (sdl-config etc) be found on the real PATH
++env['ENV']['PATH'] = os.environ.get('PATH', env['ENV'].get('PATH',''))
++if 'PLATFORM' in os.environ:
+   env.Replace(PLATFORM = os.environ['PLATFORM'])
+-if os.environ.has_key('CC'):
++if 'CC' in os.environ:
+   env.Replace(CC = os.environ['CC'])
+-if os.environ.has_key('CXX'):
++if 'CXX' in os.environ:
+   env.Replace(CXX = os.environ['CXX'])
+-if os.environ.has_key('WINDRES'):
++if 'WINDRES' in os.environ:
+   env.Replace(WINDRES = os.environ['WINDRES'])
+-if os.environ.has_key('CFLAGS'):
++if 'CFLAGS' in os.environ:
+   env.Append(CCFLAGS = os.environ['CFLAGS'].split())
+-if os.environ.has_key('CXXFLAGS'):
++if 'CXXFLAGS' in os.environ:
+   env.Append(CXXFLAGS = os.environ['CXXFLAGS'].split())
+-if os.environ.has_key('CPPFLAGS'):
++if 'CPPFLAGS' in os.environ:
+   env.Append(CPPFLAGS = os.environ['CPPFLAGS'].split())
+-if os.environ.has_key('LDFLAGS'):
++if 'LDFLAGS' in os.environ:
+   env.Append(LINKFLAGS = os.environ['LDFLAGS'].split())
+-if os.environ.has_key('PKG_CONFIG_PATH'):
++if 'PKG_CONFIG_PATH' in os.environ:
+   env['ENV']['PKG_CONFIG_PATH'] = os.environ['PKG_CONFIG_PATH']
+-if not os.environ.has_key('PKG_CONFIG_PATH') and env['PLATFORM'] == 'darwin':
++if not 'PKG_CONFIG_PATH' in os.environ and env['PLATFORM'] == 'darwin':
+   env['ENV']['PKG_CONFIG_PATH'] = "/usr/local/lib/pkgconfig:/opt/X11/lib/pkgconfig"
+-if os.environ.has_key('PKG_CONFIG_LIBDIR'):
++if 'PKG_CONFIG_LIBDIR' in os.environ:
+   env['ENV']['PKG_CONFIG_LIBDIR'] = os.environ['PKG_CONFIG_LIBDIR']
+ 
+-print "platform: ", env['PLATFORM']
++print("platform: ", env['PLATFORM'])
+ 
+ # compile with clang
+ if env['CLANG']:
+@@ -103,18 +105,18 @@ else:
+     assert conf.CheckLibWithHeader('z', 'zlib.h', 'c', 'inflate;', 1), "please install: zlib"
+   if env['SDL2']:
+     if not conf.CheckLib('SDL2'):
+-      print 'Did not find libSDL2 or SDL2.lib, exiting!'
++      print('Did not find libSDL2 or SDL2.lib, exiting!')
+       Exit(1)
+     env.Append(CPPDEFINES=["_SDL2"])
+     env.ParseConfig('pkg-config sdl2 --cflags --libs')
+   else:
+     if not conf.CheckLib('SDL'):
+-      print 'Did not find libSDL or SDL.lib, exiting!'
++      print('Did not find libSDL or SDL.lib, exiting!')
+       Exit(1)
+     env.ParseConfig('sdl-config --cflags --libs')
+   if env['GTK']:
+     if not conf.CheckLib('gtk-x11-2.0'):
+-      print 'Could not find libgtk-2.0, exiting!'
++      print('Could not find libgtk-2.0, exiting!')
+       Exit(1)
+     # Add compiler and linker flags from pkg-config
+     config_string = 'pkg-config --cflags --libs gtk+-2.0'
+@@ -153,7 +155,7 @@ else:
+         env.Append(CCFLAGS = ["-I/usr/include/lua"])
+         lua_available = True
+       if lua_available == False:
+-        print 'Could not find liblua, exiting!'
++        print('Could not find liblua, exiting!')
+         Exit(1)
+     else:
+       env.Append(CCFLAGS = ["-Isrc/lua/src"])
+@@ -167,7 +169,7 @@ else:
+     gd = conf.CheckLib('gd', autoadd=1)
+     if gd == 0:
+       env['LOGO'] = 0
+-      print 'Did not find libgd, you won\'t be able to create a logo screen for your avis.'
++      print('Did not find libgd, you won\'t be able to create a logo screen for your avis.')
+    
+   if env['OPENGL'] and conf.CheckLibWithHeader('GL', 'GL/gl.h', 'c', autoadd=1):
+     conf.env.Append(CCFLAGS = "-DOPENGL")
+@@ -181,8 +183,8 @@ if sys.byteorder == 'little' or env['PLATFORM'] == 'win32':
+ if env['FRAMESKIP']:
+   env.Append(CPPDEFINES = ['FRAMESKIP'])
+ 
+-print "base CPPDEFINES:",env['CPPDEFINES']
+-print "base CCFLAGS:",env['CCFLAGS']
++print("base CPPDEFINES:",env['CPPDEFINES'])
++print("base CCFLAGS:",env['CCFLAGS'])
+ 
+ if env['DEBUG']:
+   env.Append(CPPDEFINES=["_DEBUG"], CCFLAGS = ['-g', '-O0'])
+diff --git a/trunk/fceux-server/server.cpp b/trunk/fceux-server/server.cpp
+index 116e8f4..ba17a23 100644
+--- a/trunk/fceux-server/server.cpp
++++ b/trunk/fceux-server/server.cpp
+@@ -114,7 +114,7 @@ int LoadConfigFile(char *fn)
+  if(fp=fopen(fn,"rb"))
+  {
+   char buf[256];
+-  while(fgets(buf, 256, fp) > 0)
++  while(fgets(buf, 256, fp) != NULL)
+   {
+    if(!strncasecmp(buf,"maxclients",strlen("maxclients")))
+     sscanf(buf,"%*s %d",&ServerConfig.MaxClients);
+diff --git a/trunk/src/SConscript b/trunk/src/SConscript
+index 4713e15..2001146 100644
+--- a/trunk/src/SConscript
++++ b/trunk/src/SConscript
+@@ -33,7 +33,7 @@ else:
+   platform_files = SConscript('drivers/sdl/SConscript')
+ file_list.append(platform_files)
+ 
+-print env['LINKFLAGS']
++print(env['LINKFLAGS'])
+ 
+ if env['PLATFORM'] == 'win32':
+   fceux = env.Program('fceux.exe', file_list)
+diff --git a/trunk/src/cheat.cpp b/trunk/src/cheat.cpp
+index f61668a..cf542f9 100644
+--- a/trunk/src/cheat.cpp
++++ b/trunk/src/cheat.cpp
+@@ -1,966 +1,966 @@
+-/* FCE Ultra - NES/Famicom Emulator
+-*
+-* Copyright notice for this file:
+-*  Copyright (C) 2002 Xodnizel
+-*
+-* This program is free software; you can redistribute it and/or modify
+-* it under the terms of the GNU General Public License as published by
+-* the Free Software Foundation; either version 2 of the License, or
+-* (at your option) any later version.
+-*
+-* This program is distributed in the hope that it will be useful,
+-* but WITHOUT ANY WARRANTY; without even the implied warranty of
+-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-* GNU General Public License for more details.
+-*
+-* You should have received a copy of the GNU General Public License
+-* along with this program; if not, write to the Free Software
+-* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+-*/
+-
+-
+-#include "types.h"
+-#include "x6502.h"
+-#include "cheat.h"
+-#include "fceu.h"
+-#include "file.h"
+-#include "cart.h"
+-#include "driver.h"
+-#include "utils/memory.h"
+-
+-#include <string>
+-#include <cstdlib>
+-#include <cstring>
+-#include <cstdio>
+-#include <cctype>
+-
+-using namespace std;
+-
+-static uint8 *CheatRPtrs[64];
+-
+-vector<uint16> FrozenAddresses;			//List of addresses that are currently frozen
+-void UpdateFrozenList(void);			//Function that populates the list of frozen addresses
+-unsigned int FrozenAddressCount=0;		//Keeps up with the Frozen address count, necessary for using in other dialogs (such as hex editor)
+-
+-void FCEU_CheatResetRAM(void)
+-{
+-	int x;
+-
+-	for(x=0;x<64;x++)
+-		CheatRPtrs[x]=0;
+-}
+-
+-void FCEU_CheatAddRAM(int s, uint32 A, uint8 *p)
+-{
+-	uint32 AB=A>>10;
+-	int x;
+-
+-	for(x=s-1;x>=0;x--)
+-		CheatRPtrs[AB+x]=p-A;
+-}
+-
+-
+-struct CHEATF {
+-	struct CHEATF *next;
+-	char *name;
+-	uint16 addr;
+-	uint8 val;
+-	int compare;	/* -1 for no compare. */
+-	int type;	/* 0 for replace, 1 for substitute(GG). */
+-	int status;
+-};
+-
+-typedef struct {
+-	uint16 addr;
+-	uint8 val;
+-	int compare;
+-	readfunc PrevRead;
+-} CHEATF_SUBFAST;
+-
+-
+-static CHEATF_SUBFAST SubCheats[256];
+-static int numsubcheats=0;
+-struct CHEATF *cheats=0,*cheatsl=0;
+-
+-
+-#define CHEATC_NONE     0x8000
+-#define CHEATC_EXCLUDED 0x4000
+-#define CHEATC_NOSHOW   0xC000
+-
+-static uint16 *CheatComp = 0;
+-int savecheats = 0;
+-
+-static DECLFR(SubCheatsRead)
+-{
+-	CHEATF_SUBFAST *s=SubCheats;
+-	int x=numsubcheats;
+-
+-	do
+-	{
+-		if(s->addr==A)
+-		{
+-			if(s->compare>=0)
+-			{
+-				uint8 pv=s->PrevRead(A);
+-
+-				if(pv==s->compare)
+-					return(s->val);
+-				else return(pv);
+-			}
+-			else return(s->val);
+-		}
+-		s++;
+-	} while(--x);
+-	return(0);	/* We should never get here. */
+-}
+-
+-void RebuildSubCheats(void)
+-{
+-	int x;
+-	struct CHEATF *c=cheats;
+-	for(x=0;x<numsubcheats;x++)
+-		SetReadHandler(SubCheats[x].addr,SubCheats[x].addr,SubCheats[x].PrevRead);
+-
+-	numsubcheats=0;
+-	while(c)
+-	{
+-		if(c->type==1 && c->status)
+-		{
+-			if(GetReadHandler(c->addr)==SubCheatsRead)
+-			{
+-				/* Prevent a catastrophe by this check. */
+-				//FCEU_DispMessage("oops",0);
+-			}
+-			else
+-			{
+-				SubCheats[numsubcheats].PrevRead=GetReadHandler(c->addr);
+-				SubCheats[numsubcheats].addr=c->addr;
+-				SubCheats[numsubcheats].val=c->val;
+-				SubCheats[numsubcheats].compare=c->compare;
+-				SetReadHandler(c->addr,c->addr,SubCheatsRead);
+-				numsubcheats++;
+-			}
+-		}
+-		c=c->next;
+-	}
+-	FrozenAddressCount = numsubcheats;		//Update the frozen address list
+-	UpdateFrozenList();
+-	//FCEUI_DispMessage("Active Cheats: %d",0, FrozenAddresses.size()/*FrozenAddressCount*/); //Debug
+-}
+-
+-void FCEU_PowerCheats()
+-{
+-	numsubcheats=0;	/* Quick hack to prevent setting of ancient read addresses. */
+-	RebuildSubCheats();
+-}
+-
+-static int AddCheatEntry(char *name, uint32 addr, uint8 val, int compare, int status, int type);
+-static void CheatMemErr(void)
+-{
+-	FCEUD_PrintError("Error allocating memory for cheat data.");
+-}
+-
+-/* This function doesn't allocate any memory for "name" */
+-static int AddCheatEntry(char *name, uint32 addr, uint8 val, int compare, int status, int type)
+-{
+-	struct CHEATF *temp;
+-	if(!(temp=(struct CHEATF *)FCEU_dmalloc(sizeof(struct CHEATF))))
+-	{
+-		CheatMemErr();
+-		return(0);
+-	}
+-	temp->name=name;
+-	temp->addr=addr;
+-	temp->val=val;
+-	temp->status=status;
+-	temp->compare=compare;
+-	temp->type=type;
+-	temp->next=0;
+-
+-	if(cheats)
+-	{
+-		cheatsl->next=temp;
+-		cheatsl=temp;
+-	}
+-	else
+-		cheats=cheatsl=temp;
+-
+-	return(1);
+-}
+-
+-void FCEU_LoadGameCheats(FILE *override)
+-{
+-	FILE *fp;
+-	unsigned int addr;
+-	unsigned int val;
+-	unsigned int status;
+-	unsigned int type;
+-	unsigned int compare;
+-	int x;
+-
+-	char linebuf[2048];
+-	char *namebuf;
+-	int tc=0;
+-	char *fn;
+-
+-	numsubcheats=savecheats=0;
+-
+-	if(override)
+-		fp = override;
+-	else
+-	{
+-		fn=strdup(FCEU_MakeFName(FCEUMKF_CHEAT,0,0).c_str());
+-		fp=FCEUD_UTF8fopen(fn,"rb");
+-		free(fn);
+-		if(!fp) return;
+-	}
+-
+-	FCEU_DispMessage("Cheats file loaded.",0); //Tells user a cheats file was loaded.
+-	while(fgets(linebuf,2048,fp)>0)
+-	{
+-		char *tbuf=linebuf;
+-		int doc=0;
+-
+-		addr=val=compare=status=type=0;
+-
+-		if(tbuf[0]=='S')
+-		{
+-			tbuf++;
+-			type=1;
+-		}
+-		else type=0;
+-
+-		if(tbuf[0]=='C')
+-		{
+-			tbuf++;
+-			doc=1;
+-		}
+-
+-		if(tbuf[0]==':')
+-		{
+-			tbuf++;
+-			status=0;
+-		}
+-		else status=1;
+-
+-		if(doc)
+-		{
+-			char *neo=&tbuf[4+2+2+1+1+1];
+-			if(sscanf(tbuf,"%04x%*[:]%02x%*[:]%02x",&addr,&val,&compare)!=3)
+-				continue;
+-			if (!(namebuf=(char *)FCEU_dmalloc(strlen(neo)+1)))
+-                return;
+-			strcpy(namebuf,neo);
+-		}
+-		else
+-		{
+-			char *neo=&tbuf[4+2+1+1];
+-			if(sscanf(tbuf,"%04x%*[:]%02x",&addr,&val)!=2)
+-				continue;
+-			if (!(namebuf=(char *)FCEU_dmalloc(strlen(neo)+1)))
+-                return;
+-			strcpy(namebuf,neo);
+-		}
+-
+-		for(x=0;x<(int)strlen(namebuf);x++)
+-		{
+-			if(namebuf[x]==10 || namebuf[x]==13)
+-			{
+-				namebuf[x]=0;
+-				break;
+-			}
+-			else if(namebuf[x] > 0x00 && namebuf[x] < 0x20)
+-				namebuf[x]=0x20;
+-		}
+-
+-		AddCheatEntry(namebuf,addr,val,doc?compare:-1,status,type);
+-		tc++;
+-	}
+-	RebuildSubCheats();
+-	if(!override)
+-		fclose(fp);
+-}
+-
+-void FCEU_FlushGameCheats(FILE *override, int nosave)
+-{
+-	if(CheatComp)
+-	{
+-		free(CheatComp);
+-		CheatComp=0;
+-	}
+-	if((!savecheats || nosave) && !override)	/* Always save cheats if we're being overridden. */
+-	{
+-		if(cheats)
+-		{
+-			struct CHEATF *next=cheats;
+-			for(;;)
+-			{
+-				struct CHEATF *last=next;
+-				next=next->next;
+-				free(last->name);
+-				free(last);
+-				if(!next) break;
+-			}
+-			cheats=cheatsl=0;
+-		}
+-	}
+-	else
+-	{
+-		char *fn = 0;
+-
+-		if(!override)
+-			fn = strdup(FCEU_MakeFName(FCEUMKF_CHEAT,0,0).c_str());
+-
+-		if(cheats)
+-		{
+-			struct CHEATF *next=cheats;
+-			FILE *fp;
+-
+-			if(override)
+-				fp = override;
+-			else
+-				fp=FCEUD_UTF8fopen(fn,"wb");
+-
+-			if(fp)
+-			{
+-				for(;;)
+-				{
+-					struct CHEATF *t;
+-					if(next->type)
+-						fputc('S',fp);
+-					if(next->compare>=0)
+-						fputc('C',fp);
+-
+-					if(!next->status)
+-						fputc(':',fp);
+-
+-					if(next->compare>=0)
+-						fprintf(fp,"%04x:%02x:%02x:%s\n",next->addr,next->val,next->compare,next->name);
+-					else
+-						fprintf(fp,"%04x:%02x:%s\n",next->addr,next->val,next->name);
+-
+-					free(next->name);
+-					t=next;
+-					next=next->next;
+-					free(t);
+-					if(!next) break;
+-				}
+-				if(!override)
+-					fclose(fp);
+-			}
+-			else
+-				FCEUD_PrintError("Error saving cheats.");
+-			cheats=cheatsl=0;
+-		}
+-		else if(!override)
+-			remove(fn);
+-		if(!override)
+-			free(fn);
+-	}
+-
+-	RebuildSubCheats();  /* Remove memory handlers. */
+-
+-}
+-
+-
+-int FCEUI_AddCheat(const char *name, uint32 addr, uint8 val, int compare, int type)
+-{
+-	char *t;
+-
+-	if(!(t=(char *)FCEU_dmalloc(strlen(name)+1)))
+-	{
+-		CheatMemErr();
+-		return(0);
+-	}
+-	strcpy(t,name);
+-	if(!AddCheatEntry(t,addr,val,compare,1,type))
+-	{
+-		free(t);
+-		return(0);
+-	}
+-	savecheats=1;
+-	RebuildSubCheats();
+-
+-	return(1);
+-}
+-
+-int FCEUI_DelCheat(uint32 which)
+-{
+-	struct CHEATF *prev;
+-	struct CHEATF *cur;
+-	uint32 x=0;
+-
+-	for(prev=0,cur=cheats;;)
+-	{
+-		if(x==which)          // Remove this cheat.
+-		{
+-			if(prev)             // Update pointer to this cheat.
+-			{
+-				if(cur->next)       // More cheats.
+-					prev->next=cur->next;
+-				else                // No more.
+-				{
+-					prev->next=0;
+-					cheatsl=prev;      // Set the previous cheat as the last cheat.
+-				}
+-			}
+-			else                 // This is the first cheat.
+-			{
+-				if(cur->next)       // More cheats
+-					cheats=cur->next;
+-				else
+-					cheats=cheatsl=0;  // No (more) cheats.
+-			}
+-			free(cur->name);     // Now that all references to this cheat are removed,
+-			free(cur);           // free the memory.
+-			break;
+-		}                     // *END REMOVE THIS CHEAT*
+-
+-
+-		if(!cur->next)        // No more cheats to go through(this shouldn't ever happen...)
+-			return(0);
+-		prev=cur;
+-		cur=prev->next;
+-		x++;
+-	}
+-
+-	savecheats=1;
+-	RebuildSubCheats();
+-	return(1);
+-}
+-
+-void FCEU_ApplyPeriodicCheats(void)
+-{
+-	struct CHEATF *cur=cheats;
+-	if(!cur) return;
+-
+-	for(;;)
+-	{
+-		if(cur->status && !(cur->type))
+-			if(CheatRPtrs[cur->addr>>10])
+-				CheatRPtrs[cur->addr>>10][cur->addr]=cur->val;
+-		if(cur->next)
+-			cur=cur->next;
+-		else
+-			break;
+-	}
+-}
+-
+-
+-void FCEUI_ListCheats(int (*callb)(char *name, uint32 a, uint8 v, int compare, int s, int type, void *data), void *data)
+-{
+-	struct CHEATF *next=cheats;
+-
+-	while(next)
+-	{
+-		if(!callb(next->name,next->addr,next->val,next->compare,next->status,next->type,data)) break;
+-		next=next->next;
+-	}
+-}
+-
+-int FCEUI_GetCheat(uint32 which, char **name, uint32 *a, uint8 *v, int *compare, int *s, int *type)
+-{
+-	struct CHEATF *next=cheats;
+-	uint32 x=0;
+-
+-	while(next)
+-	{
+-		if(x==which)
+-		{
+-			if(name)
+-				*name=next->name;
+-			if(a)
+-				*a=next->addr;
+-			if(v)
+-				*v=next->val;
+-			if(s)
+-				*s=next->status;
+-			if(compare)
+-				*compare=next->compare;
+-			if(type)
+-				*type=next->type;
+-			return(1);
+-		}
+-		next=next->next;
+-		x++;
+-	}
+-	return(0);
+-}
+-
+-static int GGtobin(char c)
+-{
+-	static char lets[16]={'A','P','Z','L','G','I','T','Y','E','O','X','U','K','S','V','N'};
+-	int x;
+-
+-	for(x=0;x<16;x++)
+-		if(lets[x] == toupper(c)) return(x);
+-	return(0);
+-}
+-
+-/* Returns 1 on success, 0 on failure. Sets *a,*v,*c. */
+-int FCEUI_DecodeGG(const char *str, int *a, int *v, int *c)
+-{
+-	uint16 A;
+-	uint8 V,C;
+-	uint8 t;
+-	int s;
+-
+-	A=0x8000;
+-	V=0;
+-	C=0;
+-
+-	s=strlen(str);
+-	if(s!=6 && s!=8) return(0);
+-
+-	t=GGtobin(*str++);
+-	V|=(t&0x07);
+-	V|=(t&0x08)<<4;
+-
+-	t=GGtobin(*str++);
+-	V|=(t&0x07)<<4;
+-	A|=(t&0x08)<<4;
+-
+-	t=GGtobin(*str++);
+-	A|=(t&0x07)<<4;
+-	//if(t&0x08) return(0);	/* 8-character code?! */
+-
+-	t=GGtobin(*str++);
+-	A|=(t&0x07)<<12;
+-	A|=(t&0x08);
+-
+-	t=GGtobin(*str++);
+-	A|=(t&0x07);
+-	A|=(t&0x08)<<8;
+-
+-	if(s==6)
+-	{
+-		t=GGtobin(*str++);
+-		A|=(t&0x07)<<8;
+-		V|=(t&0x08);
+-
+-		*a=A;
+-		*v=V;
+-		*c=-1;
+-		return(1);
+-	}
+-	else
+-	{
+-		t=GGtobin(*str++);
+-		A|=(t&0x07)<<8;
+-		C|=(t&0x08);
+-
+-		t=GGtobin(*str++);
+-		C|=(t&0x07);
+-		C|=(t&0x08)<<4;
+-
+-		t=GGtobin(*str++);
+-		C|=(t&0x07)<<4;
+-		V|=(t&0x08);
+-		*a=A;
+-		*v=V;
+-		*c=C;
+-		return(1);
+-	}
+-	return(0);
+-}
+-
+-int FCEUI_DecodePAR(const char *str, int *a, int *v, int *c, int *type)
+-{
+-	int boo[4];
+-	if(strlen(str)!=8) return(0);
+-
+-	sscanf(str,"%02x%02x%02x%02x",boo,boo+1,boo+2,boo+3);
+-
+-	*c=-1;
+-
+-	if(1)
+-	{
+-		*a=(boo[3]<<8)|(boo[2]+0x7F);
+-		*v=0;
+-	}
+-	else
+-	{
+-		*v=boo[3];
+-		*a=boo[2]|(boo[1]<<8);
+-	}
+-	/* Zero-page addressing modes don't go through the normal read/write handlers in FCEU, so
+-	we must do the old hacky method of RAM cheats.
+-	*/
+-	if(*a<0x0100)
+-		*type=0;
+-	else
+-		*type=1;
+-	return(1);
+-}
+-
+-/* name can be NULL if the name isn't going to be changed. */
+-/* same goes for a, v, and s(except the values of each one must be <0) */
+-
+-int FCEUI_SetCheat(uint32 which, const char *name, int32 a, int32 v, int c, int s, int type)
+-{
+-	struct CHEATF *next=cheats;
+-	uint32 x=0;
+-
+-	while(next)
+-	{
+-		if(x==which)
+-		{
+-			if(name)
+-			{
+-				char *t;
+-				if((t=(char *)realloc(next->name, strlen(name)+1)))
+-				{
+-					next->name=t;
+-					strcpy(next->name,name);
+-				}
+-				else
+-					return(0);
+-			}
+-			if(a>=0)
+-				next->addr=a;
+-			if(v>=0)
+-				next->val=v;
+-			if(s>=0)
+-				next->status=s;
+-			if(c>=-1)
+-				next->compare=c;
+-			next->type=type;
+-
+-			savecheats=1;
+-			RebuildSubCheats();
+-
+-			return(1);
+-		}
+-		next=next->next;
+-		x++;
+-	}
+-	return(0);
+-}
+-
+-/* Convenience function. */
+-int FCEUI_ToggleCheat(uint32 which)
+-{
+-	struct CHEATF *next=cheats;
+-	uint32 x=0;
+-
+-	while(next)
+-	{
+-		if(x==which)
+-		{
+-			next->status=!next->status;
+-			savecheats=1;
+-			RebuildSubCheats();
+-			return(next->status);
+-		}
+-		next=next->next;
+-		x++;
+-	}
+-
+-	return(-1);
+-}
+-
+-static int InitCheatComp(void)
+-{
+-	uint32 x;
+-
+-	CheatComp=(uint16*)FCEU_dmalloc(65536*sizeof(uint16));
+-	if(!CheatComp)
+-	{
+-		CheatMemErr();
+-		return(0);
+-	}
+-	for(x=0;x<65536;x++)
+-		CheatComp[x]=CHEATC_NONE;
+-
+-	return(1);
+-}
+-
+-void FCEUI_CheatSearchSetCurrentAsOriginal(void)
+-{
+-	uint32 x;
+-
+-	if(!CheatComp)
+-	{
+-		if(InitCheatComp())
+-		{
+-			CheatMemErr();
+-			return;
+-		}
+-	}
+-	for(x=0x000;x<0x10000;x++)
+-		if(!(CheatComp[x]&CHEATC_NOSHOW))
+-		{
+-			if(CheatRPtrs[x>>10])
+-				CheatComp[x]=CheatRPtrs[x>>10][x];
+-			else
+-				CheatComp[x]|=CHEATC_NONE;
+-		}
+-}
+-
+-void FCEUI_CheatSearchShowExcluded(void)
+-{
+-	uint32 x;
+-
+-	for(x=0x000;x<0x10000;x++)
+-		CheatComp[x]&=~CHEATC_EXCLUDED;
+-}
+-
+-
+-int32 FCEUI_CheatSearchGetCount(void)
+-{
+-	uint32 x,c=0;
+-
+-	if(CheatComp)
+-	{
+-		for(x=0x0000;x<0x10000;x++)
+-			if(!(CheatComp[x]&CHEATC_NOSHOW) && CheatRPtrs[x>>10])
+-				c++;
+-	}
+-
+-	return c;
+-}
+-/* This function will give the initial value of the search and the current value at a location. */
+-
+-void FCEUI_CheatSearchGet(int (*callb)(uint32 a, uint8 last, uint8 current, void *data),void *data)
+-{
+-	uint32 x;
+-
+-	if(!CheatComp)
+-	{
+-		if(!InitCheatComp())
+-			CheatMemErr();
+-		return;
+-	}
+-
+-	for(x=0;x<0x10000;x++)
+-		if(!(CheatComp[x]&CHEATC_NOSHOW) && CheatRPtrs[x>>10])
+-			if(!callb(x,CheatComp[x],CheatRPtrs[x>>10][x],data))
+-				break;
+-}
+-
+-void FCEUI_CheatSearchGetRange(uint32 first, uint32 last, int (*callb)(uint32 a, uint8 last, uint8 current))
+-{
+-	uint32 x;
+-	uint32 in=0;
+-
+-	if(!CheatComp)
+-	{
+-		if(!InitCheatComp())
+-			CheatMemErr();
+-		return;
+-	}
+-
+-	for(x=0;x<0x10000;x++)
+-		if(!(CheatComp[x]&CHEATC_NOSHOW) && CheatRPtrs[x>>10])
+-		{
+-			if(in>=first)
+-				if(!callb(x,CheatComp[x],CheatRPtrs[x>>10][x]))
+-					break;
+-			in++;
+-			if(in>last) return;
+-		}
+-}
+-
+-void FCEUI_CheatSearchBegin(void)
+-{
+-	uint32 x;
+-
+-	if(!CheatComp)
+-	{
+-		if(!InitCheatComp())
+-		{
+-			CheatMemErr();
+-			return;
+-		}
+-	}
+-	for(x=0;x<0x10000;x++)
+-	{
+-		if(CheatRPtrs[x>>10])
+-			CheatComp[x]=CheatRPtrs[x>>10][x];
+-		else
+-			CheatComp[x]=CHEATC_NONE;
+-	}
+-}
+-
+-
+-static int INLINE CAbs(int x)
+-{
+-	if(x<0)
+-		return(0-x);
+-	return x;
+-}
+-
+-void FCEUI_CheatSearchEnd(int type, uint8 v1, uint8 v2)
+-{
+-	uint32 x;
+-
+-	if(!CheatComp)
+-	{
+-		if(!InitCheatComp())
+-		{
+-			CheatMemErr();
+-			return;
+-		}
+-	}
+-
+-
+-	if(!type)      // Change to a specific value.
+-	{
+-		for(x=0;x<0x10000;x++)
+-			if(!(CheatComp[x]&CHEATC_NOSHOW))
+-			{
+-				if(CheatComp[x]==v1 && CheatRPtrs[x>>10][x]==v2)
+-				{
+-
+-				}
+-				else
+-					CheatComp[x]|=CHEATC_EXCLUDED;
+-			}
+-	}
+-	else if(type==1)           // Search for relative change(between values).
+-	{
+-		for(x=0;x<0x10000;x++)
+-			if(!(CheatComp[x]&CHEATC_NOSHOW))
+-			{
+-				if(CheatComp[x]==v1 && CAbs(CheatComp[x]-CheatRPtrs[x>>10][x])==v2)
+-				{
+-
+-				}
+-				else
+-					CheatComp[x]|=CHEATC_EXCLUDED;
+-			}
+-	}
+-	else if(type==2)                          // Purely relative change.
+-	{
+-		for(x=0x000;x<0x10000;x++)
+-			if(!(CheatComp[x]&CHEATC_NOSHOW))
+-			{
+-				if(CAbs(CheatComp[x]-CheatRPtrs[x>>10][x])==v2)
+-				{
+-
+-				}
+-				else
+-					CheatComp[x]|=CHEATC_EXCLUDED;
+-			}
+-	}
+-	else if(type==3)                          // Any change.
+-	{
+-		for(x=0x000;x<0x10000;x++)
+-			if(!(CheatComp[x]&CHEATC_NOSHOW))
+-			{
+-				if(CheatComp[x]!=CheatRPtrs[x>>10][x])
+-				{
+-
+-				}
+-				else
+-					CheatComp[x]|=CHEATC_EXCLUDED;
+-			}
+-
+-	}
+-	else if(type==4)                          // new value = known
+-	{
+-		for(x=0x000;x<0x10000;x++)
+-			if(!(CheatComp[x]&CHEATC_NOSHOW))
+-			{
+-				if(CheatRPtrs[x>>10][x]==v1)
+-				{
+-
+-				}
+-				else
+-					CheatComp[x]|=CHEATC_EXCLUDED;
+-			}
+-
+-	}
+-	else if(type==5)                          // new value greater than
+-	{
+-		for(x=0x000;x<0x10000;x++)
+-			if(!(CheatComp[x]&CHEATC_NOSHOW))
+-			{
+-				if(CheatComp[x]<CheatRPtrs[x>>10][x])
+-				{
+-
+-				}
+-				else
+-					CheatComp[x]|=CHEATC_EXCLUDED;
+-			}
+-
+-	}
+-	else if(type==6)                          // new value less than
+-	{
+-		for(x=0x000;x<0x10000;x++)
+-			if(!(CheatComp[x]&CHEATC_NOSHOW))
+-			{
+-				if(CheatComp[x]>CheatRPtrs[x>>10][x])
+-				{
+-
+-				}
+-				else
+-					CheatComp[x]|=CHEATC_EXCLUDED;
+-			}
+-
+-	}
+-	else if(type==7)                          // new value greater than by known value
+-	{
+-		for(x=0x000;x<0x10000;x++)
+-			if(!(CheatComp[x]&CHEATC_NOSHOW))
+-			{
+-				if((CheatRPtrs[x>>10][x]-CheatComp[x])==v2)
+-				{
+-
+-				}
+-				else
+-					CheatComp[x]|=CHEATC_EXCLUDED;
+-			}
+-
+-	}
+-	else if(type==8)                          // new value less than by known value
+-	{
+-		for(x=0x000;x<0x10000;x++)
+-			if(!(CheatComp[x]&CHEATC_NOSHOW))
+-			{
+-				if((CheatComp[x]-CheatRPtrs[x>>10][x])==v2)
+-				{
+-
+-				}
+-				else
+-					CheatComp[x]|=CHEATC_EXCLUDED;
+-			}
+-
+-	}
+-}
+-
+-int FCEU_CheatGetByte(uint32 A)
+-{
+-	if(A < 0x10000) {
+-		uint32 ret;
+-		fceuindbg=1;
+-		ret = ARead[A](A);
+-		fceuindbg=0;
+-		return ret;
+-	} else
+-		return 0;
+-}
+-
+-void FCEU_CheatSetByte(uint32 A, uint8 V)
+-{
+-   if(CheatRPtrs[A>>10])
+-    CheatRPtrs[A>>10][A]=V;
+-   else if(A < 0x10000)
+-    BWrite[A](A, V);
+-}
+-
+-void UpdateFrozenList(void)
+-{
+-	//The purpose of this function is to keep an up to date list of addresses that are currently frozen
+-	//and make these accessible to other dialogs that deal with memory addresses such as
+-	//memwatch, hex editor, ramfilter, etc.
+-
+-	int x;
+-	FrozenAddresses.clear();		//Clear vector and repopulate
+-	for(x=0;x<numsubcheats;x++)
+-	{
+-		FrozenAddresses.push_back(SubCheats[x].addr);
+-		//FCEU_printf("Address %d: %d \n",x,FrozenAddresses[x]); //Debug
+-	}
+-	//FCEUI_DispMessage("FrozenCount: %d",0,FrozenAddressCount);//Debug
+-}
++/* FCE Ultra - NES/Famicom Emulator
++*
++* Copyright notice for this file:
++*  Copyright (C) 2002 Xodnizel
++*
++* This program is free software; you can redistribute it and/or modify
++* it under the terms of the GNU General Public License as published by
++* the Free Software Foundation; either version 2 of the License, or
++* (at your option) any later version.
++*
++* This program is distributed in the hope that it will be useful,
++* but WITHOUT ANY WARRANTY; without even the implied warranty of
++* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++* GNU General Public License for more details.
++*
++* You should have received a copy of the GNU General Public License
++* along with this program; if not, write to the Free Software
++* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
++*/
++
++
++#include "types.h"
++#include "x6502.h"
++#include "cheat.h"
++#include "fceu.h"
++#include "file.h"
++#include "cart.h"
++#include "driver.h"
++#include "utils/memory.h"
++
++#include <string>
++#include <cstdlib>
++#include <cstring>
++#include <cstdio>
++#include <cctype>
++
++using namespace std;
++
++static uint8 *CheatRPtrs[64];
++
++vector<uint16> FrozenAddresses;			//List of addresses that are currently frozen
++void UpdateFrozenList(void);			//Function that populates the list of frozen addresses
++unsigned int FrozenAddressCount=0;		//Keeps up with the Frozen address count, necessary for using in other dialogs (such as hex editor)
++
++void FCEU_CheatResetRAM(void)
++{
++	int x;
++
++	for(x=0;x<64;x++)
++		CheatRPtrs[x]=0;
++}
++
++void FCEU_CheatAddRAM(int s, uint32 A, uint8 *p)
++{
++	uint32 AB=A>>10;
++	int x;
++
++	for(x=s-1;x>=0;x--)
++		CheatRPtrs[AB+x]=p-A;
++}
++
++
++struct CHEATF {
++	struct CHEATF *next;
++	char *name;
++	uint16 addr;
++	uint8 val;
++	int compare;	/* -1 for no compare. */
++	int type;	/* 0 for replace, 1 for substitute(GG). */
++	int status;
++};
++
++typedef struct {
++	uint16 addr;
++	uint8 val;
++	int compare;
++	readfunc PrevRead;
++} CHEATF_SUBFAST;
++
++
++static CHEATF_SUBFAST SubCheats[256];
++static int numsubcheats=0;
++struct CHEATF *cheats=0,*cheatsl=0;
++
++
++#define CHEATC_NONE     0x8000
++#define CHEATC_EXCLUDED 0x4000
++#define CHEATC_NOSHOW   0xC000
++
++static uint16 *CheatComp = 0;
++int savecheats = 0;
++
++static DECLFR(SubCheatsRead)
++{
++	CHEATF_SUBFAST *s=SubCheats;
++	int x=numsubcheats;
++
++	do
++	{
++		if(s->addr==A)
++		{
++			if(s->compare>=0)
++			{
++				uint8 pv=s->PrevRead(A);
++
++				if(pv==s->compare)
++					return(s->val);
++				else return(pv);
++			}
++			else return(s->val);
++		}
++		s++;
++	} while(--x);
++	return(0);	/* We should never get here. */
++}
++
++void RebuildSubCheats(void)
++{
++	int x;
++	struct CHEATF *c=cheats;
++	for(x=0;x<numsubcheats;x++)
++		SetReadHandler(SubCheats[x].addr,SubCheats[x].addr,SubCheats[x].PrevRead);
++
++	numsubcheats=0;
++	while(c)
++	{
++		if(c->type==1 && c->status)
++		{
++			if(GetReadHandler(c->addr)==SubCheatsRead)
++			{
++				/* Prevent a catastrophe by this check. */
++				//FCEU_DispMessage("oops",0);
++			}
++			else
++			{
++				SubCheats[numsubcheats].PrevRead=GetReadHandler(c->addr);
++				SubCheats[numsubcheats].addr=c->addr;
++				SubCheats[numsubcheats].val=c->val;
++				SubCheats[numsubcheats].compare=c->compare;
++				SetReadHandler(c->addr,c->addr,SubCheatsRead);
++				numsubcheats++;
++			}
++		}
++		c=c->next;
++	}
++	FrozenAddressCount = numsubcheats;		//Update the frozen address list
++	UpdateFrozenList();
++	//FCEUI_DispMessage("Active Cheats: %d",0, FrozenAddresses.size()/*FrozenAddressCount*/); //Debug
++}
++
++void FCEU_PowerCheats()
++{
++	numsubcheats=0;	/* Quick hack to prevent setting of ancient read addresses. */
++	RebuildSubCheats();
++}
++
++static int AddCheatEntry(char *name, uint32 addr, uint8 val, int compare, int status, int type);
++static void CheatMemErr(void)
++{
++	FCEUD_PrintError("Error allocating memory for cheat data.");
++}
++
++/* This function doesn't allocate any memory for "name" */
++static int AddCheatEntry(char *name, uint32 addr, uint8 val, int compare, int status, int type)
++{
++	struct CHEATF *temp;
++	if(!(temp=(struct CHEATF *)FCEU_dmalloc(sizeof(struct CHEATF))))
++	{
++		CheatMemErr();
++		return(0);
++	}
++	temp->name=name;
++	temp->addr=addr;
++	temp->val=val;
++	temp->status=status;
++	temp->compare=compare;
++	temp->type=type;
++	temp->next=0;
++
++	if(cheats)
++	{
++		cheatsl->next=temp;
++		cheatsl=temp;
++	}
++	else
++		cheats=cheatsl=temp;
++
++	return(1);
++}
++
++void FCEU_LoadGameCheats(FILE *override)
++{
++	FILE *fp;
++	unsigned int addr;
++	unsigned int val;
++	unsigned int status;
++	unsigned int type;
++	unsigned int compare;
++	int x;
++
++	char linebuf[2048];
++	char *namebuf;
++	int tc=0;
++	char *fn;
++
++	numsubcheats=savecheats=0;
++
++	if(override)
++		fp = override;
++	else
++	{
++		fn=strdup(FCEU_MakeFName(FCEUMKF_CHEAT,0,0).c_str());
++		fp=FCEUD_UTF8fopen(fn,"rb");
++		free(fn);
++		if(!fp) return;
++	}
++
++	FCEU_DispMessage("Cheats file loaded.",0); //Tells user a cheats file was loaded.
++	while(fgets(linebuf,2048,fp) != NULL)
++	{
++		char *tbuf=linebuf;
++		int doc=0;
++
++		addr=val=compare=status=type=0;
++
++		if(tbuf[0]=='S')
++		{
++			tbuf++;
++			type=1;
++		}
++		else type=0;
++
++		if(tbuf[0]=='C')
++		{
++			tbuf++;
++			doc=1;
++		}
++
++		if(tbuf[0]==':')
++		{
++			tbuf++;
++			status=0;
++		}
++		else status=1;
++
++		if(doc)
++		{
++			char *neo=&tbuf[4+2+2+1+1+1];
++			if(sscanf(tbuf,"%04x%*[:]%02x%*[:]%02x",&addr,&val,&compare)!=3)
++				continue;
++			if (!(namebuf=(char *)FCEU_dmalloc(strlen(neo)+1)))
++                return;
++			strcpy(namebuf,neo);
++		}
++		else
++		{
++			char *neo=&tbuf[4+2+1+1];
++			if(sscanf(tbuf,"%04x%*[:]%02x",&addr,&val)!=2)
++				continue;
++			if (!(namebuf=(char *)FCEU_dmalloc(strlen(neo)+1)))
++                return;
++			strcpy(namebuf,neo);
++		}
++
++		for(x=0;x<(int)strlen(namebuf);x++)
++		{
++			if(namebuf[x]==10 || namebuf[x]==13)
++			{
++				namebuf[x]=0;
++				break;
++			}
++			else if(namebuf[x] > 0x00 && namebuf[x] < 0x20)
++				namebuf[x]=0x20;
++		}
++
++		AddCheatEntry(namebuf,addr,val,doc?compare:-1,status,type);
++		tc++;
++	}
++	RebuildSubCheats();
++	if(!override)
++		fclose(fp);
++}
++
++void FCEU_FlushGameCheats(FILE *override, int nosave)
++{
++	if(CheatComp)
++	{
++		free(CheatComp);
++		CheatComp=0;
++	}
++	if((!savecheats || nosave) && !override)	/* Always save cheats if we're being overridden. */
++	{
++		if(cheats)
++		{
++			struct CHEATF *next=cheats;
++			for(;;)
++			{
++				struct CHEATF *last=next;
++				next=next->next;
++				free(last->name);
++				free(last);
++				if(!next) break;
++			}
++			cheats=cheatsl=0;
++		}
++	}
++	else
++	{
++		char *fn = 0;
++
++		if(!override)
++			fn = strdup(FCEU_MakeFName(FCEUMKF_CHEAT,0,0).c_str());
++
++		if(cheats)
++		{
++			struct CHEATF *next=cheats;
++			FILE *fp;
++
++			if(override)
++				fp = override;
++			else
++				fp=FCEUD_UTF8fopen(fn,"wb");
++
++			if(fp)
++			{
++				for(;;)
++				{
++					struct CHEATF *t;
++					if(next->type)
++						fputc('S',fp);
++					if(next->compare>=0)
++						fputc('C',fp);
++
++					if(!next->status)
++						fputc(':',fp);
++
++					if(next->compare>=0)
++						fprintf(fp,"%04x:%02x:%02x:%s\n",next->addr,next->val,next->compare,next->name);
++					else
++						fprintf(fp,"%04x:%02x:%s\n",next->addr,next->val,next->name);
++
++					free(next->name);
++					t=next;
++					next=next->next;
++					free(t);
++					if(!next) break;
++				}
++				if(!override)
++					fclose(fp);
++			}
++			else
++				FCEUD_PrintError("Error saving cheats.");
++			cheats=cheatsl=0;
++		}
++		else if(!override)
++			remove(fn);
++		if(!override)
++			free(fn);
++	}
++
++	RebuildSubCheats();  /* Remove memory handlers. */
++
++}
++
++
++int FCEUI_AddCheat(const char *name, uint32 addr, uint8 val, int compare, int type)
++{
++	char *t;
++
++	if(!(t=(char *)FCEU_dmalloc(strlen(name)+1)))
++	{
++		CheatMemErr();
++		return(0);
++	}
++	strcpy(t,name);
++	if(!AddCheatEntry(t,addr,val,compare,1,type))
++	{
++		free(t);
++		return(0);
++	}
++	savecheats=1;
++	RebuildSubCheats();
++
++	return(1);
++}
++
++int FCEUI_DelCheat(uint32 which)
++{
++	struct CHEATF *prev;
++	struct CHEATF *cur;
++	uint32 x=0;
++
++	for(prev=0,cur=cheats;;)
++	{
++		if(x==which)          // Remove this cheat.
++		{
++			if(prev)             // Update pointer to this cheat.
++			{
++				if(cur->next)       // More cheats.
++					prev->next=cur->next;
++				else                // No more.
++				{
++					prev->next=0;
++					cheatsl=prev;      // Set the previous cheat as the last cheat.
++				}
++			}
++			else                 // This is the first cheat.
++			{
++				if(cur->next)       // More cheats
++					cheats=cur->next;
++				else
++					cheats=cheatsl=0;  // No (more) cheats.
++			}
++			free(cur->name);     // Now that all references to this cheat are removed,
++			free(cur);           // free the memory.
++			break;
++		}                     // *END REMOVE THIS CHEAT*
++
++
++		if(!cur->next)        // No more cheats to go through(this shouldn't ever happen...)
++			return(0);
++		prev=cur;
++		cur=prev->next;
++		x++;
++	}
++
++	savecheats=1;
++	RebuildSubCheats();
++	return(1);
++}
++
++void FCEU_ApplyPeriodicCheats(void)
++{
++	struct CHEATF *cur=cheats;
++	if(!cur) return;
++
++	for(;;)
++	{
++		if(cur->status && !(cur->type))
++			if(CheatRPtrs[cur->addr>>10])
++				CheatRPtrs[cur->addr>>10][cur->addr]=cur->val;
++		if(cur->next)
++			cur=cur->next;
++		else
++			break;
++	}
++}
++
++
++void FCEUI_ListCheats(int (*callb)(char *name, uint32 a, uint8 v, int compare, int s, int type, void *data), void *data)
++{
++	struct CHEATF *next=cheats;
++
++	while(next)
++	{
++		if(!callb(next->name,next->addr,next->val,next->compare,next->status,next->type,data)) break;
++		next=next->next;
++	}
++}
++
++int FCEUI_GetCheat(uint32 which, char **name, uint32 *a, uint8 *v, int *compare, int *s, int *type)
++{
++	struct CHEATF *next=cheats;
++	uint32 x=0;
++
++	while(next)
++	{
++		if(x==which)
++		{
++			if(name)
++				*name=next->name;
++			if(a)
++				*a=next->addr;
++			if(v)
++				*v=next->val;
++			if(s)
++				*s=next->status;
++			if(compare)
++				*compare=next->compare;
++			if(type)
++				*type=next->type;
++			return(1);
++		}
++		next=next->next;
++		x++;
++	}
++	return(0);
++}
++
++static int GGtobin(char c)
++{
++	static char lets[16]={'A','P','Z','L','G','I','T','Y','E','O','X','U','K','S','V','N'};
++	int x;
++
++	for(x=0;x<16;x++)
++		if(lets[x] == toupper(c)) return(x);
++	return(0);
++}
++
++/* Returns 1 on success, 0 on failure. Sets *a,*v,*c. */
++int FCEUI_DecodeGG(const char *str, int *a, int *v, int *c)
++{
++	uint16 A;
++	uint8 V,C;
++	uint8 t;
++	int s;
++
++	A=0x8000;
++	V=0;
++	C=0;
++
++	s=strlen(str);
++	if(s!=6 && s!=8) return(0);
++
++	t=GGtobin(*str++);
++	V|=(t&0x07);
++	V|=(t&0x08)<<4;
++
++	t=GGtobin(*str++);
++	V|=(t&0x07)<<4;
++	A|=(t&0x08)<<4;
++
++	t=GGtobin(*str++);
++	A|=(t&0x07)<<4;
++	//if(t&0x08) return(0);	/* 8-character code?! */
++
++	t=GGtobin(*str++);
++	A|=(t&0x07)<<12;
++	A|=(t&0x08);
++
++	t=GGtobin(*str++);
++	A|=(t&0x07);
++	A|=(t&0x08)<<8;
++
++	if(s==6)
++	{
++		t=GGtobin(*str++);
++		A|=(t&0x07)<<8;
++		V|=(t&0x08);
++
++		*a=A;
++		*v=V;
++		*c=-1;
++		return(1);
++	}
++	else
++	{
++		t=GGtobin(*str++);
++		A|=(t&0x07)<<8;
++		C|=(t&0x08);
++
++		t=GGtobin(*str++);
++		C|=(t&0x07);
++		C|=(t&0x08)<<4;
++
++		t=GGtobin(*str++);
++		C|=(t&0x07)<<4;
++		V|=(t&0x08);
++		*a=A;
++		*v=V;
++		*c=C;
++		return(1);
++	}
++	return(0);
++}
++
++int FCEUI_DecodePAR(const char *str, int *a, int *v, int *c, int *type)
++{
++	int boo[4];
++	if(strlen(str)!=8) return(0);
++
++	sscanf(str,"%02x%02x%02x%02x",boo,boo+1,boo+2,boo+3);
++
++	*c=-1;
++
++	if(1)
++	{
++		*a=(boo[3]<<8)|(boo[2]+0x7F);
++		*v=0;
++	}
++	else
++	{
++		*v=boo[3];
++		*a=boo[2]|(boo[1]<<8);
++	}
++	/* Zero-page addressing modes don't go through the normal read/write handlers in FCEU, so
++	we must do the old hacky method of RAM cheats.
++	*/
++	if(*a<0x0100)
++		*type=0;
++	else
++		*type=1;
++	return(1);
++}
++
++/* name can be NULL if the name isn't going to be changed. */
++/* same goes for a, v, and s(except the values of each one must be <0) */
++
++int FCEUI_SetCheat(uint32 which, const char *name, int32 a, int32 v, int c, int s, int type)
++{
++	struct CHEATF *next=cheats;
++	uint32 x=0;
++
++	while(next)
++	{
++		if(x==which)
++		{
++			if(name)
++			{
++				char *t;
++				if((t=(char *)realloc(next->name, strlen(name)+1)))
++				{
++					next->name=t;
++					strcpy(next->name,name);
++				}
++				else
++					return(0);
++			}
++			if(a>=0)
++				next->addr=a;
++			if(v>=0)
++				next->val=v;
++			if(s>=0)
++				next->status=s;
++			if(c>=-1)
++				next->compare=c;
++			next->type=type;
++
++			savecheats=1;
++			RebuildSubCheats();
++
++			return(1);
++		}
++		next=next->next;
++		x++;
++	}
++	return(0);
++}
++
++/* Convenience function. */
++int FCEUI_ToggleCheat(uint32 which)
++{
++	struct CHEATF *next=cheats;
++	uint32 x=0;
++
++	while(next)
++	{
++		if(x==which)
++		{
++			next->status=!next->status;
++			savecheats=1;
++			RebuildSubCheats();
++			return(next->status);
++		}
++		next=next->next;
++		x++;
++	}
++
++	return(-1);
++}
++
++static int InitCheatComp(void)
++{
++	uint32 x;
++
++	CheatComp=(uint16*)FCEU_dmalloc(65536*sizeof(uint16));
++	if(!CheatComp)
++	{
++		CheatMemErr();
++		return(0);
++	}
++	for(x=0;x<65536;x++)
++		CheatComp[x]=CHEATC_NONE;
++
++	return(1);
++}
++
++void FCEUI_CheatSearchSetCurrentAsOriginal(void)
++{
++	uint32 x;
++
++	if(!CheatComp)
++	{
++		if(InitCheatComp())
++		{
++			CheatMemErr();
++			return;
++		}
++	}
++	for(x=0x000;x<0x10000;x++)
++		if(!(CheatComp[x]&CHEATC_NOSHOW))
++		{
++			if(CheatRPtrs[x>>10])
++				CheatComp[x]=CheatRPtrs[x>>10][x];
++			else
++				CheatComp[x]|=CHEATC_NONE;
++		}
++}
++
++void FCEUI_CheatSearchShowExcluded(void)
++{
++	uint32 x;
++
++	for(x=0x000;x<0x10000;x++)
++		CheatComp[x]&=~CHEATC_EXCLUDED;
++}
++
++
++int32 FCEUI_CheatSearchGetCount(void)
++{
++	uint32 x,c=0;
++
++	if(CheatComp)
++	{
++		for(x=0x0000;x<0x10000;x++)
++			if(!(CheatComp[x]&CHEATC_NOSHOW) && CheatRPtrs[x>>10])
++				c++;
++	}
++
++	return c;
++}
++/* This function will give the initial value of the search and the current value at a location. */
++
++void FCEUI_CheatSearchGet(int (*callb)(uint32 a, uint8 last, uint8 current, void *data),void *data)
++{
++	uint32 x;
++
++	if(!CheatComp)
++	{
++		if(!InitCheatComp())
++			CheatMemErr();
++		return;
++	}
++
++	for(x=0;x<0x10000;x++)
++		if(!(CheatComp[x]&CHEATC_NOSHOW) && CheatRPtrs[x>>10])
++			if(!callb(x,CheatComp[x],CheatRPtrs[x>>10][x],data))
++				break;
++}
++
++void FCEUI_CheatSearchGetRange(uint32 first, uint32 last, int (*callb)(uint32 a, uint8 last, uint8 current))
++{
++	uint32 x;
++	uint32 in=0;
++
++	if(!CheatComp)
++	{
++		if(!InitCheatComp())
++			CheatMemErr();
++		return;
++	}
++
++	for(x=0;x<0x10000;x++)
++		if(!(CheatComp[x]&CHEATC_NOSHOW) && CheatRPtrs[x>>10])
++		{
++			if(in>=first)
++				if(!callb(x,CheatComp[x],CheatRPtrs[x>>10][x]))
++					break;
++			in++;
++			if(in>last) return;
++		}
++}
++
++void FCEUI_CheatSearchBegin(void)
++{
++	uint32 x;
++
++	if(!CheatComp)
++	{
++		if(!InitCheatComp())
++		{
++			CheatMemErr();
++			return;
++		}
++	}
++	for(x=0;x<0x10000;x++)
++	{
++		if(CheatRPtrs[x>>10])
++			CheatComp[x]=CheatRPtrs[x>>10][x];
++		else
++			CheatComp[x]=CHEATC_NONE;
++	}
++}
++
++
++static int INLINE CAbs(int x)
++{
++	if(x<0)
++		return(0-x);
++	return x;
++}
++
++void FCEUI_CheatSearchEnd(int type, uint8 v1, uint8 v2)
++{
++	uint32 x;
++
++	if(!CheatComp)
++	{
++		if(!InitCheatComp())
++		{
++			CheatMemErr();
++			return;
++		}
++	}
++
++
++	if(!type)      // Change to a specific value.
++	{
++		for(x=0;x<0x10000;x++)
++			if(!(CheatComp[x]&CHEATC_NOSHOW))
++			{
++				if(CheatComp[x]==v1 && CheatRPtrs[x>>10][x]==v2)
++				{
++
++				}
++				else
++					CheatComp[x]|=CHEATC_EXCLUDED;
++			}
++	}
++	else if(type==1)           // Search for relative change(between values).
++	{
++		for(x=0;x<0x10000;x++)
++			if(!(CheatComp[x]&CHEATC_NOSHOW))
++			{
++				if(CheatComp[x]==v1 && CAbs(CheatComp[x]-CheatRPtrs[x>>10][x])==v2)
++				{
++
++				}
++				else
++					CheatComp[x]|=CHEATC_EXCLUDED;
++			}
++	}
++	else if(type==2)                          // Purely relative change.
++	{
++		for(x=0x000;x<0x10000;x++)
++			if(!(CheatComp[x]&CHEATC_NOSHOW))
++			{
++				if(CAbs(CheatComp[x]-CheatRPtrs[x>>10][x])==v2)
++				{
++
++				}
++				else
++					CheatComp[x]|=CHEATC_EXCLUDED;
++			}
++	}
++	else if(type==3)                          // Any change.
++	{
++		for(x=0x000;x<0x10000;x++)
++			if(!(CheatComp[x]&CHEATC_NOSHOW))
++			{
++				if(CheatComp[x]!=CheatRPtrs[x>>10][x])
++				{
++
++				}
++				else
++					CheatComp[x]|=CHEATC_EXCLUDED;
++			}
++
++	}
++	else if(type==4)                          // new value = known
++	{
++		for(x=0x000;x<0x10000;x++)
++			if(!(CheatComp[x]&CHEATC_NOSHOW))
++			{
++				if(CheatRPtrs[x>>10][x]==v1)
++				{
++
++				}
++				else
++					CheatComp[x]|=CHEATC_EXCLUDED;
++			}
++
++	}
++	else if(type==5)                          // new value greater than
++	{
++		for(x=0x000;x<0x10000;x++)
++			if(!(CheatComp[x]&CHEATC_NOSHOW))
++			{
++				if(CheatComp[x]<CheatRPtrs[x>>10][x])
++				{
++
++				}
++				else
++					CheatComp[x]|=CHEATC_EXCLUDED;
++			}
++
++	}
++	else if(type==6)                          // new value less than
++	{
++		for(x=0x000;x<0x10000;x++)
++			if(!(CheatComp[x]&CHEATC_NOSHOW))
++			{
++				if(CheatComp[x]>CheatRPtrs[x>>10][x])
++				{
++
++				}
++				else
++					CheatComp[x]|=CHEATC_EXCLUDED;
++			}
++
++	}
++	else if(type==7)                          // new value greater than by known value
++	{
++		for(x=0x000;x<0x10000;x++)
++			if(!(CheatComp[x]&CHEATC_NOSHOW))
++			{
++				if((CheatRPtrs[x>>10][x]-CheatComp[x])==v2)
++				{
++
++				}
++				else
++					CheatComp[x]|=CHEATC_EXCLUDED;
++			}
++
++	}
++	else if(type==8)                          // new value less than by known value
++	{
++		for(x=0x000;x<0x10000;x++)
++			if(!(CheatComp[x]&CHEATC_NOSHOW))
++			{
++				if((CheatComp[x]-CheatRPtrs[x>>10][x])==v2)
++				{
++
++				}
++				else
++					CheatComp[x]|=CHEATC_EXCLUDED;
++			}
++
++	}
++}
++
++int FCEU_CheatGetByte(uint32 A)
++{
++	if(A < 0x10000) {
++		uint32 ret;
++		fceuindbg=1;
++		ret = ARead[A](A);
++		fceuindbg=0;
++		return ret;
++	} else
++		return 0;
++}
++
++void FCEU_CheatSetByte(uint32 A, uint8 V)
++{
++   if(CheatRPtrs[A>>10])
++    CheatRPtrs[A>>10][A]=V;
++   else if(A < 0x10000)
++    BWrite[A](A, V);
++}
++
++void UpdateFrozenList(void)
++{
++	//The purpose of this function is to keep an up to date list of addresses that are currently frozen
++	//and make these accessible to other dialogs that deal with memory addresses such as
++	//memwatch, hex editor, ramfilter, etc.
++
++	int x;
++	FrozenAddresses.clear();		//Clear vector and repopulate
++	for(x=0;x<numsubcheats;x++)
++	{
++		FrozenAddresses.push_back(SubCheats[x].addr);
++		//FCEU_printf("Address %d: %d \n",x,FrozenAddresses[x]); //Debug
++	}
++	//FCEUI_DispMessage("FrozenCount: %d",0,FrozenAddressCount);//Debug
++}
+diff --git a/trunk/src/drivers/sdl/SConscript b/trunk/src/drivers/sdl/SConscript
+index 23e11b9..eb3724a 100644
+--- a/trunk/src/drivers/sdl/SConscript
++++ b/trunk/src/drivers/sdl/SConscript
+@@ -1,8 +1,11 @@
+ # Fix compliation error about 'XKeysymToString' by linking X11 explicitly
+ # Thanks Antonio Ospite!
+ Import('env')
+-config_string = 'pkg-config --cflags --libs x11'
+-env.ParseConfig(config_string)
++# X11 is only needed by gui.cpp (the GTK GUI). With GTK off there is no
++# XKeysymToString reference, and on a cross build there is no libX11 at all.
++if env['GTK'] or env['GTK3']:
++    config_string = 'pkg-config --cflags --libs x11'
++    env.ParseConfig(config_string)
+ Export('env')
+ 
+ source_list = Split(
+diff --git a/trunk/src/drivers/sdl/sdl-video.cpp b/trunk/src/drivers/sdl/sdl-video.cpp
+index 016c253..8829d38 100644
+--- a/trunk/src/drivers/sdl/sdl-video.cpp
++++ b/trunk/src/drivers/sdl/sdl-video.cpp
+@@ -158,6 +158,38 @@ int InitVideo(FCEUGI *gi)
+ 	// TODO - SDL2
+ }
+ #else
++
++#ifdef ASP_BUILD
++/* Take the framebuffer exactly as it already is: native geometry, native
++ * depth. Asking this device's display driver for a different depth hangs
++ * it hard, and asking for a smaller geometry yields a surface that still
++ * carries the real framebuffer's line pitch. */
++static SDL_Surface *asp_set_mode(Uint32 flags)
++{
++	const SDL_VideoInfo *vi = SDL_GetVideoInfo();
++	int w = (vi && vi->current_w >= 256) ? vi->current_w : 1280;
++	int h = (vi && vi->current_h >= 224) ? vi->current_h : 720;
++	SDL_Surface *s;
++	/* Request the depth the display already reports rather than 0 ("any"),
++	 * which is driver-dependent - SDL's dummy driver answers 0 with 8bpp. */
++	int bpp = (vi && vi->vfmt) ? vi->vfmt->BitsPerPixel : 16;
++	fprintf(stderr, "asp: SDL_SetVideoMode(%d,%d,%d) ...\n", w, h, bpp);
++	s = SDL_SetVideoMode(w, h, bpp, SDL_SWSURFACE);
++	if (s != NULL && s->format->BytesPerPixel != 2
++	              && s->format->BytesPerPixel != 4) {
++		fprintf(stderr, "asp: native depth %dbpp, retrying at 16\n",
++			s->format->BitsPerPixel);
++		s = SDL_SetVideoMode(w, h, 16, SDL_SWSURFACE);
++	}
++	if (s != NULL)
++		fprintf(stderr, "asp: screen %dx%d %dbpp pitch %d\n",
++			s->w, s->h, s->format->BitsPerPixel, s->pitch);
++	else
++		fprintf(stderr, "asp: SDL_SetVideoMode failed: %s\n", SDL_GetError());
++	return s;
++}
++#endif
++
+ /**
+  * Attempts to initialize the graphical video display.  Returns 0 on
+  * success, -1 on failure.
+@@ -329,8 +361,12 @@ InitVideo(FCEUGI *gi)
+ 		s_screen = SDL_SetVideoMode(s_useOpenGL ? s_nativeWidth : xres,
+ 									s_useOpenGL ? s_nativeHeight : yres,
+ 									desbpp, flags);
++#else
++#ifdef ASP_BUILD
++		s_screen = asp_set_mode(flags);
+ #else
+ 		s_screen = SDL_SetVideoMode(xres, yres, desbpp, flags);
++#endif
+ #endif
+ 
+ 		if(!s_screen) {
+@@ -422,8 +458,12 @@ InitVideo(FCEUGI *gi)
+ 		}
+ #endif
+         
++#ifdef ASP_BUILD
++		s_screen = asp_set_mode(flags);
++#else
+ 		s_screen = SDL_SetVideoMode(scrw, (int)(s_tlines * s_eys),
+ 								desbpp, flags);
++#endif
+ 		if(!s_screen) {
+ 			FCEUD_PrintError(SDL_GetError());
+ 			return -1;
+@@ -622,6 +662,77 @@ void UnlockConsole(){}
+ /**
+  * Pushes the given buffer of bits to the screen.
+  */
++
++#ifdef ASP_BUILD
++/* Neo Geo Arcade Stick Pro output path.
++ *
++ * The panel is a fixed 1280x720 32bpp framebuffer whose driver will not
++ * survive a depth change, so the mode is taken exactly as it is and the
++ * NES's 256x240 8bpp frame is scaled up here instead of relying on FCEUX's
++ * integer scale factors (which letterbox badly at this size). Palette
++ * entries are pre-shifted into the surface's own channel layout, so this
++ * works at 16bpp or 32bpp without caring which.
++ */
++static uint32 asp_pal[256];
++static int asp_pal_bpp;
++
++static void asp_build_palette(SDL_Surface *dst, SDL_Color *pal)
++{
++	const SDL_PixelFormat *f = dst->format;
++	int i;
++	for (i = 0; i < 256; i++)
++		asp_pal[i] = ((uint32)(pal[i].r >> f->Rloss) << f->Rshift)
++		           | ((uint32)(pal[i].g >> f->Gloss) << f->Gshift)
++		           | ((uint32)(pal[i].b >> f->Bloss) << f->Bshift);
++	asp_pal_bpp = f->BytesPerPixel;
++}
++
++static void asp_blit(SDL_Surface *dst, const uint8 *src, int sw, int sh, int spitch)
++{
++	static uint16 xmap[2048];
++	static int cache_w, cache_sw;
++	int dw = dst->w, dh = dst->h;
++	int bpp = dst->format->BytesPerPixel;
++	int i, j, prev_sy = -1;
++
++	if (dw > 2048) dw = 2048;
++	if (dw <= 0 || dh <= 0 || sw <= 0 || sh <= 0) return;
++	if (bpp != 2 && bpp != 4) return;  /* never write a depth we cannot */
++
++	if (dw != cache_w || sw != cache_sw) {
++		for (j = 0; j < dw; j++)
++			xmap[j] = (uint16)(((unsigned)j * sw) / dw);
++		cache_w = dw; cache_sw = sw;
++	}
++
++	if (bpp == 2) {
++		int dpp = dst->pitch / 2;
++		uint16 *p = (uint16 *)dst->pixels, *prev = NULL;
++		for (i = 0; i < dh; i++, p += dpp) {
++			int sy = (int)(((unsigned)i * sh) / dh);
++			if (sy == prev_sy && prev) { memcpy(p, prev, dw * 2); continue; }
++			{
++				const uint8 *s = src + sy * spitch;
++				for (j = 0; j < dw; j++) p[j] = (uint16)asp_pal[s[xmap[j]]];
++			}
++			prev_sy = sy; prev = p;
++		}
++	} else {
++		int dpp = dst->pitch / 4;
++		uint32 *p = (uint32 *)dst->pixels, *prev = NULL;
++		for (i = 0; i < dh; i++, p += dpp) {
++			int sy = (int)(((unsigned)i * sh) / dh);
++			if (sy == prev_sy && prev) { memcpy(p, prev, dw * 4); continue; }
++			{
++				const uint8 *s = src + sy * spitch;
++				for (j = 0; j < dw; j++) p[j] = asp_pal[s[xmap[j]]];
++			}
++			prev_sy = sy; prev = p;
++		}
++	}
++}
++#endif
++
+ void
+ BlitScreen(uint8 *XBuf)
+ {
+@@ -650,6 +761,33 @@ BlitScreen(uint8 *XBuf)
+ 	// XXX soules - not entirely sure why this is being done yet
+ 	XBuf += s_srendline * 256;
+ 
++#ifdef ASP_BUILD
++	/* scale the whole visible NES frame onto the whole panel */
++	{
++		if (asp_pal_bpp != s_screen->format->BytesPerPixel)
++			asp_build_palette(s_screen, s_psdl);
++		if (SDL_MUSTLOCK(s_screen) && SDL_LockSurface(s_screen) < 0)
++			return;
++		asp_blit(s_screen, XBuf, NWIDTH, s_tlines, 256);
++		if (SDL_MUSTLOCK(s_screen))
++			SDL_UnlockSurface(s_screen);
++		{	/* test hook: ASP_DUMP_FRAME=<n> writes that frame to a BMP */
++			static int frameno, want = -2;
++			if (want == -2) {
++				const char *e = getenv("ASP_DUMP_FRAME");
++				want = e ? atoi(e) : -1;
++			}
++			if (want >= 0 && frameno++ == want) {
++				SDL_SaveBMP(s_screen, "asp_frame.bmp");
++				fprintf(stderr, "asp: wrote asp_frame.bmp (%dx%d src %dx%d)\n",
++					s_screen->w, s_screen->h, NWIDTH, s_tlines);
++			}
++		}
++		SDL_Flip(s_screen);
++		return;
++	}
++#endif
++
+ 	if(s_BlitBuf) {
+ 		TmpScreen = s_BlitBuf;
+ 	} else {
+diff --git a/trunk/src/drivers/sdl/sdl.cpp b/trunk/src/drivers/sdl/sdl.cpp
+index 8994556..8a82aa7 100644
+--- a/trunk/src/drivers/sdl/sdl.cpp
++++ b/trunk/src/drivers/sdl/sdl.cpp
+@@ -529,8 +529,45 @@ void FCEUD_TraceInstruction() {
+ /**
+  * The main loop for the SDL.
+  */
++#ifdef ASP_BUILD
++#include <unistd.h>
++/* The ASP firmware's own log is a couple of KB and rewritten every launch,
++ * so keep our own next to the binary. */
++static void asp_open_log(void)
++{
++	char path[512];
++	int n = readlink("/proc/self/exe", path, sizeof(path) - 16);
++	if (n <= 0) return;
++	path[n] = 0;
++	while (n > 0 && path[n - 1] != '/') n--;
++	strcpy(path + n, "fc_log.txt");
++	if (freopen(path, "w", stderr) == NULL) return;
++	setvbuf(stderr, NULL, _IOLBF, 0);
++	dup2(fileno(stderr), fileno(stdout));
++	setvbuf(stdout, NULL, _IOLBF, 0);
++}
++#endif
++
+ int main(int argc, char *argv[])
+ {
++#ifdef ASP_BUILD
++	{
++		int i;
++		asp_open_log();
++		for (i = 0; i < argc; i++)
++			fprintf(stderr, "asp: argv[%d] = %s\n", i, argv[i]);
++		/* The firmware invokes emulators as:
++		 *     <emu> "<rom>" /mnt/data/save
++		 * and FCEUX takes the LAST positional argument as the ROM, so
++		 * without this it tries to load the save directory as a game.
++		 */
++		if (argc > 2 && argv[argc - 1][0] == '/'
++		    && strstr(argv[argc - 1], "/save") != NULL) {
++			fprintf(stderr, "asp: dropping trailing save-dir argument\n");
++			argc--;
++		}
++	}
++#endif
+   // this is a hackish check for the --help arguemnts
+   // these are normally processed by the config parser, but SDL_Init
+   // must be run before the config parser: so if even SDL_Init fails,

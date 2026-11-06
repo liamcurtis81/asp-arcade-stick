@@ -1,0 +1,319 @@
+From 2c1e30d9364a884e85873c24d97f559a4ed16459 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 29 Oct 2026 23:26:38 +0000
+Subject: [PATCH 02/21] ASP: per-game tuning sections, frame-time spread
+ histograms, frame-count exit
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/burner/pi/main_pi.cpp | 121 ++++++++++++++++++++++++++++----------
+ src/burner/pi/run_pi.cpp  | 108 +++++++++++++++++++++++++++++++++-
+ 2 files changed, 197 insertions(+), 32 deletions(-)
+
+diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
+index f7dd0ad..cf28bc8 100755
+--- a/src/burner/pi/main_pi.cpp
++++ b/src/burner/pi/main_pi.cpp
+@@ -2,6 +2,7 @@
+ #include <sys/stat.h>
+ #include <fcntl.h>
+ #include <signal.h>
++#include <strings.h>		// strcasecmp, for per-game tuning section names
+ #include <unistd.h>
+ 
+ TCHAR* AdaptiveEncodingReads(const TCHAR* pszFileName)
+@@ -300,6 +301,89 @@ extern int asp_draw_lead;
+ extern int asp_aud_rate_override;
+ extern int asp_aud_device_samples;
+ extern int asp_hash_frames;
++extern int asp_exit_after_frames;
++
++// Returns 1 if the key was recognised and applied, 0 if it is unknown.
++static int asp_tuning_apply(const char *key, int value)
++{
++	if (strcmp(key, "always_draw_frames") == 0) {
++		bAlwaysDrawFrames = value;
++	} else if (strcmp(key, "draw_every_n") == 0) {
++		asp_draw_every_n = value;
++	} else if (strcmp(key, "draw_guard") == 0) {
++		asp_draw_guard = value;      // accepted, no longer consulted
++	} else if (strcmp(key, "profile_present") == 0) {
++		asp_fb_profile = value;
++	} else if (strcmp(key, "audio_segments") == 0) {
++		asp_aud_segments = value;
++	} else if (strcmp(key, "draw_lead") == 0) {
++		asp_draw_lead = value;
++	} else if (strcmp(key, "audio_rate") == 0) {
++		asp_aud_rate_override = value;
++	} else if (strcmp(key, "device_samples") == 0) {
++		asp_aud_device_samples = value;
++	} else if (strcmp(key, "hash_frames") == 0) {
++		asp_hash_frames = value;
++	} else if (strcmp(key, "exit_after_frames") == 0) {
++		asp_exit_after_frames = value;
++	} else {
++		return 0;
++	}
++	return 1;
++}
++
++// One sweep of the tuning file. want_section NULL reads only the keys that sit
++// before any [section] header, i.e. the globals; otherwise it reads only the
++// keys inside the section whose name matches, and ignores the globals.
++//
++// Two sweeps rather than one running parse, so the result does not depend on
++// where in the file a section happens to sit: globals always land first and a
++// per-game section always has the last word, even if someone puts the section
++// at the top.
++static void asp_tuning_pass(FILE *f, const char *want_section)
++{
++	char line[256];
++	char section[64] = "";               // empty means global scope
++
++	rewind(f);
++	while (fgets(line, sizeof(line), f)) {
++		char *p = line;
++		while (*p == ' ' || *p == '\t') p++;
++		if (*p == '#' || *p == '\n' || *p == '\r' || *p == '\0') continue;
++
++		if (*p == '[') {
++			char *end = strchr(p, ']');
++			if (!end) {
++				fprintf(stderr, "asp: tuning: unterminated section \"%s\", "
++					"ignored\n", p);
++				continue;
++			}
++			size_t n = (size_t)(end - (p + 1));
++			if (n >= sizeof(section)) n = sizeof(section) - 1;
++			memcpy(section, p + 1, n);
++			section[n] = '\0';
++			continue;
++		}
++
++		char key[64];
++		int value;
++		if (sscanf(p, "%63s %d", key, &value) != 2) continue;
++
++		int is_global = (section[0] == '\0');
++		if (want_section == NULL) {
++			if (!is_global) continue;
++		} else {
++			if (is_global || strcasecmp(section, want_section) != 0) continue;
++		}
++
++		if (asp_tuning_apply(key, value)) {
++			fprintf(stderr, "asp: tuning: %s%s = %d\n",
++				want_section ? "per-game " : "", key, value);
++		} else {
++			fprintf(stderr, "asp: tuning: unknown key \"%s\", ignored\n", key);
++		}
++	}
++}
+ 
+ static void asp_tuning_load(void)
+ {
+@@ -315,37 +399,14 @@ static void asp_tuning_load(void)
+ 		return;
+ 	}
+ 
+-	char line[256];
+-	while (fgets(line, sizeof(line), f)) {
+-		char key[64];
+-		int value;
+-		if (line[0] == '#' || line[0] == '\n' || line[0] == '\r') continue;
+-		if (sscanf(line, "%63s %d", key, &value) != 2) continue;
+-
+-		if (strcmp(key, "always_draw_frames") == 0) {
+-			bAlwaysDrawFrames = value;
+-		} else if (strcmp(key, "draw_every_n") == 0) {
+-			asp_draw_every_n = value;
+-		} else if (strcmp(key, "draw_guard") == 0) {
+-			asp_draw_guard = value;      // accepted, no longer consulted
+-		} else if (strcmp(key, "profile_present") == 0) {
+-			asp_fb_profile = value;
+-		} else if (strcmp(key, "audio_segments") == 0) {
+-			asp_aud_segments = value;
+-		} else if (strcmp(key, "draw_lead") == 0) {
+-			asp_draw_lead = value;
+-		} else if (strcmp(key, "audio_rate") == 0) {
+-			asp_aud_rate_override = value;
+-		} else if (strcmp(key, "device_samples") == 0) {
+-			asp_aud_device_samples = value;
+-		} else if (strcmp(key, "hash_frames") == 0) {
+-			asp_hash_frames = value;
+-		} else {
+-			fprintf(stderr, "asp: tuning: unknown key \"%s\", ignored\n", key);
+-			continue;
+-		}
+-		fprintf(stderr, "asp: tuning: %s = %d\n", key, value);
++	asp_tuning_pass(f, NULL);
++
++	// asp_short_name is set by asp_setup_paths, which runs well before this,
++	// so the running game's name is already known here.
++	if (asp_short_name[0] != '\0') {
++		asp_tuning_pass(f, asp_short_name);
+ 	}
++
+ 	fclose(f);
+ }
+ 
+diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
+index 00ca55a..e8ad44c 100644
+--- a/src/burner/pi/run_pi.cpp
++++ b/src/burner/pi/run_pi.cpp
+@@ -44,6 +44,35 @@ void ToggleLayer(unsigned char thisLayer)
+ // every frame is affordable.
+ unsigned long long asp_t_paint = 0, asp_t_draw = 0, asp_t_emu = 0;
+ unsigned int asp_n_paint = 0, asp_n_draw = 0, asp_n_emu = 0;
++
++// Means hide the thing Liam can actually see. A steady 30 fps reads as smoother
++// than a 35 fps average made of alternating 12 ms and 40 ms frames, so the
++// SPREAD matters more to him than the mean, and until now nothing measured it.
++//
++// Histogram rather than a sample buffer: 128 buckets, selected by shifting the
++// nanosecond count right by 19, which is a bucket every 524288 ns (0.524 ms)
++// and a top bucket at 67 ms. A shift, not a divide - this part has no hardware
++// divide and the frame path is the last place to introduce a libgcc call.
++//
++// ASP_SPREAD_GAP is the interval between consecutive PRESENTED frames, measured
++// at VidPaint. That is the one that corresponds to perceived smoothness: the
++// other two say where the time goes, this one says what the eye receives.
++#define ASP_SPREAD_BUCKETS	128
++#define ASP_SPREAD_SHIFT	19
++unsigned int asp_hist_draw[ASP_SPREAD_BUCKETS];
++unsigned int asp_hist_paint[ASP_SPREAD_BUCKETS];
++unsigned int asp_hist_gap[ASP_SPREAD_BUCKETS];
++unsigned long long asp_max_draw = 0, asp_max_paint = 0, asp_max_gap = 0;
++static unsigned long long asp_last_present_ns = 0;
++
++static inline void asp_spread_add(unsigned int *hist, unsigned long long *peak,
++                                  unsigned long long dt_ns)
++{
++	unsigned int b = (unsigned int)(dt_ns >> ASP_SPREAD_SHIFT);
++	if (b >= ASP_SPREAD_BUCKETS) b = ASP_SPREAD_BUCKETS - 1;
++	hist[b]++;
++	if (dt_ns > *peak) *peak = dt_ns;
++}
+ // How many frames the audio catch-up loop runs through per wake-up. Only the
+ // last of each batch is drawn, so this distribution IS the rendered rate.
+ unsigned int asp_batch_hist[9];
+@@ -89,6 +118,21 @@ int asp_aud_device_samples = 0;
+ // The hash runs AFTER asp_t_draw closes, so it never contaminates the cost
+ // measurements; it only costs a little wall time on the first N frames.
+ int asp_hash_frames = 0;
++
++// Quit cleanly after this many DRAWN frames. 0 = never, which is the device
++// setting and the default.
++//
++// The headless harness has no window, so nothing ever posts SDL_QUIT and the
++// run loop never ends on its own. `timeout` then kills the process with
++// SIGTERM, which - contrary to what I assumed - does NOT reach the clean exit
++// path, so asp_log_framerate never runs and the log carries no hashes, no cost
++// figures and no spread. Measured it: the process exited and the log stopped at
++// the startup banner.
++//
++// Ending on a frame count instead makes a harness run terminate by itself AND
++// makes two runs exactly comparable, since they cover the same frames rather
++// than the same wall-clock seconds under a variable-speed emulator.
++int asp_exit_after_frames = 0;
+ unsigned int asp_hash_state = 2166136261u;
+ unsigned int asp_hash_done = 0;
+ unsigned int asp_hash_marks[6];
+@@ -118,8 +162,17 @@ static int RunFrame(int bDraw, int bPause)
+ #ifdef BUILD_ASP
+ 		unsigned long long t0 = asp_now_ns();
+ 		VidPaint(0);
+-		asp_t_paint += asp_now_ns() - t0;
++		unsigned long long t1 = asp_now_ns();
++		asp_t_paint += t1 - t0;
+ 		asp_n_paint++;
++		asp_spread_add(asp_hist_paint, &asp_max_paint, t1 - t0);
++		// Interval between presented frames. The first one has no predecessor,
++		// and a paused stretch would otherwise log one enormous gap, so only
++		// consecutive unpaused presents are counted.
++		if (asp_last_present_ns != 0) {
++			asp_spread_add(asp_hist_gap, &asp_max_gap, t1 - asp_last_present_ns);
++		}
++		asp_last_present_ns = t1;
+ #else
+ 		VidPaint(0);
+ #endif
+@@ -133,6 +186,11 @@ static int RunFrame(int bDraw, int bPause)
+ 		if (bPause != bPrevPause) {
+ 			VidPaint(2);
+ 		}
++#ifdef BUILD_ASP
++		// Break the present-interval chain, so resuming does not log the whole
++		// paused stretch as one enormous frame gap.
++		asp_last_present_ns = 0;
++#endif
+ 	} else {
+ 		nFramesEmulated++;
+ 		nCurrentFrame++;
+@@ -149,8 +207,14 @@ static int RunFrame(int bDraw, int bPause)
+ 		}
+ 		unsigned long long t0 = asp_now_ns();
+ 		int vf = VidFrame();
+-		asp_t_draw += asp_now_ns() - t0;
++		unsigned long long dt_draw = asp_now_ns() - t0;
++		asp_t_draw += dt_draw;
+ 		asp_n_draw++;
++		asp_spread_add(asp_hist_draw, &asp_max_draw, dt_draw);
++		if (asp_exit_after_frames > 0
++		    && asp_n_draw >= (unsigned int)asp_exit_after_frames) {
++			nExitEmulator = 1;
++		}
+ 		// NOT pBurnDraw: vid_interface sets it for the duration of the frame
+ 		// and nulls it again on the way out, so by the time VidFrame returns
+ 		// it is always NULL and the hash never ran once. pVidImage is the
+@@ -369,6 +433,46 @@ static void asp_log_framerate(unsigned int ticks, int emulated, int rendered)
+ 			(emu_ms + extra_ms) > 0.0 ? 1000.0 / (emu_ms + extra_ms) : 0.0,
+ 			nBurnFPS ? 100000.0 / nBurnFPS : 0.0);
+ 
++		// Spread, not just the mean. Bucket b covers [b, b+1) * 0.524288 ms, so
++		// the upper edge is reported: "p95 18.3" means 95% of frames came in at
++		// or under 18.3 ms. The exact peak is tracked separately because the
++		// top bucket is an overflow and would otherwise hide a 200 ms stall.
++		{
++			static const double kBucketMs = (double)(1u << ASP_SPREAD_SHIFT) / 1e6;
++			struct { const char *name; unsigned int *h; unsigned long long peak; }
++			sets[3] = {
++				{ "emulate+blit", asp_hist_draw,  asp_max_draw  },
++				{ "present",      asp_hist_paint, asp_max_paint },
++				{ "frame gap",    asp_hist_gap,   asp_max_gap   },
++			};
++			for (int s = 0; s < 3; s++) {
++				unsigned int total = 0;
++				for (int i = 0; i < ASP_SPREAD_BUCKETS; i++) total += sets[s].h[i];
++				if (!total) continue;
++				const double want[4] = { 0.50, 0.95, 0.99, 1.00 };
++				double at[4] = { 0.0, 0.0, 0.0, 0.0 };
++				int w = 0;
++				unsigned int run = 0;
++				for (int i = 0; i < ASP_SPREAD_BUCKETS && w < 4; i++) {
++					run += sets[s].h[i];
++					while (w < 4 && (double)run >= want[w] * (double)total) {
++						at[w++] = (double)(i + 1) * kBucketMs;
++					}
++				}
++				// A percentile is reported as its bucket's UPPER edge while
++				// the peak is exact, so on a small sample p99 could print
++				// above "worst" and read as a contradiction. Nothing can
++				// exceed the measured peak, so clamp to it.
++				double peak_ms = sets[s].peak / 1e6;
++				for (int k = 0; k < 4; k++) {
++					if (at[k] > peak_ms) at[k] = peak_ms;
++				}
++				fprintf(f, "----- %s spread (n=%u): p50 %.2f, p95 %.2f, "
++					"p99 %.2f ms, worst %.2f ms -----\n",
++					sets[s].name, total, at[0], at[1], at[2], peak_ms);
++			}
++		}
++
+ 		fprintf(f, "----- audio catch-up batch sizes:");
+ 		for (int i = 1; i <= 8; i++) {
+ 			if (asp_batch_hist[i]) fprintf(f, " %d:%u", i, asp_batch_hist[i]);
+-- 
+2.43.0
+

@@ -1,0 +1,75 @@
+From 90d0e2cbe599e94858796d29a91ec4c70bb28c63 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 1 Nov 2026 16:47:50 +0000
+Subject: [PATCH 16/21] ASP: hash async-drawn pictures for A/B proof against
+ inline draw
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/burner/pi/asp_async.cpp | 16 ++++++++++++++++
+ src/burner/pi/run_pi.cpp    | 14 ++++++++++++++
+ 2 files changed, 30 insertions(+)
+
+diff --git a/src/burner/pi/asp_async.cpp b/src/burner/pi/asp_async.cpp
+index 65719e4..ccb74cb 100644
+--- a/src/burner/pi/asp_async.cpp
++++ b/src/burner/pi/asp_async.cpp
+@@ -27,6 +27,10 @@
+ int asp_async_mode = 0;                 // asp_tuning.txt "async_draw"
+ int asp_async_live = 0;                 // exit report
+ unsigned int asp_async_frames = 0, asp_async_waits = 0;
++// Hashes of the pictures the render thread made, same scheme and checkpoints
++// as the inline frame hashes, so async_draw 1 can be compared with 0.
++unsigned int asp_async_hash_marks[10], asp_async_hash_done = 0;
++static unsigned int asp_async_hash_state = 2166136261u;
+ 
+ extern int asp_async_frame_pending;     // vid_asp.cpp: skip its own present
+ extern void asp_present_external(const unsigned char *buf);
+@@ -55,6 +59,18 @@ static void *worker(void *)
+ 		nBurnBpp   = rbpp;
+ 		g_draw();
+ 		pBurnDraw = NULL;
++		{
++			extern int asp_hash_frames;
++			if (asp_hash_frames > 0 && asp_async_hash_done < (unsigned)asp_hash_frames) {
++				const unsigned int *w = (const unsigned int *)rbuf;
++				unsigned int h = asp_async_hash_state;
++				for (size_t i = 0; i < rsize / 4; i++) { h ^= w[i]; h *= 16777619u; }
++				asp_async_hash_state = h;
++				asp_async_hash_done++;
++				static const unsigned int at[10] = { 50, 100, 150, 200, 250, 300, 500, 1000, 1500, 2000 };
++				for (int k = 0; k < 10; k++) if (asp_async_hash_done == at[k]) asp_async_hash_marks[k] = h;
++			}
++		}
+ 		if (present_it) asp_present_external(rbuf);
+ 
+ 		pthread_mutex_lock(&m);
+diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
+index a2ee2bb..71884a3 100644
+--- a/src/burner/pi/run_pi.cpp
++++ b/src/burner/pi/run_pi.cpp
+@@ -694,6 +694,20 @@ static void asp_log_framerate(unsigned int ticks, int emulated, int rendered)
+ 			asp_sdl_driver_dsp, asp_sdl_jit_ms, asp_sdl_writes, asp_sdl_write_blocks, asp_sdl_write_max_ms,
+ 			asp_sdl_poll_calls, asp_sdl_poll_waits, asp_sdl_poll_max_ms, asp_sdl_sleeps);
+ 	}
++	{
++		extern int asp_async_mode, asp_async_live;
++		extern unsigned int asp_async_frames, asp_async_waits, asp_async_hash_marks[10], asp_async_hash_done;
++		if (asp_async_frames) {
++			fprintf(f, "----- async draw (mode %d): %u pictures on the render thread, emulation waited for it %u times -----\n",
++				asp_async_mode, asp_async_frames, asp_async_waits);
++			if (asp_async_hash_done) {
++				static const unsigned int at[10] = { 50, 100, 150, 200, 250, 300, 500, 1000, 1500, 2000 };
++				fprintf(f, "----- async frame hashes:");
++				for (int k = 0; k < 10; k++) if (asp_async_hash_done >= at[k]) fprintf(f, " %u:%08x", at[k], asp_async_hash_marks[k]);
++				fprintf(f, " -----\n");
++			}
++		}
++	}
+ 	{
+ 		// Generic per-driver draw split (asp_ds_* filled by a driver's draw).
+ 		extern unsigned long long asp_ds_t[8];
+-- 
+2.43.0
+

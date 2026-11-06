@@ -1,0 +1,33 @@
+From 8db9357601c07154a2ba30872baac83fa13ad33e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 1 Nov 2026 16:25:38 +0000
+Subject: [PATCH 14/21] ASP: report our SDL OSS backend's write/poll behaviour
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/burner/pi/run_pi.cpp | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
+index 720fce7..a2ee2bb 100644
+--- a/src/burner/pi/run_pi.cpp
++++ b/src/burner/pi/run_pi.cpp
+@@ -686,6 +686,14 @@ static void asp_log_framerate(unsigned int ticks, int emulated, int rendered)
+ 			fprintf(f, " -----\n");
+ 		}
+ 	}
++	{
++		extern int asp_sdl_jit_ms, asp_sdl_driver_dsp;
++		extern unsigned int asp_sdl_poll_waits, asp_sdl_poll_calls, asp_sdl_write_blocks, asp_sdl_writes, asp_sdl_sleeps;
++		extern long asp_sdl_write_max_ms, asp_sdl_poll_max_ms;
++		fprintf(f, "----- sdl oss: driver dsp %d, jit %d ms; writes %u (blocked >=5ms: %u, max %ld ms); polls %u (waited: %u, max %ld ms); jit sleeps %u -----\n",
++			asp_sdl_driver_dsp, asp_sdl_jit_ms, asp_sdl_writes, asp_sdl_write_blocks, asp_sdl_write_max_ms,
++			asp_sdl_poll_calls, asp_sdl_poll_waits, asp_sdl_poll_max_ms, asp_sdl_sleeps);
++	}
+ 	{
+ 		// Generic per-driver draw split (asp_ds_* filled by a driver's draw).
+ 		extern unsigned long long asp_ds_t[8];
+-- 
+2.43.0
+

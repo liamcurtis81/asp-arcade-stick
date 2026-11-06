@@ -1,0 +1,137 @@
+# Tuning for fba_v19.dge, read fresh on every launch. No rebuild needed.
+#
+# Rewritten clean: this file had been patched by string replacement once too
+# often and one edit had mangled a comment into something the parser would read
+# as a setting.
+#
+# MEASURED, so that none of it has to be re-derived:
+#   emulating one frame   ~11 ms
+#   drawing one frame     ~10 ms on top of that
+#   the frame budget      16.90 ms at 59.18 Hz
+# A fully drawn frame therefore costs about 21 ms against a 16.90 ms budget,
+# which is why drawing every frame is impossible and why the audio cushion,
+# the lip-sync gap and the frame rate all come out of one pot.
+
+# --------------------------------------------------------------- draw rate
+# How many emulated frames pass between drawn ones. Drawing only ever happens
+# at an audio batch end, where the buffer is fullest; this sets how many of
+# those ends are skipped.
+#   2 = about 21 fps displayed. The v15 setting.
+#   3 = about 18 fps, more slack per cycle, steadier under load.
+draw_every_n 1
+
+# 1 = draw every frame. Measured at 46 fps with the audio dragged down with it.
+# Diagnosis only.
+always_draw_frames 0
+
+# 1 = time the scaler and the framebuffer write separately. Costs about 0.9 ms
+# per drawn frame in clock_gettime calls, so it is off unless taking a reading.
+profile_present 0
+
+# ------------------------------------------------------------------- audio
+# Segments in the ring, one video frame of sound each. The fill loop tops it up
+# to within one segment of the play point, so the queue sits at segments-1.
+# That one number is BOTH the picture-ahead-of-sound gap AND the underrun
+# cushion - they are the same quantity, which is why no value gives both.
+#   6 = about 97 ms. "Plays and sounds good."     <- where we are now
+#   5 = about 79 ms. "Sound quality good, just feel very behind the action."
+#   4 = about 62 ms. "A bit boomy" / "wobbly."
+audio_segments 5
+
+# Sample rate. CONFIRMED by the device: v19 logged "asked 48000, device gave
+# 44100", so the hardware is 44.1 kHz native. 22050 and 48000 both caused the
+# loop to stall on a mismatched audio clock. Leave this at 44100.
+#
+# It must be an explicit number, never 0: FBNeo writes nAudSampleRate into
+# fbneo.ini on exit and restores it on load, so a rate tried once sticks, and
+# 0 meaning "leave alone" left a bad saved value in place.
+audio_rate 44100
+
+# The sound device's own buffer, in samples, on top of the ring. 0 keeps
+# FBNeo's computed size (512 here, 11.6 ms). 256 halves that, but it is an
+# unverified variable and the sound comes first.
+device_samples 0
+
+# 1 = also allow a draw on the frame before a batch end, roughly doubling the
+# draw opportunities. Untried. Only worth trying once the sound is settled.
+draw_lead 0
+
+# Hash the first 300 drawn frames and report checkpoints in the exit log. This
+# is the correctness harness for touching the renderers: identical hashes before
+# and after a change prove no pixel moved. It needs a clean comparison, so the
+# stick must not be touched until the attract mode has run a few seconds.
+# 0 disables it. The hash runs after the draw timer closes, so it does not
+# contaminate the per-frame COST figures.
+#
+# OFF for this build, deliberately. It does delay the frame that follows it,
+# which would skew the new frame-gap histogram over the first 300 frames - and
+# the frame gap is the number this build exists to measure. Pixel-identity for
+# v23 was already proven in the harness against the v22 baseline, so nothing is
+# lost by leaving it off here. Put it back to 300 before touching a renderer.
+hash_frames 0
+
+# Quit cleanly after this many DRAWN frames. 0 = run until the user quits, which
+# is what the stick wants. Non-zero is for the headless harness, where nothing
+# ever posts SDL_QUIT and the run would otherwise be killed by a signal before
+# writing its exit report.
+exit_after_frames 0
+
+# Present on a second core. 1 = the emulation thread hands the finished frame
+# to a worker and carries straight on; the scaling and framebuffer write
+# (about 2.7 ms per drawn frame on the stick) happen on another core. 0 = do it
+# inline, as every build before v25 did. Harness: frame hashes identical either
+# way on Metamorphic Force and Night Slashers, clean exit, and the present cost
+# on the emulation thread down from 1.25 ms to 0.08 ms.
+present_thread 1
+
+# Konami K056832 tilemaps: 1 = draw interior tile rows on a fast path that asks
+# the clip and blend questions once per row instead of once per pixel. Frame
+# hashes identical over 3000 frames on Metamorphic Force, Mystic Warriors and
+# Violent Storm. 0 = the original loop, if a game ever draws wrongly.
+fast_tiles 1
+
+# ------------------------------------------------------- per-game overrides
+# Everything above is global. A [romname] section below overrides those keys
+# for one game only, matched against the name the launcher passed in, without
+# regard to case. Keys outside any section are always globals, and a section
+# always wins over them regardless of where it sits in this file.
+#
+# Any key valid above is valid in a section.
+
+# Night Slashers. The board blits 19.47 ms against a 17.11 ms budget, three
+# times Metamorphic Force's, because Data East's 32-bit hardware alpha-blends
+# heavily and the driver runs an ARM CPU emulated in software. Emulation alone
+# fits the budget at 13.74 ms, so nothing is wrong with the speed of the
+# emulation - the drawing is what drags it to 65% and puts the game into
+# genuine slow motion. Drawing less often is the only lever that helps, and a
+# choppier picture is the better trade: Liam has said the rendered rate is
+# below his notice where the game speed is not.
+[nslasheru]
+# 3 -> 4 on 30 Oct. v25 log: 98.7% of arcade speed at cadence 3, with 2
+# batches at the ring limit - right on the edge, so busy moments tip it slow,
+# which Liam felt. Modelled from measured costs, 4 leaves about 8% headroom at
+# about 14.6 pictures a second instead of 15.8. Back to 3 if the picture bothers
+# him more than the speed did.
+draw_every_n 4
+# The driver's own idle-loop speed hack, behind a "Speed Hacks" DIP that
+# defaults to Off. Harness, always_draw_frames 1, 300 frames: 58971 ARM
+# instructions interpreted per frame with it off, 8237 with it on - 86% of the
+# interpreter's work was the game's busy-wait. Frame hashes identical to the
+# baseline on all six checkpoints in both armed runs. draw_every_n stays at 3
+# for the first device reading; lower it once the new emulate cost is known.
+speed_hacks 1
+
+# DO NOT add a cadence section for the Konami boards. draw_every_n 2 is what
+# made Metamorphic Force tinny, and the mechanism was never found, so the only
+# safe cadence for them is the global 1. This section is here to be read, not
+# to change anything.
+[metamrph]
+draw_every_n 1
+# TEMPORARY benchmark: quits after 1200 drawn attract frames, about 30 s.
+# REMOVE after the v27 emulation-split reading.
+exit_after_frames 1200
+# audio_segments 4 tried here on 30 Oct and REJECTED: Liam heard no reduction
+# in lag and the sound went boomy and jittery. 5 segments is the floor for this
+# board at draw_every_n 1. The ring cannot get shallower until the drawn frame
+# gets cheaper: a drawn frame costs about 21 ms against a 16.9 ms budget, the
+# emulator falls behind by a batch, and the deep ring is what absorbs that.

@@ -1,0 +1,123 @@
+From 90957b7e180948927c8d1fbc95b578972d81185e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 31 Oct 2026 09:47:55 +0000
+Subject: [PATCH 06/21] ASP: sampled per-processor emulation split for the
+ mystwarr driver
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/burn/drv/konami/d_mystwarr.cpp | 51 ++++++++++++++++++++++++++++++
+ src/burner/pi/run_pi.cpp           | 15 +++++++++
+ 2 files changed, 66 insertions(+)
+
+diff --git a/src/burn/drv/konami/d_mystwarr.cpp b/src/burn/drv/konami/d_mystwarr.cpp
+index 8417e19..b630e00 100644
+--- a/src/burn/drv/konami/d_mystwarr.cpp
++++ b/src/burn/drv/konami/d_mystwarr.cpp
+@@ -2992,8 +2992,31 @@ void clear_opposites_viostorm(UINT16 &ipt)
+ 	}
+ }
+ 
++#ifdef BUILD_ASP
++#include <time.h>
++// Where Metamorphic Force's 10.6 ms of emulation goes, per processor. Timing
++// every one of the 256 slices would itself cost about a millisecond a frame -
++// a clock read on this kernel is about 1.2 us, measured when profiling the
++// present - so one frame in sixteen is timed in full and the rest not at all.
++// The averages over those frames are the split; the overhead is about 0.06 ms.
++unsigned long long asp_mw_t68k = 0, asp_mw_tz80 = 0, asp_mw_ttimer = 0,
++                   asp_mw_tsound = 0, asp_mw_tframe = 0;
++unsigned int asp_mw_samples = 0;
++static unsigned int asp_mw_frameno = 0;
++static inline unsigned long long asp_mw_ns(void)
++{
++	struct timespec ts;
++	clock_gettime(CLOCK_MONOTONIC, &ts);
++	return (unsigned long long)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
++}
++#endif
++
+ static INT32 DrvFrame()
+ {
++#ifdef BUILD_ASP
++	const int asp_samp = ((asp_mw_frameno++ & 15u) == 0);
++	const unsigned long long asp_f0 = asp_samp ? asp_mw_ns() : 0;
++#endif
+ 	if (DrvReset) {
+ 		DrvDoReset();
+ 	}
+@@ -3108,16 +3131,44 @@ static INT32 DrvFrame()
+ 			}
+ 		}
+ 
++#ifdef BUILD_ASP
++		if (asp_samp) {
++			unsigned long long a = asp_mw_ns();
++			CPU_RUN(0, Sek);
++			unsigned long long b = asp_mw_ns();
++			CPU_RUN(1, Zet);
++			unsigned long long c = asp_mw_ns();
++			CPU_RUN(2, timer);
++			asp_mw_t68k   += b - a;
++			asp_mw_tz80   += c - b;
++			asp_mw_ttimer += asp_mw_ns() - c;
++		} else
++#endif
++		{
+ 		CPU_RUN(0, Sek);
+ 		CPU_RUN(1, Zet);
+ 		CPU_RUN(2, timer);
++		}
+ 	}
+ 
++#ifdef BUILD_ASP
++	const unsigned long long asp_s0 = asp_samp ? asp_mw_ns() : 0;
++#endif
+ 	if (pBurnSoundOut) {
+ 		BurnSoundClear();
+ 		K054539Update(0, pBurnSoundOut, nBurnSoundLen);
+ 		K054539Update(1, pBurnSoundOut, nBurnSoundLen);
+ 	}
++#ifdef BUILD_ASP
++	if (asp_samp) {
++		unsigned long long e = asp_mw_ns();
++		asp_mw_tsound += e - asp_s0;
++		// Whole frame on sampled frames, minus any draw, which the Konami
++		// draw timers already account for separately.
++		asp_mw_tframe += e - asp_f0;
++		asp_mw_samples++;
++	}
++#endif
+ 
+ 	ZetClose();
+ 	SekClose();
+diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
+index 8199584..649e349 100644
+--- a/src/burner/pi/run_pi.cpp
++++ b/src/burner/pi/run_pi.cpp
+@@ -502,6 +502,21 @@ static void asp_log_framerate(unsigned int ticks, int emulated, int rendered)
+ 		}
+ 
+ 		{
++			extern unsigned long long asp_mw_t68k, asp_mw_tz80, asp_mw_ttimer,
++				asp_mw_tsound, asp_mw_tframe;
++			extern unsigned int asp_mw_samples;
++			if (asp_mw_samples > 0) {
++				double n = (double)asp_mw_samples;
++				double m68 = asp_mw_t68k / 1e6 / n, z80 = asp_mw_tz80 / 1e6 / n;
++				double tmr = asp_mw_ttimer / 1e6 / n, snd = asp_mw_tsound / 1e6 / n;
++				double frm = asp_mw_tframe / 1e6 / n;
++				fprintf(f, "----- emulation split (%u sampled frames, 1 in 16): "
++					"68000 %.2f ms, Z80 %.2f ms, timer %.2f ms, K054539 sound %.2f ms; "
++					"whole frame %.2f ms, of which %.2f ms is none of those "
++					"(drawing on drawn frames, interrupts, loop) -----\n",
++					asp_mw_samples, m68, z80, tmr, snd, frm,
++					frm - m68 - z80 - tmr - snd);
++			}
+ 			extern int asp_present_thread_live;
+ 			fprintf(f, "----- present: %s -----\n", asp_present_thread_live
+ 				? "on a second core (the emulation thread only hands off a copy)"
+-- 
+2.43.0
+

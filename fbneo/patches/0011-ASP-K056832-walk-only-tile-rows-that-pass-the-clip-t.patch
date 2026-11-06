@@ -1,0 +1,58 @@
+From 96a99cbecb15066d2e18a987a93cc77272194af0 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 1 Nov 2026 10:28:46 +0000
+Subject: [PATCH 11/21] ASP: K056832 - walk only tile rows that pass the clip
+ test (line/row-scroll layers)
+
+Harness: frames and sound identical with fast_tiles 0/1 on xexex, mystwarr, metamrph, viostorm, moomesa, bucky, asterix.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/burn/drv/konami/k056832.cpp | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+diff --git a/src/burn/drv/konami/k056832.cpp b/src/burn/drv/konami/k056832.cpp
+index 81b87d7..648b484 100644
+--- a/src/burn/drv/konami/k056832.cpp
++++ b/src/burn/drv/konami/k056832.cpp
+@@ -542,8 +542,36 @@ static void draw_layer_internal(INT32 layer, INT32 pageIndex, INT32 *clip, INT32
+ 	}
+ 
+ 
++#ifdef BUILD_ASP
++	// ASP: in line- and row-scroll modes this function is called once per
++	// scanline (or per 8 lines) with a clip only that tall, and walks all 2048
++	// tiles of the page each time, discarding almost all of them at the
++	// "speed-up" test below. Evaluate that same test once per tile ROW (it
++	// depends only on the row) and walk only the rows that pass. The tiles
++	// visited, their order and everything done to them are unchanged.
++	UINT32 asp_rows = 0xffffffff;
++	if (asp_fast_tiles) {
++		asp_rows = 0;
++		for (INT32 r = 0; r < 32; r++) {
++			INT32 sy = r * 8, syyh, syyl;
++			if (tilemap_flip & 2) {
++				syyh = (256 - 8) - (sy - 7); syyh = (syyh + scrolly) & 0xff;
++				syyl = (256 - 8) - (sy - 0); syyl = (syyl + scrolly) & 0xff;
++			} else {
++				syyh = ((sy + 7) - scrolly) & 0xff;
++				syyl = ((sy + 0) - scrolly) & 0xff;
++			}
++			if (!((syyh < (miny-7) || syyh > (maxy+7)) && (syyl < (miny-7) || syyl > (maxy+7))))
++				asp_rows |= 1u << r;
++		}
++	}
++#endif
++
+ 	for (INT32 offs = 0; offs < 64 * 32; offs++)
+ 	{
++#ifdef BUILD_ASP
++		if (!(asp_rows & (1u << (offs >> 6)))) { offs |= 0x3f; continue; }
++#endif
+ 		INT32 sx = (offs & 0x3f) * 8;
+ 		INT32 sy = (offs / 0x40) * 8; // sy handling in blitter (down below...)
+ 
+-- 
+2.43.0
+

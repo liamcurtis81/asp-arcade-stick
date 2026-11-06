@@ -1,0 +1,69 @@
+{
+ "conflicts": [
+  [
+   "md_t2",
+   "md_t2.zip",
+   [
+    [
+     1991,
+     "T2: Terminator 2 - Judgment Day (Euro, USA)"
+    ],
+    [
+     1992,
+     "T2: The Arcade Game (Euro, USA)"
+    ],
+    [
+     1994,
+     "T2: The Arcade Game (Japan)"
+    ]
+   ]
+  ]
+ ],
+ "missing": [
+  [
+   "md_camerica",
+   "md",
+   "md_camerica.zip"
+  ],
+  [
+   "md_bubbob",
+   "md",
+   "MD_bubbob.zip"
+  ],
+  [
+   "md_tmnt",
+   "md",
+   "md_tmnt.zip"
+  ],
+  [
+   "md_wwf",
+   "md",
+   "md_wwf.zip"
+  ],
+  [
+   "md_pwrinst",
+   "md",
+   "md_pwrinst.zip"
+  ],
+  [
+   "supermariobrosducknes",
+   "fc",
+   "Super Mario Bros. + Duck Hunt (U).nes"
+  ],
+  [
+   "pipedreamunes",
+   "fc",
+   "Pipe Dream (U).nes"
+  ],
+  [
+   "donkeykongclassicsnes",
+   "fc",
+   "Donkey Kong Classics (U).nes"
+  ],
+  [
+   "md_phantasystarivtheend",
+   "md",
+   "md_phantasystarivtheend.zip"
+  ]
+ ]
+}

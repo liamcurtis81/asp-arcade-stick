@@ -1,0 +1,228 @@
+From 547eb8d3aa5e0ff10c6a9c68e7cc9fb3f6673f70 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 30 Oct 2026 16:15:17 +0000
+Subject: [PATCH 04/21] ASP: present worker thread (present_thread), present
+ mode in exit report
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/burner/pi/main_pi.cpp      |   3 +
+ src/burner/pi/run_pi.cpp       |   4 ++
+ src/intf/video/asp/vid_asp.cpp | 128 ++++++++++++++++++++++++++++++++-
+ 3 files changed, 132 insertions(+), 3 deletions(-)
+
+diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
+index 8ab19b4..940b254 100755
+--- a/src/burner/pi/main_pi.cpp
++++ b/src/burner/pi/main_pi.cpp
+@@ -302,6 +302,7 @@ extern int asp_aud_rate_override;
+ extern int asp_aud_device_samples;
+ extern int asp_hash_frames;
+ extern int asp_exit_after_frames;
++extern int asp_present_thread;   // vid_asp.cpp
+ extern unsigned char *asp_reset_ptr;
+ extern int asp_reset_pending;
+ 
+@@ -335,6 +336,8 @@ static int asp_tuning_apply(const char *key, int value)
+ 		asp_exit_after_frames = value;
+ 	} else if (strcmp(key, "speed_hacks") == 0) {
+ 		asp_speed_hacks = value;
++	} else if (strcmp(key, "present_thread") == 0) {
++		asp_present_thread = value;
+ 	} else {
+ 		return 0;
+ 	}
+diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
+index 7702d49..730563e 100644
+--- a/src/burner/pi/run_pi.cpp
++++ b/src/burner/pi/run_pi.cpp
+@@ -492,6 +492,10 @@ static void asp_log_framerate(unsigned int ticks, int emulated, int rendered)
+ 		}
+ 
+ 		{
++			extern int asp_present_thread_live;
++			fprintf(f, "----- present: %s -----\n", asp_present_thread_live
++				? "on a second core (the emulation thread only hands off a copy)"
++				: "inline on the emulation thread");
+ 			extern unsigned long long asp_arm_insns, asp_arm_idle_hits;
+ 			extern int asp_speed_hacks;
+ 			if (asp_arm_insns > 0 && emulated > 0) {
+diff --git a/src/intf/video/asp/vid_asp.cpp b/src/intf/video/asp/vid_asp.cpp
+index d0c4265..6c5d079 100644
+--- a/src/intf/video/asp/vid_asp.cpp
++++ b/src/intf/video/asp/vid_asp.cpp
+@@ -23,6 +23,7 @@
+ // Both live in asp_screen.cfg so they can be corrected without a rebuild.
+ 
+ #include "burner.h"
++#include <pthread.h>
+ 
+ // ---------------------------------------------------------------------------
+ // asp_screen.cfg, read once at startup. Same file and keys as the other three
+@@ -105,17 +106,129 @@ static void asp_read_screen_cfg()
+ // ---------------------------------------------------------------------------
+ // Present
+ // ---------------------------------------------------------------------------
+-static void asp_present()
++static void asp_present_from(const unsigned char *buf)
+ {
+ 	int ox, oy, dw, dh;
+-	if (!asp_buffer) return;
++	if (!buf) return;
+ 	if (!asp_fb_first_frame_setup()) return;
+ 
+ 	asp_target_rect_fb(&ox, &oy, &dw, &dh);
+-	asp_fb_present((const unsigned short *)asp_buffer,
++	asp_fb_present((const unsigned short *)buf,
+ 		asp_buf_w, asp_buf_h, asp_buf_w, ox, oy, dw, dh);
+ }
+ 
++// ---------------------------------------------------------------------------
++// Present on a second core.
++//
++// The stick has four Cortex-A7 cores and the emulator ran on one. Every drawn
++// frame then paid about 2.7 ms on the emulation thread to scale the finished
++// picture and write it to the framebuffer - work that depends on no game state
++// at all. While it ran, no frame was emulated and so no sound was produced,
++// which is part of why sound arrives in bursts and the ring has to be deep.
++//
++// With present_thread 1 the emulation thread only copies the finished frame
++// into a hand-off buffer (288x224x2 = 129 KB for most boards) and returns. A
++// worker on another core does the scaling and the framebuffer write. If a new
++// frame is handed off before the worker has shown the previous one, the newest
++// simply replaces it: the emulator never waits on the screen.
++//
++// EVERY present goes through the worker while it runs, including pause and
++// redraw. asp_fb_present keeps static scratch buffers, so two threads presenting
++// at once would corrupt each other.
++//
++// Frame hashes are taken over pVidImage on the emulation thread, upstream of
++// all this, so they are unaffected by construction.
++// ---------------------------------------------------------------------------
++int asp_present_thread = 0;          // set from asp_tuning.txt
++
++static pthread_t       asp_pt;
++static pthread_mutex_t asp_pt_lock = PTHREAD_MUTEX_INITIALIZER;
++static pthread_cond_t  asp_pt_cond = PTHREAD_COND_INITIALIZER;
++static unsigned char  *asp_pt_pending = NULL;  // filled by the emulation thread
++static unsigned char  *asp_pt_work    = NULL;  // owned by the worker
++static size_t          asp_pt_size    = 0;
++static int             asp_pt_have    = 0;     // pending holds an unshown frame
++static int             asp_pt_stop    = 0;
++static int             asp_pt_running = 0;
++int asp_present_thread_live = 0;     // read by the exit report in run_pi
++
++static void *asp_present_worker(void *)
++{
++	for (;;) {
++		pthread_mutex_lock(&asp_pt_lock);
++		while (!asp_pt_have && !asp_pt_stop)
++			pthread_cond_wait(&asp_pt_cond, &asp_pt_lock);
++		if (asp_pt_stop) {
++			pthread_mutex_unlock(&asp_pt_lock);
++			break;
++		}
++		// Swap rather than copy under the lock, so the emulation thread is
++		// never held up for longer than a pointer exchange.
++		unsigned char *t = asp_pt_work;
++		asp_pt_work = asp_pt_pending;
++		asp_pt_pending = t;
++		asp_pt_have = 0;
++		pthread_mutex_unlock(&asp_pt_lock);
++
++		asp_present_from(asp_pt_work);
++	}
++	return NULL;
++}
++
++static void asp_present_thread_start()
++{
++	if (!asp_present_thread || asp_pt_running || !asp_buffer) return;
++
++	asp_pt_size    = (size_t)asp_buf_w * asp_buf_h * 2;
++	asp_pt_pending = (unsigned char *)malloc(asp_pt_size);
++	asp_pt_work    = (unsigned char *)malloc(asp_pt_size);
++	if (!asp_pt_pending || !asp_pt_work) {
++		free(asp_pt_pending); free(asp_pt_work);
++		asp_pt_pending = asp_pt_work = NULL;
++		fprintf(stderr, "asp: present thread: allocation failed, presenting inline\n");
++		return;
++	}
++	asp_pt_have = 0;
++	asp_pt_stop = 0;
++	if (pthread_create(&asp_pt, NULL, asp_present_worker, NULL) != 0) {
++		free(asp_pt_pending); free(asp_pt_work);
++		asp_pt_pending = asp_pt_work = NULL;
++		fprintf(stderr, "asp: present thread: could not start, presenting inline\n");
++		return;
++	}
++	asp_pt_running = 1;
++	asp_present_thread_live = 1;
++	fprintf(stderr, "asp: present thread running, %u-byte hand-off\n",
++		(unsigned)asp_pt_size);
++}
++
++static void asp_present_thread_stop()
++{
++	if (!asp_pt_running) return;
++	pthread_mutex_lock(&asp_pt_lock);
++	asp_pt_stop = 1;
++	pthread_cond_signal(&asp_pt_cond);
++	pthread_mutex_unlock(&asp_pt_lock);
++	pthread_join(asp_pt, NULL);
++	asp_pt_running = 0;
++	free(asp_pt_pending); free(asp_pt_work);
++	asp_pt_pending = asp_pt_work = NULL;
++}
++
++static void asp_present()
++{
++	if (!asp_buffer) return;
++	if (!asp_pt_running) {
++		asp_present_from(asp_buffer);
++		return;
++	}
++	pthread_mutex_lock(&asp_pt_lock);
++	memcpy(asp_pt_pending, asp_buffer, asp_pt_size);
++	asp_pt_have = 1;
++	pthread_cond_signal(&asp_pt_cond);
++	pthread_mutex_unlock(&asp_pt_lock);
++}
++
+ // ---------------------------------------------------------------------------
+ // VidOut
+ // ---------------------------------------------------------------------------
+@@ -145,6 +258,10 @@ static int AspInit()
+ 	asp_buf_w = nVidImageWidth;
+ 	asp_buf_h = nVidImageHeight;
+ 
++	// A re-init reallocates the buffer, possibly at a new size; the worker
++	// must not be holding hand-off buffers sized for the old one.
++	asp_present_thread_stop();
++
+ 	free(asp_buffer);
+ 	asp_buffer = (unsigned char *)calloc(1, (size_t)asp_buf_w * asp_buf_h * nVidImageBPP);
+ 	if (!asp_buffer) {
+@@ -165,6 +282,9 @@ static int AspInit()
+ 	if (asp_fb_first_frame_setup())
+ 		asp_fb_bench();
+ 
++	// After the bench, so the measurement is not shared with a running worker.
++	asp_present_thread_start();
++
+ 	fprintf(stderr, "asp: game %dx%d aspect %d:%d%s%s -> buffer %dx%d RGB565\n",
+ 		gw, gh, xa, ya,
+ 		asp_rotated ? " rotated" : "", asp_flipped ? " flipped" : "",
+@@ -175,6 +295,8 @@ static int AspInit()
+ 
+ static int AspExit()
+ {
++	// Stop the worker before the framebuffer it writes to goes away.
++	asp_present_thread_stop();
+ 	asp_fb_close();
+ 	free(asp_buffer);
+ 	asp_buffer = NULL;
+-- 
+2.43.0
+

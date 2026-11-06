@@ -1,0 +1,20 @@
+ng
+/mnt/hdisk/ASPh/hack/bin/fba/fba029743
+fc
+/mnt/hdisk/ASPh/hack/bin/fc/fc_emu.dge
+gba
+/mnt/hdisk/ASPh/hack/bin/gba/gba_emu.dge
+ra
+/mnt/hdisk/ASPh/hack/bin/ra/mplayer -ao pcm:fast:file=/dev/snd/actsnd -vo fbdev
+gbc
+/mnt/hdisk/ASPh/hack/bin/gbc/gbcgb_emu.dge
+md
+/mnt/hdisk/ASPh/hack/bin/md/md_emu.dge
+sfc
+/mnt/hdisk/ASPh/hack/bin/sfc/sfc_emu.dge
+fba
+/mnt/hdisk/ASPh/hack/bin/fba/fba029743
+fbneo
+/mnt/hdisk/ASPh/retroarch/bin/fbneo
+fbax
+/mnt/hdisk/ASPh/hack/bin/fba/fba_v23.dge

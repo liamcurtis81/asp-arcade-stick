@@ -1,0 +1,25 @@
+#Language list, tag is the font and strings dir
+
+#Language list, tag is the font and strings dir
+
+[English]=<NeoGeo>
+
+#德语
+[German]=<Capcom Play System>
+
+#法语
+[French]=<Arcade Classics>
+
+#意大利语
+[Italian]=<Brawlers>
+
+#俄语
+[Russian]=<Shooters>
+
+#葡萄牙语
+[Portuguese]=<Mega Drive>
+
+#西班牙语
+[Spanish]=<SNES>
+
+[Simplified_Chinese]=<NES>

@@ -1,0 +1,276 @@
+From 174286c9d1d451477066da8ba19d4a249fbd76e6 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 31 Oct 2026 16:59:06 +0000
+Subject: [PATCH 10/21] ASP: Data East layer/alpha-mix fast paths, Moo
+ Mesa/Bucky sound waits (ZetSetIdleLoopN), Xexex draw split
+
+Harness: Night Slashers and Captain America frames and sound identical before/after; Moo Mesa, Bucky
+and the other Z80-hook games identical with skips off/on.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/burn/asp_dsplit.h              | 22 ++++++++++++++++
+ src/burn/drv/dataeast/d_deco32.cpp |  7 ++++++
+ src/burn/drv/dataeast/deco16ic.cpp | 15 +++++++++++
+ src/burn/drv/konami/d_moo.cpp      | 20 +++++++++++++++
+ src/burn/drv/konami/d_xexex.cpp    |  9 +++++++
+ src/cpu/z80_intf.cpp               | 40 +++++++++++++++++++++---------
+ src/cpu/z80_intf.h                 |  1 +
+ 7 files changed, 102 insertions(+), 12 deletions(-)
+ create mode 100644 src/burn/asp_dsplit.h
+
+diff --git a/src/burn/asp_dsplit.h b/src/burn/asp_dsplit.h
+new file mode 100644
+index 0000000..1733fa5
+--- /dev/null
++++ b/src/burn/asp_dsplit.h
+@@ -0,0 +1,22 @@
++// ASP: per-stage timing of a driver's draw, reported in the exit log as
++// "draw split". Usage: ASP_DS_BEGIN at the top of the draw, ASP_DS(k, "name")
++// after each stage. Compiles to nothing outside the stick build.
++#ifndef ASP_DSPLIT_H
++#define ASP_DSPLIT_H
++#ifdef BUILD_ASP
++#include <time.h>
++extern unsigned long long asp_ds_t[8];
++extern unsigned int asp_ds_frames;
++extern const char *asp_ds_name[8];
++static inline unsigned long long asp_ds_now(void)
++{
++	struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
++	return (unsigned long long)ts.tv_sec * 1000000000ull + ts.tv_nsec;
++}
++#define ASP_DS_BEGIN unsigned long long asp_ds_prev = asp_ds_now(); asp_ds_frames++
++#define ASP_DS(k, name) do { unsigned long long n_ = asp_ds_now(); asp_ds_t[k] += n_ - asp_ds_prev; asp_ds_prev = n_; asp_ds_name[k] = name; } while (0)
++#else
++#define ASP_DS_BEGIN do {} while (0)
++#define ASP_DS(k, name) do {} while (0)
++#endif
++#endif
+diff --git a/src/burn/drv/dataeast/d_deco32.cpp b/src/burn/drv/dataeast/d_deco32.cpp
+index 79935bf..caeeeda 100644
+--- a/src/burn/drv/dataeast/d_deco32.cpp
++++ b/src/burn/drv/dataeast/d_deco32.cpp
+@@ -2989,6 +2989,13 @@ static void mixDualAlphaSprites(INT32 mixAlphaTilemap, INT32 drawAlphaTilemap)
+ 
+ 			UINT16 priColAlphaPal0=sprite0[x];
+ 			UINT16 priColAlphaPal1=sprite1[x];
++#ifdef BUILD_ASP
++			// ASP: no sprite pixel in either buffer and no alpha-tilemap pixel:
++			// every branch below is skipped, so skip the work of reaching them.
++			if (!(priColAlphaPal0 & 0xff) && !(priColAlphaPal1 & 0xff) &&
++				!(mixAlphaTilemap && drawAlphaTilemap && (alphaTilemap[x] & 0xf)))
++				continue;
++#endif
+ 			UINT16 pri0=(priColAlphaPal0&0x6000)>>13;
+ 			UINT16 pri1=(priColAlphaPal1&0x6000)>>13;
+ 			UINT16 col0=((priColAlphaPal0&0x1f00)>>8);
+diff --git a/src/burn/drv/dataeast/deco16ic.cpp b/src/burn/drv/dataeast/deco16ic.cpp
+index 32acf72..c8add34 100644
+--- a/src/burn/drv/dataeast/deco16ic.cpp
++++ b/src/burn/drv/dataeast/deco16ic.cpp
+@@ -412,6 +412,21 @@ void deco16_draw_layer_by_line(INT32 draw_start, INT32 draw_end, INT32 tmap, UIN
+ 
+ 				if (flipx) flipx = smask;
+ 
++#ifdef BUILD_ASP
++				// ASP: a tile wholly on screen needs no per-pixel bounds test.
++				// Same pixels, same order, same writes as the loop below.
++				if (sx >= 0 && sx + size <= nScreenWidth) {
++					UINT16 *d = dest + y * nScreenWidth + sx;
++					UINT8 *pm = deco16_prio_map + y * 512 + sx;
++					for (INT32 xxx = 0; xxx < size; xxx++) {
++						INT32 pxl = src[xxx ^ flipx];
++						if (tmask[pxl]) continue;
++						d[xxx] = pxl + color;
++						pm[xxx] = priority;
++					}
++					continue;
++				}
++#endif
+ 				for (INT32 xxx = 0; xxx < size; xxx++) {
+ 					if ((xxx + sx) < 0 || (xxx + sx) >= nScreenWidth) continue;
+ 
+diff --git a/src/burn/drv/konami/d_moo.cpp b/src/burn/drv/konami/d_moo.cpp
+index 066481d..37fb3c3 100644
+--- a/src/burn/drv/konami/d_moo.cpp
++++ b/src/burn/drv/konami/d_moo.cpp
+@@ -29,6 +29,24 @@ static AspIdle68k asp_idle_bucky = { 3, { 0x14c2, 0x14c8, 0x14ca }, { 20, 8, 10
+ 	{ 0x2079, 0x3010, 0x6bf6 }, asp_bucky_again, 0 };
+ static AspIdle68k *asp_moo_idle = NULL;
+ 
++// ASP sound Z80 wait (see ZetSetIdleLoopN): poll the YM2151 timer flag through
++// a subroutine:  CALL status ; LD A,($ec01) ; AND 2 ; RET ; JR Z,back
++static INT32 asp_moo_zwait(void)
++{
++	return !(BurnYM2151Read() & 2);
++}
++static const INT32 asp_moo_zcyc[5] = { 17, 13, 7, 10, 12 };
++static const UINT16 asp_moomesa_zpc[5] = { 0x00ae, 0x0c43, 0x0c46, 0x0c48, 0x00b1 };   // 151a07.f5
++static const UINT16 asp_bucky_zpc[5]   = { 0x00a8, 0x0bce, 0x0bd1, 0x0bd3, 0x00ab };   // 173a07.f5
++static void asp_moo_zset(const UINT16 *pc)
++{
++#ifdef BUILD_ASP
++	static const UINT8 want[5][2] = { { 0xcd, 0 }, { 0x3a, 0 }, { 0xe6, 0 }, { 0xc9, 0 }, { 0x28, 0 } };
++	for (INT32 j = 0; j < 5; j++) if (ZetReadByte(pc[j]) != want[j][0]) return;
++	ZetSetIdleLoopN(0, 5, pc, asp_moo_zcyc, asp_moo_zwait);
++#endif
++}
++
+ static UINT8 *AllMem;
+ static UINT8 *Drv68KROM;
+ static UINT8 *DrvZ80ROM;
+@@ -1036,6 +1054,7 @@ static INT32 MooInit()
+ 	ZetMapMemory(DrvZ80RAM,			0xc000, 0xdfff, MAP_RAM);
+ 	ZetSetWriteHandler(moo_sound_write);
+ 	ZetSetReadHandler(moo_sound_read);
++	asp_moo_zset(asp_moomesa_zpc);
+ 	ZetClose();
+ 
+ 	EEPROMInit(&moo_eeprom_interface);
+@@ -1127,6 +1146,7 @@ static INT32 BuckyInit()
+ 	ZetMapMemory(DrvZ80RAM,			0xc000, 0xdfff, MAP_RAM);
+ 	ZetSetWriteHandler(moo_sound_write);
+ 	ZetSetReadHandler(moo_sound_read);
++	asp_moo_zset(asp_bucky_zpc);
+ 	ZetClose();
+ 
+ 	EEPROMInit(&moo_eeprom_interface);
+diff --git a/src/burn/drv/konami/d_xexex.cpp b/src/burn/drv/konami/d_xexex.cpp
+index 5d36553..01f1f17 100644
+--- a/src/burn/drv/konami/d_xexex.cpp
++++ b/src/burn/drv/konami/d_xexex.cpp
+@@ -9,6 +9,7 @@
+ #include "k054539.h"
+ #include "eeprom.h"
+ #include "asp_idle.h"
++#include "asp_dsplit.h"
+ 
+ // ASP sound Z80 wait (see ZetSetIdleLoop): 067eaa05.4e
+ //   BIT 1,(HL=0xec01) ; JP Z,self   - YM2151 timer B flag
+@@ -670,6 +671,7 @@ static void DrvPaletteRecalc()
+ 
+ static INT32 DrvDraw()
+ {
++	ASP_DS_BEGIN;
+ 	DrvPaletteRecalc();
+ 
+ 	INT32 layer[4], bg_colorbase, plane, alpha;
+@@ -697,20 +699,24 @@ static INT32 DrvDraw()
+ 	konami_sortlayers4(layer, layerpri);
+ 
+ 	KonamiClearBitmaps(0);
++	ASP_DS(0, "palette+clear");
+ 
+ 	for (plane = 0; plane < 4; plane++)
+ 	{
+ 		if (layer[plane] < 0)
+ 		{
+ 			if (nSpriteEnable & 2) K053250Draw(0, bg_colorbase, 0, 1 << plane);
++			ASP_DS(1, "k053250-road");
+ 		}
+ 		else if (!enable_alpha || layer[plane] != 1)
+ 		{
+ 			if (nBurnLayer & (1 << layer[plane])) K056832Draw(layer[plane], 0, 1 << plane);
++			ASP_DS(2, "tilemaps");
+ 		}
+ 	}
+ 
+ 	if (nSpriteEnable & 1) K053247SpritesRender();
++	ASP_DS(3, "sprites");
+ 
+ 	if (enable_alpha)
+ 	{
+@@ -727,9 +733,12 @@ static INT32 DrvDraw()
+ 		}
+ 	}
+ 
++	ASP_DS(4, "alpha-layer");
+ 	if (nBurnLayer & 8) K056832Draw(0, 0, 0);
++	ASP_DS(5, "text-layer");
+ 
+ 	KonamiBlendCopy(DrvPalette);
++	ASP_DS(6, "blend-copy");
+ 
+ 	return 0;
+ }
+diff --git a/src/cpu/z80_intf.cpp b/src/cpu/z80_intf.cpp
+index 89118d8..8345383 100644
+--- a/src/cpu/z80_intf.cpp
++++ b/src/cpu/z80_intf.cpp
+@@ -395,31 +395,47 @@ static INT32 ZetRunReal(INT32 nCycles);
+ // outside ZetRun), so inside one call the loop cannot end until the cycles do.
+ extern int asp_idle_skips;
+ extern unsigned long long asp_idle_skippedz80;
+-static struct { UINT16 pc[2]; INT32 cyc[2]; INT32 (*again)(void); } asp_zidle[MAX_Z80];
+-void ZetSetIdleLoop(INT32 nCPU, UINT16 pc0, INT32 cyc0, UINT16 pc1, INT32 cyc1, INT32 (*again)(void))
++static struct { INT32 n; UINT16 pc[6]; INT32 cyc[6]; INT32 (*again)(void); } asp_zidle[MAX_Z80];
++void ZetSetIdleLoopN(INT32 nCPU, INT32 n, const UINT16 *pcs, const INT32 *cycs, INT32 (*again)(void))
+ {
+-	asp_zidle[nCPU].pc[0] = pc0; asp_zidle[nCPU].cyc[0] = cyc0;
+-	asp_zidle[nCPU].pc[1] = pc1; asp_zidle[nCPU].cyc[1] = cyc1;
++	if (n < 2 || n > 6) return;
++	asp_zidle[nCPU].n = n;
++	for (INT32 j = 0; j < n; j++) { asp_zidle[nCPU].pc[j] = pcs[j]; asp_zidle[nCPU].cyc[j] = cycs[j]; }
+ 	asp_zidle[nCPU].again = again;
+ }
++void ZetSetIdleLoop(INT32 nCPU, UINT16 pc0, INT32 cyc0, UINT16 pc1, INT32 cyc1, INT32 (*again)(void))
++{
++	const UINT16 pcs[2] = { pc0, pc1 };
++	const INT32 cycs[2] = { cyc0, cyc1 };
++	ZetSetIdleLoopN(nCPU, 2, pcs, cycs, again);
++}
+ #endif
+ 
+ INT32 ZetRun(INT32 nCycles)
+ {
+ #ifdef BUILD_ASP
+ 	if (nCycles > 64 && asp_idle_skips && nOpenedCPU >= 0 && asp_zidle[nOpenedCPU].again) {
+-		const UINT16 p0 = asp_zidle[nOpenedCPU].pc[0], p1 = asp_zidle[nOpenedCPU].pc[1];
+-		const INT32 c0 = asp_zidle[nOpenedCPU].cyc[0], c1 = asp_zidle[nOpenedCPU].cyc[1];
+-		const INT32 iter = c0 + c1;
++		const INT32 n = asp_zidle[nOpenedCPU].n;
++		const UINT16 *P = asp_zidle[nOpenedCPU].pc;
++		const INT32 *C = asp_zidle[nOpenedCPU].cyc;
++		INT32 iter = 0;
++		for (INT32 j = 0; j < n; j++) iter += C[j];
+ 		INT32 ran = ZetRunReal(1);          // takes any pending interrupt first
+ 		INT32 rem = nCycles - ran;
+ 		UINT32 pc = ZetGetPC(-1);
+-		if (pc == p1 && rem > c1 && asp_zidle[nOpenedCPU].again()) {
+-			INT32 r = ZetRunReal(c1);       // finish this pass for real: lands on p0
+-			ran += r; rem -= r;
+-			pc = ZetGetPC(-1);
++		for (INT32 j = 1; j < n; j++) {
++			if (pc == P[j]) {               // mid-pass: finish it for real, lands on P[0]
++				INT32 to_top = 0;
++				for (INT32 m = j; m < n; m++) to_top += C[m];
++				if (rem > to_top && asp_zidle[nOpenedCPU].again()) {
++					INT32 r = ZetRunReal(to_top);
++					ran += r; rem -= r;
++					pc = ZetGetPC(-1);
++				}
++				break;
++			}
+ 		}
+-		if (pc == p0 && rem > iter && asp_zidle[nOpenedCPU].again()) {
++		if (pc == P[0] && rem > iter && asp_zidle[nOpenedCPU].again()) {
+ 			INT32 k = (rem - 1) / iter;
+ 			nZetCyclesTotal += k * iter;    // as ZetIdle
+ 			asp_idle_skippedz80 += k * iter;
+diff --git a/src/cpu/z80_intf.h b/src/cpu/z80_intf.h
+index e0dc753..8161189 100644
+--- a/src/cpu/z80_intf.h
++++ b/src/cpu/z80_intf.h
+@@ -55,6 +55,7 @@ INT32 ZetScan(INT32 nAction);
+ INT32 ZetRun(INT32 nCycles);
+ #ifdef BUILD_ASP
+ void ZetSetIdleLoop(INT32 nCPU, UINT16 pc0, INT32 cyc0, UINT16 pc1, INT32 cyc1, INT32 (*again)(void));
++void ZetSetIdleLoopN(INT32 nCPU, INT32 n, const UINT16 *pcs, const INT32 *cycs, INT32 (*again)(void));
+ #endif
+ INT32 ZetRun(INT32 nCPU, INT32 nCycles);
+ void ZetRunEnd();
+-- 
+2.43.0
+

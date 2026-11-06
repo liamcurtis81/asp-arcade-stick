@@ -1,0 +1,50 @@
+===== cpu info =====
+scaling_governor = performance
+scaling_cur_freq = 1128000
+scaling_min_freq = 1128000
+scaling_max_freq = 1128000
+cpuinfo_cur_freq = 1128000
+cpuinfo_min_freq = 240000
+cpuinfo_max_freq = 1308000
+scaling_available_frequencies = 240000 708000 900000 1032000 1128000 1248000 1308000 
+scaling_available_governors = conservative ondemand userspace interactive performance 
+online cpus = 0-2
+present cpus = 0-3
+--- loadavg ---
+1.79 0.57 0.20 1/81 1550
+--- cpuinfo ---
+Processor	: ARMv7 Processor rev 1 (v7l)
+processor	: 0
+BogoMIPS	: 1022.18
+
+processor	: 1
+BogoMIPS	: 1022.18
+
+processor	: 2
+BogoMIPS	: 1022.18
+
+Features	: swp half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 
+CPU implementer	: 0x41
+CPU architecture: 7
+CPU variant	: 0x0
+
+Hardware	: gs702c
+Revision	: 0000
+Serial		: b57e0b7ba67bc7ae
+--- top 8 by cpu, before launch ---
+Mem: 139840K used, 122304K free, 0K shrd, 1K buff, 5K cached
+CPU:  3.1% usr  0.0% sys  0.0% nic 96.8% idle  0.0% io  0.0% irq  0.0% sirq
+Load average: 1.79 0.57 0.20 1/82 1553
+  PID  PPID USER     STAT   VSZ %MEM CPU %CPU COMMAND
+ 1364  1167 0        S     126m 49.4   2  1.5 ././QUI_G1 
+ 1552  1533 0        R     2240  0.8   2  1.5 busybox top -b -n 1 
+ 1077  1060 0        S    51252 19.5   2  0.0 .//misc/SNK_MAIN 
+ 1517  1364 0        S    36508 13.9   2  0.0 /mnt/hdisk/ASPh/biosme metamrph 
+ 1161  1128 0        S    35952 13.7   0  0.0 ././splash 
+ 1553  1533 0        S     2244  0.8   0  0.0 busybox head -16 
+ 1167  1161 0        S     2240  0.8   1  0.0 busybox sh /mnt/data/usb/real_dmen
+ 1531  1168 0        S     2240  0.8   0  0.0 busybox sleep 1 
+ 1098     1 0        S      972  0.3   3  0.0 /system/bin/sh 
+ 1168  1167 0        S      968  0.3   1  0.0 /system/bin/sh /mnt/data/usb/lang_
+ 1533  1517 0        S      968  0.3   2  0.0 /system/bin/sh /mnt/hdisk/ASPh/ret
+ 1128  1077 0        S      964  0.3   2  0.0 /system/bin/sh /mnt/data/usb/dmenu

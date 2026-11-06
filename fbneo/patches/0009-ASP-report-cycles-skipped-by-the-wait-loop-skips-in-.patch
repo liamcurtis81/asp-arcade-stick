@@ -1,0 +1,94 @@
+From 5ac0fa5749c37c88c75776d8bd920d486249c34d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 31 Oct 2026 15:59:13 +0000
+Subject: [PATCH 09/21] ASP: report cycles skipped by the wait-loop skips in
+ the exit log
+
+All ten Konami games proved identical (frames to 2000, sound to 2000 frames) with skips off vs on.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/burn/drv/konami/asp_idle.h | 4 ++++
+ src/burner/pi/main_pi.cpp      | 1 +
+ src/burner/pi/run_pi.cpp       | 9 +++++++++
+ src/cpu/z80_intf.cpp           | 2 ++
+ 4 files changed, 16 insertions(+)
+
+diff --git a/src/burn/drv/konami/asp_idle.h b/src/burn/drv/konami/asp_idle.h
+index d917b27..677e281 100644
+--- a/src/burn/drv/konami/asp_idle.h
++++ b/src/burn/drv/konami/asp_idle.h
+@@ -22,6 +22,7 @@
+ 
+ #ifdef BUILD_ASP
+ extern int asp_idle_skips;          // asp_tuning.txt "idle_skips", default 1
++extern unsigned long long asp_idle_skipped68k; // cycles skipped, for the exit report
+ #else
+ static const int asp_idle_skips = 0;
+ #endif
+@@ -74,6 +75,9 @@ static inline INT32 asp_idle68k_run(AspIdle68k *L, INT32 nCycles)
+ 	if (pc == L->pc[0] && rem > iter && L->again()) {
+ 		INT32 k = (rem - 1) / iter;     // whole passes, leaving at least 1 cycle real
+ 		SekIdle(k * iter);
++#ifdef BUILD_ASP
++		asp_idle_skipped68k += k * iter;
++#endif
+ 		ran += k * iter;
+ 		rem -= k * iter;
+ 	}
+diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
+index b2a4ea0..e28cd41 100755
+--- a/src/burner/pi/main_pi.cpp
++++ b/src/burner/pi/main_pi.cpp
+@@ -306,6 +306,7 @@ extern int asp_present_thread;   // vid_asp.cpp
+ extern int asp_fast_tiles;       // k056832.cpp
+ extern int asp_z80_idle;         // d_mystwarr.cpp
+ int asp_idle_skips = 1;          // konami/asp_idle.h: 68000 wait-loop skips
++unsigned long long asp_idle_skipped68k = 0, asp_idle_skippedz80 = 0;
+ extern unsigned char *asp_reset_ptr;
+ extern int asp_reset_pending;
+ 
+diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
+index 0c8a640..c3c41c0 100644
+--- a/src/burner/pi/run_pi.cpp
++++ b/src/burner/pi/run_pi.cpp
+@@ -669,6 +669,15 @@ static void asp_log_framerate(unsigned int ticks, int emulated, int rendered)
+ 			}
+ 		}
+ 	}
++	{
++		extern unsigned long long asp_idle_skipped68k, asp_idle_skippedz80;
++		extern int asp_idle_skips;
++		if (asp_idle_skipped68k || asp_idle_skippedz80) {
++			fprintf(f, "----- wait-loop skips (idle_skips %d): 68000 %.0f k cycles/frame, Z80 %.0f k cycles/frame skipped -----\n",
++				asp_idle_skips, asp_idle_skipped68k / 1e3 / (nFramesEmulated ? nFramesEmulated : 1),
++				asp_idle_skippedz80 / 1e3 / (nFramesEmulated ? nFramesEmulated : 1));
++		}
++	}
+ 	{
+ 		// Generic per-driver draw split (asp_ds_* filled by a driver's draw).
+ 		extern unsigned long long asp_ds_t[8];
+diff --git a/src/cpu/z80_intf.cpp b/src/cpu/z80_intf.cpp
+index 87cd8c0..89118d8 100644
+--- a/src/cpu/z80_intf.cpp
++++ b/src/cpu/z80_intf.cpp
+@@ -394,6 +394,7 @@ static INT32 ZetRunReal(INT32 nCycles);
+ // both only change between run calls (sound rendering and timer events happen
+ // outside ZetRun), so inside one call the loop cannot end until the cycles do.
+ extern int asp_idle_skips;
++extern unsigned long long asp_idle_skippedz80;
+ static struct { UINT16 pc[2]; INT32 cyc[2]; INT32 (*again)(void); } asp_zidle[MAX_Z80];
+ void ZetSetIdleLoop(INT32 nCPU, UINT16 pc0, INT32 cyc0, UINT16 pc1, INT32 cyc1, INT32 (*again)(void))
+ {
+@@ -421,6 +422,7 @@ INT32 ZetRun(INT32 nCycles)
+ 		if (pc == p0 && rem > iter && asp_zidle[nOpenedCPU].again()) {
+ 			INT32 k = (rem - 1) / iter;
+ 			nZetCyclesTotal += k * iter;    // as ZetIdle
++			asp_idle_skippedz80 += k * iter;
+ 			ran += k * iter; rem -= k * iter;
+ 		}
+ 		if (rem > 0) ran += ZetRunReal(rem);
+-- 
+2.43.0
+

@@ -1,0 +1,376 @@
+PROPOSED ARCADE PAGE ORDERING
+========================================================================
+Sorted by real title, regional qualifiers ignored for the sort.
+Entries with no recoverable title (the snd/d variants) go last.
+
+### Neo Geo  (150 entries, 146 change position)
+    0  2020bb       2020 Super Baseball (set 1)
+    1  3countb      3 Count Bout / Fire Suplex (NGM-043)(NGH-043)
+    2  sonicwi2     Aero Fighters 2 / Sonic Wings 2
+    3  sonicwi3     Aero Fighters 3 / Sonic Wings 3
+    4  aodk         Aggressors of Dark Kombat / Tsuukai GANGAN Koushinkyoku (ADM-0
+    5  alpham2      Alpha Mission II / ASO II - Last Guardian (NGM-007)(NGH-007)
+    6  androdun     Andro Dunos (NGM-049)(NGH-049)
+    7  aof          Art of Fighting / Ryuuko no Ken (NGM-044)(NGH-044)
+    8  aof2         Art of Fighting 2 / Ryuuko no Ken 2 (NGM-056)
+    9  aof3         Art of Fighting 3 - The Path of the Warrior / Art of Fighting 
+   10  b2b          Bang Bang Busters (2010 NCI release)
+   11  bstars2      Baseball Stars 2
+   12  bstars       Baseball Stars Professional (NGM-002)
+   13  flipshot     Battle Flip Shot
+   14  blazstar     Blazing Star
+   15  bjourney     Blue's Journey / Raguy (ALM-001)(ALH-001)
+   16  breakers     Breakers
+   17  breakrev     Breakers Revenge
+   18  burningf     Burning Fight (NGM-018)(NGH-018)
+   19  ctomaday     Captain Tomaday
+   20  ironclad     Choutetsu Brikin'ger - Iron clad (Prototype)
+   21  crsword      Crossed Swords (ALM-002)(ALH-002)
+   22  cyberlip     Cyber-Lip (NGM-010)
+   23  diggerma     Digger Man
+   24  doubledr     Double Dragon (Neo-Geo)
+   25  eightman     Eight Man (NGM-025)(NGH-025)
+   26  kabukikl     Far East of Eden - Kabuki Klash / Tengai Makyou - Shin Den
+   27  fatfury2     Fatal Fury 2 / Garou Densetsu 2 - arata-naru tatakai (NGM-047)
+   28  fatfury3     Fatal Fury 3 - Road to the Final Victory / Garou Densetsu 3 - 
+   29  fatfury1     Fatal Fury - King of Fighters / Garou Densetsu - shukumei no t
+   30  fatfursp     Fatal Fury Special / Garou Densetsu Special (set 1)(NGM-058)(N
+   31  fightfev     Fight Fever (set 1)
+   32  fbfrenzy     Football Frenzy (NGM-034)(NGH-034)
+   33  galaxyfg     Galaxy Fight - Universal Warriors
+   34  gpilots      Ghost Pilots (NGM-020)(NGH-020)
+   35  ghostlop     Ghostlop (prototype)
+   36  goalx3       Goal! Goal! Goal!
+   37  gururin      Gururin
+   38  irrmaze      The Irritating Maze / Ultra Denryu Iraira Bou
+   39  karnovr      Karnov's Revenge / Fighter's History Dynamite
+   40  kof94        The King of Fighters '94 (NGM-055)(NGH-055)
+   41  kof95        The King of Fighters '95 (NGM-084)
+   42  kof96        The King of Fighters '96 (NGM-214)
+   43  kof98        The King of Fighters '98 - The Slugfest / King of Fighters '98
+   44  kotm         King of the Monsters (set 1)
+   45  kotm2        King of the Monsters 2 - The Next Thing (NGM-039)(NGH-039)
+   46  kizuna       Kizuna Encounter - Super Tag Battle / Fu'un Super Tag Battle
+   47  lastblad     The Last Blade / Bakumatsu Roman - Gekka no Kenshi (NGM-2340)
+   48  lastbld2     The Last Blade 2 / Bakumatsu Roman - Dai Ni Maku Gekka no Kens
+   49  lasthope     Last Hope (bootleg AES to MVS conversion, no coin support)
+   50  lhcdb        Last Hope CD Beta (Neo CD conversion)
+   51  lresort      Last Resort
+   52  lbowling     League Bowling (NGM-019)(NGH-019)
+   53  magdrop2     Magical Drop II
+   54  magdrop3     Magical Drop III
+   55  maglord      Magician Lord (NGM-005)
+   56  mslug2       Metal Slug 2 - Super Vehicle-001/II (NGM-2410) (NGH-2410)
+   57  mslug        Metal Slug - Super Vehicle-001
+   58  mslugx       Metal Slug X - Super Vehicle-001 (NGM-2500)(NGH-2500)
+   59  miexchng     Money Puzzle Exchanger / Money Idol Exchanger
+   60  mutnat       Mutation Nation (NGM-014)(NGH-014)
+   61  nam1975      NAM-1975 (NGM-001)(NGH-001)
+   62  kof97        need AES for practice mode
+   63  neobombe     Neo Bomberman
+   64  neodrift     Neo Drift Out - New Technology
+   65  neomrdo      Neo Mr. Do!
+   66  neopong      Neo Pong (ver 1.1)
+   67  turfmast     Neo Turf Masters / Big Tournament Golf
+   68  neocup98     Neo-Geo Cup '98 - The Road to the Victory
+   69  ncombat      Ninja Combat (NGM-009)
+   70  ncommand     Ninja Commando
+   71  ninjamas     Ninja Master's - haoh-ninpo-cho
+   72  overtop      Over Top
+   73  panicbom     Panic Bomber
+   74  pgoal        Pleasure Goal / Futsal - 5 on 5 Mini Soccer (NGM-219)
+   75  popbounc     Pop 'n Bounce / Gapporin
+   76  pspikes2     Power Spikes II (NGM-068)
+   77  pulstar      Pulstar
+   78  pbobblen     Puzzle Bobble / Bust-A-Move (Neo-Geo) (NGM-083)
+   79  pbobbl2n     Puzzle Bobble 2 / Bust-A-Move Again (Neo-Geo)
+   80  puzzledp     Puzzle De Pon!
+   81  puzzldpr     Puzzle De Pon! R!
+   82  joyjoy       Puzzled / Joy Joy Kid (NGM-021)(NGH-021)
+   83  ragnagrd     Ragnagard / Shin-Oh-Ken
+   84  rbff1        Real Bout Fatal Fury / Real Bout Garou Densetsu (NGM-095)(NGH-
+   85  rbff2        Real Bout Fatal Fury 2 - The Newcomers / Real Bout Garou Dense
+   86  ridhero      Riding Hero (NGM-006)(NGH-006)
+   87  roboarmy     Robo Army (set 1)
+   88  samsho       Samurai Shodown / Samurai Spirits (NGM-045)
+   89  samsho2      Samurai Shodown II / Shin Samurai Spirits - Haohmaru jigokuhen
+   90  samsho3      Samurai Shodown III / Samurai Spirits - Zankurou Musouken (NGM
+   91  samsho4      Samurai Shodown IV - Amakusa's Revenge / Samurai Spirits - Ama
+   92  samsh5pf     Samurai Shodown V Perfect  [?]
+   93  savagere     Savage Reign / Fu'un Mokushiroku - kakutou sousei
+   94  rbffspec     Select Geese Howard with portrait, press 'B+C' to select EX ch
+   95  sengoku      Sengoku / Sengoku Denshou (NGM-017)(NGH-017)
+   96  sengoku2     Sengoku 2 / Sengoku Denshou 2
+   97  shocktro     Shock Troopers (set 1)
+   98  shocktr2     Shock Troopers - 2nd Squad
+   99  socbrawl     Soccer Brawl (NGM-031)
+  100  spinmast     Spin Master / Miracle Adventure
+  101  stakwin      Stakes Winner / Stakes Winner - GI kinzen seiha e no michi
+  102  stakwin2     Stakes Winner 2
+  103  strhoop      Street Hoop / Street Slam / Dunk Dream (DEM-004) (DEH-004)
+  104  sbp          Super Bubble Pop
+  105  sdodgeb      Super Dodge Ball / Kunio no Nekketsu Toukyuu Densetsu
+  106  ssideki      Super Sidekicks / Tokuten Ou
+  107  ssideki2     Super Sidekicks 2 - The World Championship / Tokuten Ou 2 - re
+  108  ssideki3     Super Sidekicks 3 - The Next Glory / Tokuten Ou 3 - eikou e no
+  109  superspy     The Super Spy (NGM-011)(NGH-011)
+  110  tws96        Tecmo World Soccer '96
+  111  trally       Thrash Rally (ALM-003)(ALH-003)
+  112  tophuntr     Top Hunter - Roddy & Cathy (NGM-046)
+  113  tpgolf       Top Player's Golf (NGM-003)(NGH-003)
+  114  twinspri     Twinkle Star Sprites
+  115  ssideki4     The Ultimate 11 - The SNK Football Championship / Tokuten Ou -
+  116  viewpoin     Viewpoint
+  117  vliner       V-Liner (v0.7a)
+  118  gowcaizr     Voltage Fighter - Gowcaizer / Choujin Gakuen Gowcaizer
+  119  wakuwak7     Waku Waku 7
+  120  wjammers     Windjammers / Flying Power Disc
+  121  wh1          World Heroes (ALM-005)
+  122  wh2          World Heroes 2 (ALM-006)(ALH-006)
+  123  wh2j         World Heroes 2 Jet (ADM-007)(ADH-007)
+  124  whp          World Heroes Perfect
+  125  zedblade     Zed Blade / Operation Ragnarok
+  126  zintrckb     Zintrick / Oshidashi Zentrix (hack / bootleg)
+  127  zupapa       Zupapa!
+  128  bangbsnd     (no title found)
+  129  ganryusnd    (no title found)
+  130  garousnd     (no title found)
+  131  jockeysnd    (no title found)
+  132  kof00snd     (no title found)
+  133  kof01snd     (no title found)
+  134  kof02snd     (no title found)
+  135  kof03snd     (no title found)
+  136  kof99snd     (no title found)
+  137  matrimsnd    (no title found)
+  138  mslug3snd    (no title found)
+  139  mslug4snd    (no title found)
+  140  mslug5snd    (no title found)
+  141  nitdsnd      (no title found)
+  142  pnyaasnd     (no title found)
+  143  preis2snd    (no title found)
+  144  rotdsnd      (no title found)
+  145  s1945psnd    (no title found)
+  146  sams5snd     (no title found)
+  147  sengo3snd    (no title found)
+  148  ss5spsnd     (no title found)
+  149  svcsnd       (no title found)
+
+### Capcom Play System  (71 entries, 70 change position)
+    0  1941         1941 - Counter Attack (900227 World)
+    1  1944         1944 - the loop master (000620 USA)
+    2  19xx         19XX - the war against destiny (960104 Euro)
+    3  avsp         Alien vs Predator (940520 Euro)
+    4  armwar       Armored Warriors (941024 Europe)
+    5  batcir       Battle Circuit (970319 Euro)
+    6  block        Block Block (World 911219 Joystick)
+    7  dino         Cadillacs & Dinosaurs (930201 Etc)
+    8  csclub       Capcom Sports Club (971017 Euro)
+    9  captcomm     Captain Commando (911014 Other Country)
+   10  cawing       Carrier Air Wing (U.S. navy 901012 etc)
+   11  cybots       Cyberbots - fullmetal madness (950424 Euro)
+   12  dstlk        Darkstalkers - the night warriors (940705 Euro)
+   13  dimahoo      Dimahoo (000121 Euro)
+   14  ddsom        Dungeons & Dragons - shadow over mystara (960619 Euro)
+   15  ddtod        Dungeons & Dragons - tower of doom (940412 Euro)
+   16  dynwar       Dynasty Wars (US set 1)
+   17  ecofghtr     Eco Fighters (931203 etc)
+   18  ffight       Final Fight (World, set 1)
+   19  forgottn     Forgotten Worlds (World, newer)
+   20  ghouls       Ghouls'n Ghosts (World)
+   21  gigawing     Giga Wing (990222 USA)
+   22  hsf2         Hyper Street Fighter II: The Anniversary Edition (040202 USA)
+   23  jojoba       JoJo's Bizarre Adventure: Heritage for the Future / JoJo no Ki
+   24  jojo         JoJo's Venture / JoJo no Kimyou na Bouken (Euro 990128)
+   25  kod          The King of Dragons (World 910805)
+   26  knights      Knights Of The Round (911127 Etc)
+   27  ssf2         Linkup feature not implemented
+   28  msword       Magic Sword - heroic fantasy (25.07.1990 other country)
+   29  mmatrix      Mars Matrix (000412 USA)
+   30  msh          Marvel Super Heroes (951024 Euro)
+   31  mshvsf       Marvel Super Heroes vs Street Fighter (970625 Euro)
+   32  mvsc         Marvel vs Capcom - clash of super heroes (980123 Euro)
+   33  megaman2     Mega Man 2 - The Power Fighters (960708 USA)
+   34  megaman      Mega Man - the power battle (951006 USA)
+   35  mtwins       Mega Twins (chiki chiki boys 900619 etc)
+   36  mercs        Mercs (900302 etc)
+   37  nemo         Nemo (90 11 30 etc)
+   38  nwarr        Night Warriors - darkstalkers' revenge (950316 Euro)
+   39  pang3        Pang! 3 (950601 Euro)
+   40  pnickj       Pnickies (940608 Japan)
+   41  progear      Progear (010117 USA)
+   42  punisher     The Punisher (930422 Etc)
+   43  redearth     Red Earth / War-Zard (Euro 961121)
+   44  ringdest     Ring of Destruction - slammasters II (940902 Euro)
+   45  slammast     Saturday Night Slam Masters (Slam Masters 930713 World)
+   46  sfa2         Street Fighter Alpha 2 (960229 Euro)
+   47  sfa3         Street Fighter Alpha 3 (980904 Euro)
+   48  sfa          Street Fighter Alpha - warriors' dreams (950727 Euro)
+   49  sf2ce        Street Fighter II' - Champion Edition (street Fighter
+   50  sf2hf        Street Fighter II' - Hyper Fighting (street fighter 2' T 92120
+   51  sf2          Street Fighter II - The World Warrior (910522 Etc)
+   52  sfiii2       Street Fighter III 2nd Impact: Giant Attack (USA 970930)
+   53  sfiii3       Street Fighter III 3rd Strike: Fight for the Future (Euro 9906
+   54  sfiii        Street Fighter III: New Generation (Euro 970204)
+   55  sfz2al       Street Fighter Zero 2 Alpha (960826 Asia)
+   56  strider      Strider (US set 1)
+   57  sgemf        Super Gem Fighter Mini Mix (970904 USA)
+   58  spf2t        Super Puzzle Fighter II Turbo (Super Puzzle Fighter 2 Turbo 96
+   59  ssf2t        Super Street Fighter II Turbo (super street fighter 2 X 940223
+   60  ssf2xj       Super Street Fighter II X - grand master challenge (super stre
+   61  3wonders     Three Wonders (wonder 3 910520 etc)
+   62  unsquad      U.N. Squadron (US)
+   63  vhunt2       Vampire Hunter 2 - darkstalkers revenge (970929 Japan)
+   64  vsav2        Vampire Savior 2 - the lord of vampire (970913 Japan)
+   65  vsav         Vampire Savior - the lord of vampire (970519 Euro)
+   66  varth        Varth - operation thunderstorm (920714 etc)
+   67  wof          Warriors Of Fate (921002 Etc)
+   68  willow       Willow (World)
+   69  xmcota       X-Men - children of the atom (950331 Euro)
+   70  xmvsf        X-Men vs Street Fighter (961004 Euro)
+
+### Arcade Classics  (27 entries, 20 change position)
+    0  centiped     2 Player version
+    1  alphamis     Alpha Mission
+    2  dkongjr      Bad Colours
+    3  btime        BurgerTime  [?]
+    4  digdug       Dig Dug (rev 2)
+    5  dkong        Donkey Kong  [?]
+    6  frogger      Frogger
+    7  galaga       Galaga  [?]
+    8  galaxian     Galaxian  [?]
+    9  gauntlet     Gauntlet (rev 14)
+   10  gberet       Green Beret
+   11  gwar         Guerrilla War (US)
+   12  ikari        Ikari Warriors (US JAMMA)
+   13  kungfum      Kung-Fu Master
+   14  mooncrst     Moon Cresta (Nichibutsu)
+   15  mspacman     MS Pacman
+   16  pacman       Pac-Man (Midway)
+   17  popeye       Popeye (revision D)
+   18  qbert        Q*bert  [?]
+   19  invaders     Space Invaders  [?]
+   20  superpac     Super Pac-Man
+   21  szaxxon      Super Zaxxon
+   22  timeplt      Time Pilot
+   23  vangrd2      Vanguard II
+   24  zaxxon       Zaxxon
+   25  timesold     (no title found)
+   26  vanguard     (no title found)
+
+### Brawlers  (52 entries, 45 change position)
+    0  astorm       Alien Storm (set 4, World, 2 Players, FD1094 317-0154)
+    1  aliens       Aliens (World set 1)
+    2  altbeast     Altered Beast  [?]
+    3  asterix      Asterix (ver EAD)
+    4  baddudes     Bad Dudes vs. Dragonninja (US)
+    5  bucky        Bucky O'Hare (ver EAB)
+    6  captaven     Captain America and The Avengers (Asia Rev 1.4)
+    7  ctribe       The Combatribes (US, rev 2, set 1)
+    8  dmnfrnt      Demon Front (VM105XX, S105XX)
+    9  ddragonu     Double Dragon (US set 1)
+   10  ddux         Dynamite Dux (set 2, FD1094 317-0096)
+   11  goldnaxe     Golden Axe (set 6, US, 8751 317-123A)
+   12  growl        Growl (World, Rev 1)
+   13  gundhara     Gundhara
+   14  gunforc2     Gunforce 2 (US)
+   15  gunforce     Gunforce - Battle Fire Engulfed Terror Island (World)
+   16  sailormn     Hack only enable in Extra Hard
+   17  hook         Hook (World)
+   18  svg          Incomplete dump
+   19  theglad      Incomplete Dump
+   20  killbld      The Killing Blade (V109, China)
+   21  kov2         Knights of Valour 2 (V107, Hong Kong)
+   22  kov          Knights of Valour - Sangoku Senki (V117)
+   23  kbash        Knuckle Bash
+   24  martmast     Martial Masters (V104, 102, 102, USA)
+   25  metmqstr     Metamoqester (International)
+   26  metamrph     Metamorphic Force (ver EAA)
+   27  mwalk        Michael Jackson's Moonwalker  [?]
+   28  mystwarr     Mystic Warriors (ver EAA)
+   29  nslasheru    Night Slashers (US Rev 1.2, DE-0395-1 PCB)
+   30  nbbatman     Ninja Baseball Batman (World)
+   31  ninjak       The Ninja Kids (World)
+   32  orlegend     Oriental Legend - Xi Yo Gi Shi Re Zuang (V126)
+   33  outzone      Out Zone
+   34  robocop      Robocop (World revision 4)
+   35  rthunder     Rolling Thunder (rev 3)
+   36  shdancer     Shadow Dancer (set 3, US)
+   37  shadoww      Shadow Warriors (World, set 1)
+   38  shinobi      Shinobi (set 6, System 16A, unprotected)
+   39  simpsons2p   The Simpsons (2 Players World, set 1)
+   40  splatter     Splatter House (World, new version (SH3))
+   41  ssriders     Sunset Riders (4 Players ver. EAC)
+   42  superman     Superman (World)
+   43  tmnt         Teenage Mutant Ninja Turtles (World 4 Players, version X)
+   44  tmnt22pu     Teenage Mutant Ninja Turtles - Turtles in Time (2 Players ver.
+   45  twocrude     Two Crude (US FT revision 1)
+   46  uccops       Undercover Cops (World)
+   47  vendetta     Vendetta (World, 4 Players ver. T)
+   48  vigilant     Vigilante (World, Rev E)
+   49  viostorm     Violent Storm (ver EAC)
+   50  moomesa      Wild West C.O.W.-Boys of Moo Mesa (ver EAB)
+   51  xmen         X-Men (4 Players ver EBA)
+
+### Shooters  (61 entries, 55 change position)
+    0  airduel      Air Duel (World, M82 hardware)
+    1  agallet      Air Gallet (Europe)
+    2  bangball     Bang Bang Ball (v1.05)
+    3  bbakraid     Battle Bakraid - Unlimited Version (U.S.A.) (Tue Jun 8 1999)
+    4  bgaregga     Battle Garegga (Europe / USA / Japan / Asia) (Sat Feb 3 1996)
+    5  blswhstl     Bells & Whistles (World, version L)
+    6  cairblad     Change Air Blade (Japan)
+    7  cyvern       Cyvern (US)
+    8  daioh        Daioh
+    9  dariusg      Darius Gaiden - Silver Hawk (Ver 2.5O 1994/09/19)
+   10  dogyuun      Dogyuun
+   11  donpachi     DonPachi (USA, ver. 1.12, 95/05/2x)
+   12  dragnblz     Dragon Blaze
+   13  dspirit      Dragon Spirit (new version (DS3))
+   14  esprade      ESP Ra.De. - A.D.2018 Tokyo (International, ver. 98/04/22)
+   15  fixeight     FixEight (Europe)
+   16  galaga88     Galaga '88
+   17  gradius      Gradius (Japan, ROM version)
+   18  gradius2     Gradius II - GOFER no Yabou (Japan New ver.)
+   19  gradius3     Gradius III (World, program code R)
+   20  gseeker      Grid Seeker: Project Storm Hammer (Ver 1.3O)
+   21  grindstm     Grind Stormer
+   22  gnbarich     Gunbarich
+   23  gunbird      Gunbird (World)
+   24  gunbird2     Gunbird 2 (set 1)
+   25  gunlock      Gunlock (Ver 2.3O 1994/01/20)
+   26  gunnail      GunNail (28th May. 1992)
+   27  guwange      Guwange (Japan, Master Ver. 99/06/24)
+   28  hellfire     Hellfire (2P set)
+   29  hotdogst     Hotdog Storm - The First Supersonics (korea)
+   30  kingdmgp     Kingdom Grandprix (World)
+   31  lgtnfght     Lightning Fighters (World)
+   32  macrossp     Macross Plus
+   33  mazinger     Mazinger Z (World, ver. 94/06/27)
+   34  metalb       Metal Black (World)
+   35  parodius     Parodius DA! (World, set 1)
+   36  phelios      Phelios
+   37  raiden       Raiden (set 1)
+   38  raidendx     Raiden DX (UK)
+   39  raiden2      Raiden II (US, set 1)
+   40  rshark       R-Shark
+   41  rtype        R-Type (World)
+   42  rtype2       R-Type II (World)
+   43  rtypeleo     R-Type Leo (World)
+   44  salamand     Salamander (version D)
+   45  sstriker     Sorcer Striker
+   46  spacedx      Space Invaders DX  [?]
+   47  s1945        Strikers 1945 (World)
+   48  s1945ii      Strikers 1945 II
+   49  s1945iii     Strikers 1945 III (World) / Strikers 1999 (Japan)
+   50  macross      Super Spacefortress Macross / Chou-Jikuu Yousai Macross
+   51  macross2     Super Spacefortress Macross II / Chou-Jikuu Yousai Macross II
+   52  thunderx     Thunder Cross (set 1)
+   53  thndrx2      Thunder Cross II (World)
+   54  truxton      Truxton / Tatsujin
+   55  truxton2     Truxton II
+   56  ultrax       Ultra X Weapons / Ultra Keibitai
+   57  earthjkr     U.N. Defense Force: Earth Joker (US / Japan, set 1)
+   58  vasara       Vasara
+   59  vasara2      Vasara 2 (set 1)
+   60  xexex        Xexex (ver EAA)
+

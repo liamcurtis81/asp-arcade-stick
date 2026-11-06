@@ -1,0 +1,160 @@
+From f8ba3ace61ac1824ed6c61844096b21627ad4f31 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 31 Oct 2026 14:41:19 +0000
+Subject: [PATCH 07/21] ASP: Metamorphic Force sound Z80 idle-loop skip
+ (z80_idle), output identical
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/burn/drv/konami/d_mystwarr.cpp | 77 +++++++++++++++++++++++++++++-
+ src/burner/pi/main_pi.cpp          |  3 ++
+ 2 files changed, 78 insertions(+), 2 deletions(-)
+
+diff --git a/src/burn/drv/konami/d_mystwarr.cpp b/src/burn/drv/konami/d_mystwarr.cpp
+index b630e00..2458daf 100644
+--- a/src/burn/drv/konami/d_mystwarr.cpp
++++ b/src/burn/drv/konami/d_mystwarr.cpp
+@@ -3003,6 +3003,40 @@ unsigned long long asp_mw_t68k = 0, asp_mw_tz80 = 0, asp_mw_ttimer = 0,
+                    asp_mw_tsound = 0, asp_mw_tframe = 0;
+ unsigned int asp_mw_samples = 0;
+ static unsigned int asp_mw_frameno = 0;
++#endif
++
++// Metamorphic Force's sound Z80 spends most of its time in one wait loop,
++//   047b  LD HL,0xd015
++//   047e  BIT 0,(HL)      12 T
++//   0480  JP Z,0x047e     10 T
++// waiting for the NMI handler (0x0066) to set bit 0 of d015. It runs with
++// interrupts disabled (the loop is left through EI/NOP/DI at 0485), so only an
++// NMI can end it, and NMIs are raised by the timer between run slices, never
++// inside one. When a slice finds the Z80 parked at 047e with the bit clear and
++// IFF1 off, the whole iterations that fit in the slice are skipped by ZetIdle
++// and only the last partial iteration is executed for real. Same instructions,
++// same cycle count, same stopping point - the interpreter just stops paying for
++// thousands of identical BIT/JP pairs a frame.
++int asp_z80_idle = 1;
++#ifdef BUILD_ASP
++// TEMPORARY probe: where the sound Z80 is when each run slice ends, to find
++// its idle loop. Enabled only by ASP_Z80PC=path in the environment.
++static unsigned int asp_z80pc_hist[0x10000];
++static FILE *asp_z80pc_out = NULL;
++static int asp_z80pc_on = -1;
++static void asp_z80pc_note(void)
++{
++	if (asp_z80pc_on < 0) asp_z80pc_on = getenv("ASP_Z80PC") != NULL;
++	if (asp_z80pc_on) asp_z80pc_hist[ZetGetPC(-1) & 0xffff]++;
++}
++static void asp_z80pc_dump(void)
++{
++	if (asp_z80pc_on <= 0 || (asp_mw_frameno % 500)) return;
++	FILE *f = fopen(getenv("ASP_Z80PC"), "w");
++	if (!f) return;
++	for (int a = 0; a < 0x10000; a++) if (asp_z80pc_hist[a]) fprintf(f, "%04x %u\n", a, asp_z80pc_hist[a]);
++	fclose(f);
++}
+ static inline unsigned long long asp_mw_ns(void)
+ {
+ 	struct timespec ts;
+@@ -3011,6 +3045,30 @@ static inline unsigned long long asp_mw_ns(void)
+ }
+ #endif
+ 
++static INT32 asp_mw_zet_slice(INT32 target, INT32 done)
++{
++	INT32 rem = target - done;
++	if (!asp_z80_idle || nGame != 2 || rem < 23)
++		return ZetRun(rem);
++	// one real instruction first: takes any NMI latched since the last slice
++	INT32 ran = ZetRun(1);
++	rem -= ran;
++	// After that one instruction the Z80 sits at 047e (about to test) or at
++	// 0480 (tested, bit clear, about to jump back: 10 T to land on 047e).
++	const UINT32 pc = ZetGetPC(-1);
++	const INT32 pre = (pc == 0x0480) ? 10 : 0;
++	if ((pc == 0x047e || pc == 0x0480) && rem >= pre + 23 &&
++	    !(DrvZ80RAM[0x1015] & 1) && !ActiveZ80GetIFF1()) {
++		INT32 k = (rem - pre - 1) / 22;
++		ZetIdle(pre + k * 22);
++		ActiveZ80SetPC(0x047e);
++		ran += pre + k * 22;
++		rem -= pre + k * 22;
++	}
++	if (rem > 0) ran += ZetRun(rem);
++	return ran;
++}
++
+ static INT32 DrvFrame()
+ {
+ #ifdef BUILD_ASP
+@@ -3136,7 +3194,7 @@ static INT32 DrvFrame()
+ 			unsigned long long a = asp_mw_ns();
+ 			CPU_RUN(0, Sek);
+ 			unsigned long long b = asp_mw_ns();
+-			CPU_RUN(1, Zet);
++			nCyclesDone[1] += asp_mw_zet_slice((INT32)(((INT64)nCyclesTotal[1] * (i + 1)) / nInterleave), nCyclesDone[1]);
+ 			unsigned long long c = asp_mw_ns();
+ 			CPU_RUN(2, timer);
+ 			asp_mw_t68k   += b - a;
+@@ -3146,7 +3204,8 @@ static INT32 DrvFrame()
+ #endif
+ 		{
+ 		CPU_RUN(0, Sek);
+-		CPU_RUN(1, Zet);
++		nCyclesDone[1] += asp_mw_zet_slice((INT32)(((INT64)nCyclesTotal[1] * (i + 1)) / nInterleave), nCyclesDone[1]);
++		asp_z80pc_note();
+ 		CPU_RUN(2, timer);
+ 		}
+ 	}
+@@ -3158,6 +3217,17 @@ static INT32 DrvFrame()
+ 		BurnSoundClear();
+ 		K054539Update(0, pBurnSoundOut, nBurnSoundLen);
+ 		K054539Update(1, pBurnSoundOut, nBurnSoundLen);
++#ifdef BUILD_ASP
++		{	// TEMPORARY: running hash of the sound output, ASP_SNDHASH=path
++			static unsigned int h = 2166136261u; static int on = -1; static unsigned int fr = 0;
++			if (on < 0) on = getenv("ASP_SNDHASH") != NULL;
++			if (on) {
++				const unsigned char *b = (const unsigned char *)pBurnSoundOut;
++				for (INT32 j = 0; j < nBurnSoundLen * 4; j++) h = (h ^ b[j]) * 16777619u;
++				if ((++fr % 500) == 0) { FILE *f = fopen(getenv("ASP_SNDHASH"), "a"); if (f) { fprintf(f, "%u:%08x\n", fr, h); fclose(f); } }
++			}
++		}
++#endif
+ 	}
+ #ifdef BUILD_ASP
+ 	if (asp_samp) {
+@@ -3170,6 +3240,9 @@ static INT32 DrvFrame()
+ 	}
+ #endif
+ 
++#ifdef BUILD_ASP
++	asp_z80pc_dump();
++#endif
+ 	ZetClose();
+ 	SekClose();
+ 
+diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
+index a7bcc32..f8b7afa 100755
+--- a/src/burner/pi/main_pi.cpp
++++ b/src/burner/pi/main_pi.cpp
+@@ -304,6 +304,7 @@ extern int asp_hash_frames;
+ extern int asp_exit_after_frames;
+ extern int asp_present_thread;   // vid_asp.cpp
+ extern int asp_fast_tiles;       // k056832.cpp
++extern int asp_z80_idle;         // d_mystwarr.cpp
+ extern unsigned char *asp_reset_ptr;
+ extern int asp_reset_pending;
+ 
+@@ -341,6 +342,8 @@ static int asp_tuning_apply(const char *key, int value)
+ 		asp_present_thread = value;
+ 	} else if (strcmp(key, "fast_tiles") == 0) {
+ 		asp_fast_tiles = value;
++	} else if (strcmp(key, "z80_idle") == 0) {
++		asp_z80_idle = value;
+ 	} else {
+ 		return 0;
+ 	}
+-- 
+2.43.0
+

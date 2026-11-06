@@ -1,0 +1,393 @@
+From 4f724191fd31f2c0e8702d9d5deeee56000d88e2 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 1 Nov 2026 16:34:27 +0000
+Subject: [PATCH 15/21] ASP WIP: draw on a second core (async_draw), Night
+ Slashers first - unproven, building
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ makefile.asp                       |   2 +-
+ src/burn/burn.cpp                  |   6 +-
+ src/burn/burn.h                    |  13 ++-
+ src/burn/drv/dataeast/d_deco32.cpp |  60 ++++++++++++--
+ src/burn/drv/dataeast/deco16ic.cpp |   6 +-
+ src/burn/drv/dataeast/deco16ic.h   |   8 +-
+ src/burner/pi/asp_async.cpp        | 123 +++++++++++++++++++++++++++++
+ src/burner/pi/main_pi.cpp          |   3 +
+ src/intf/video/asp/vid_asp.cpp     |  22 ++++++
+ 9 files changed, 225 insertions(+), 18 deletions(-)
+ create mode 100644 src/burner/pi/asp_async.cpp
+
+diff --git a/makefile.asp b/makefile.asp
+index 3e45754..3e66e9c 100644
+--- a/makefile.asp
++++ b/makefile.asp
+@@ -96,7 +96,7 @@ depobj += cdlist.o \
+ 		\
+ 		inp_pi.o aud_sdl.o support_paths.o \
+ 		ips_manager.o scrn.o config.o \
+-		main_pi.o run_pi.o stringset.o bzip.o drv.o media.o inpdipsw.o \
++		main_pi.o run_pi.o asp_async.o stringset.o bzip.o drv.o media.o inpdipsw.o \
+ 		matrix.o vid_asp.o inputbuf.o replay.o cd_img.o romdata.o crt.o
+ 
+ 
+diff --git a/src/burn/burn.cpp b/src/burn/burn.cpp
+index 3674759..7aa0f0b 100644
+--- a/src/burn/burn.cpp
++++ b/src/burn/burn.cpp
+@@ -68,9 +68,9 @@ INT32 nBurnFPS            = 6000;
+ INT32 nBurnCPUSpeedAdjust = 0x0100;	// CPU speed adjustment (clock * nBurnCPUSpeedAdjust / 0x0100)
+ 
+ // Burn Draw:
+-UINT8* pBurnDraw = NULL;			// Pointer to correctly sized bitmap
+-INT32 nBurnPitch = 0;				// Pitch between each line
+-INT32 nBurnBpp;						// Bytes per pixel (2, 3, or 4)
++ASP_TLS UINT8* pBurnDraw = NULL;			// Pointer to correctly sized bitmap
++ASP_TLS INT32 nBurnPitch = 0;				// Pitch between each line
++ASP_TLS INT32 nBurnBpp;						// Bytes per pixel (2, 3, or 4)
+ 
+ INT32 nBurnSoundRate = 0;			// sample rate of sound or zero for no sound
+ INT32 nBurnSoundLen  = 0;			// length in samples per frame
+diff --git a/src/burn/burn.h b/src/burn/burn.h
+index 042b984..accbee8 100644
+--- a/src/burn/burn.h
++++ b/src/burn/burn.h
+@@ -357,9 +357,16 @@ extern UINT32 nNamesExArray;
+ 
+ extern INT32 nMaxPlayers;
+ 
+-extern UINT8 *pBurnDraw;			// Pointer to correctly sized bitmap
+-extern INT32 nBurnPitch;			// Pitch between each line
+-extern INT32 nBurnBpp;				// Bytes per pixel (2, 3, or 4)
++#ifdef BUILD_ASP
++// ASP: per thread, so a render thread can draw into its own buffer while the
++// emulation thread carries on (burner/pi/asp_async.cpp).
++#define ASP_TLS __thread
++#else
++#define ASP_TLS
++#endif
++extern ASP_TLS UINT8 *pBurnDraw;			// Pointer to correctly sized bitmap
++extern ASP_TLS INT32 nBurnPitch;			// Pitch between each line
++extern ASP_TLS INT32 nBurnBpp;				// Bytes per pixel (2, 3, or 4)
+ 
+ extern UINT8 nBurnLayer;			// Can be used externally to select which layers to show
+ extern UINT8 nSpriteEnable;			// Can be used externally to select which Sprites to show
+diff --git a/src/burn/drv/dataeast/d_deco32.cpp b/src/burn/drv/dataeast/d_deco32.cpp
+index caeeeda..ef4a85b 100644
+--- a/src/burn/drv/dataeast/d_deco32.cpp
++++ b/src/burn/drv/dataeast/d_deco32.cpp
+@@ -32,12 +32,12 @@ static UINT8 *DrvDVIROM; // dragngun
+ static UINT8 *DrvSysRAM;
+ static UINT8 *DrvHucRAM;
+ static UINT8 *DrvSprRAM;
+-static UINT8 *DrvSprBuf;
++static ASP_TLS UINT8 *DrvSprBuf;
+ static UINT8 *DrvSprRAM2;
+-static UINT8 *DrvSprBuf2;
++static ASP_TLS UINT8 *DrvSprBuf2;
+ static UINT8 *DrvPalRAM;
+-static UINT8 *DrvPalBuf; // active palette
+-static UINT8 *DrvAceRAM;
++static ASP_TLS UINT8 *DrvPalBuf; // active palette
++static ASP_TLS UINT8 *DrvAceRAM;
+ static UINT8 *DrvJackRAM;
+ static UINT8 *DrvTMSRAM;
+ 
+@@ -51,7 +51,7 @@ static UINT32 *DrvPalette;
+ static UINT8 DrvRecalc;
+ 
+ static INT32 DrvOkiBank;
+-static INT32 global_priority;
++static ASP_TLS INT32 global_priority;
+ static UINT32 sprite_ctrl;
+ static UINT32 lightgun_port;
+ 
+@@ -2319,6 +2319,12 @@ static INT32 DragngunCommonInit(INT32 has_z80, UINT32 speedhack)
+ 
+ static INT32 DrvExit()
+ {
++#ifdef BUILD_ASP
++	{	// the render thread must not be drawing from memory being freed
++		extern void asp_async_stop();
++		asp_async_stop();
++	}
++#endif
+ 	GenericTilesExit();
+ 	deco16Exit();
+ 
+@@ -3594,6 +3600,47 @@ static INT32 DragngunDrawScanline(INT32 line)
+ 	return 0;
+ }
+ 
++#ifdef BUILD_ASP
++// ASP: Night Slashers' picture drawn on a second core (burner/pi/asp_async.cpp).
++// Everything NslasherDraw reads that the emulation can change between pictures
++// is copied here at the moment the inline draw would have run; the render
++// thread's per-thread pointers (ASP_TLS) then point at the copies.
++extern int asp_async_draw(void (*capture)(void), void (*bind)(void), INT32 (*draw)(void), INT32 height);
++extern void asp_async_stop();
++static UINT8  asp_snap_pf[4][0x2000], asp_snap_rs[4][0x2000];
++static UINT16 asp_snap_ctl[2][8];
++static UINT8  asp_snap_pal[0x2000], asp_snap_ace[0x400], asp_snap_spr[0x2000], asp_snap_spr2[0x1000];
++static INT32  asp_snap_prio;
++static void asp_ns_capture(void)
++{
++	for (INT32 i = 0; i < 4; i++) {
++		memcpy(asp_snap_pf[i], deco16_pf_ram[i], 0x2000);
++		memcpy(asp_snap_rs[i], deco16_pf_rowscroll[i], 0x2000);
++	}
++	memcpy(asp_snap_ctl[0], deco16_pf_control[0], 0x10);
++	memcpy(asp_snap_ctl[1], deco16_pf_control[1], 0x10);
++	memcpy(asp_snap_pal, DrvPalBuf, 0x2000);
++	memcpy(asp_snap_ace, DrvAceRAM, 0x400);
++	memcpy(asp_snap_spr, DrvSprBuf, 0x2000);
++	memcpy(asp_snap_spr2, DrvSprBuf2, 0x1000);
++	asp_snap_prio = global_priority;
++}
++static void asp_ns_bind(void)     // runs on the render thread
++{
++	for (INT32 i = 0; i < 4; i++) {
++		deco16_pf_ram[i] = asp_snap_pf[i];
++		deco16_pf_rowscroll[i] = asp_snap_rs[i];
++	}
++	deco16_pf_control[0] = asp_snap_ctl[0];
++	deco16_pf_control[1] = asp_snap_ctl[1];
++	DrvPalBuf = asp_snap_pal;
++	DrvAceRAM = asp_snap_ace;
++	DrvSprBuf = asp_snap_spr;
++	DrvSprBuf2 = asp_snap_spr2;
++	global_priority = asp_snap_prio;
++}
++#endif
++
+ static INT32 DrvFrame()
+ {
+ 	if (DrvReset) {
+@@ -3682,6 +3729,9 @@ static INT32 DrvFrame()
+ 	nExtraCycles[1] = nCyclesDone[1] - nCyclesTotal[1];
+ 
+ 	if (pBurnDraw && pDrawScanline == NULL) {
++#ifdef BUILD_ASP
++		if (!(game_select == 2 && asp_async_draw(asp_ns_capture, asp_ns_bind, NslasherDraw, nScreenHeight)))
++#endif
+ 		BurnDrvRedraw();
+ 	}
+ 
+diff --git a/src/burn/drv/dataeast/deco16ic.cpp b/src/burn/drv/dataeast/deco16ic.cpp
+index c8add34..b0d9fc7 100644
+--- a/src/burn/drv/dataeast/deco16ic.cpp
++++ b/src/burn/drv/dataeast/deco16ic.cpp
+@@ -37,9 +37,9 @@ static INT32 deco16_graphics_size[4];
+ 
+ UINT8 *deco16_graphics[3];
+ 
+-UINT16 *deco16_pf_control[2];
+-UINT8 *deco16_pf_ram[4] = { NULL, NULL, NULL, NULL };
+-UINT8 *deco16_pf_rowscroll[4];
++ASP_TLS UINT16 *deco16_pf_control[2];
++ASP_TLS UINT8 *deco16_pf_ram[4] = { NULL, NULL, NULL, NULL };
++ASP_TLS UINT8 *deco16_pf_rowscroll[4];
+ 
+ UINT16 deco16_priority;
+ 
+diff --git a/src/burn/drv/dataeast/deco16ic.h b/src/burn/drv/dataeast/deco16ic.h
+index 840bc2a..1b9d001 100644
+--- a/src/burn/drv/dataeast/deco16ic.h
++++ b/src/burn/drv/dataeast/deco16ic.h
+@@ -1,9 +1,11 @@
+ 
+ // deco16 tilemap routines
+ 
+-extern UINT16 *deco16_pf_control[2];
+-extern UINT8 *deco16_pf_ram[4];
+-extern UINT8 *deco16_pf_rowscroll[4];
++// ASP_TLS (burn.h): per thread, so the render thread can point these at a
++// snapshot while the emulation thread keeps writing the live ones.
++extern ASP_TLS UINT16 *deco16_pf_control[2];
++extern ASP_TLS UINT8 *deco16_pf_ram[4];
++extern ASP_TLS UINT8 *deco16_pf_rowscroll[4];
+ 
+ extern UINT16 deco16_priority;
+ extern INT32 deco16_vblank;
+diff --git a/src/burner/pi/asp_async.cpp b/src/burner/pi/asp_async.cpp
+new file mode 100644
+index 0000000..65719e4
+--- /dev/null
++++ b/src/burner/pi/asp_async.cpp
+@@ -0,0 +1,123 @@
++// ASP: draw on a second core.
++//
++// The emulator ran on one core: emulate a frame, stop, draw the picture, carry
++// on. Sound is only made while emulating, so the sound buffer had to be deep
++// enough to cover every drawing pause - about 13 ms a picture on Night
++// Slashers - and that depth is the lag between picture and sound.
++//
++// A driver that opts in hands the picture to a render thread instead. At the
++// moment it would have drawn, it copies the video state the draw reads (tile
++// RAM, scroll registers, palette, sprite list) into a snapshot - a few tens of
++// KB, well under a millisecond - and returns to emulating. The render thread
++// points its own per-thread copies of the driver's video pointers (ASP_TLS)
++// at the snapshot, runs the driver's unchanged draw function into its own
++// buffer, and hands the finished picture to the present worker. The picture
++// is exactly the one the inline draw would have made, from exactly the same
++// state; it just reaches the screen while the next frame is being emulated.
++//
++// async_draw 0  off: draw inline, as before
++// async_draw 1  on
++// async_draw 2  check: use the render thread and snapshot, but wait for it and
++//               put the picture where the inline draw would, so the harness's
++//               frame hashes prove the snapshot is complete
++#include "burner.h"
++#include <pthread.h>
++#include <string.h>
++
++int asp_async_mode = 0;                 // asp_tuning.txt "async_draw"
++int asp_async_live = 0;                 // exit report
++unsigned int asp_async_frames = 0, asp_async_waits = 0;
++
++extern int asp_async_frame_pending;     // vid_asp.cpp: skip its own present
++extern void asp_present_external(const unsigned char *buf);
++
++static pthread_t       th;
++static pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
++static pthread_cond_t  c_req = PTHREAD_COND_INITIALIZER, c_done = PTHREAD_COND_INITIALIZER;
++static int busy = 0, stop_req = 0, running = 0, present_it = 1;
++static void (*g_bind)(void) = NULL;
++static INT32 (*g_draw)(void) = NULL;
++static unsigned char *rbuf = NULL;
++static size_t rsize = 0;
++static INT32 rpitch = 0, rbpp = 0;
++
++static void *worker(void *)
++{
++	for (;;) {
++		pthread_mutex_lock(&m);
++		while (!busy && !stop_req) pthread_cond_wait(&c_req, &m);
++		if (stop_req) { pthread_mutex_unlock(&m); break; }
++		pthread_mutex_unlock(&m);
++
++		g_bind();
++		pBurnDraw  = rbuf;
++		nBurnPitch = rpitch;
++		nBurnBpp   = rbpp;
++		g_draw();
++		pBurnDraw = NULL;
++		if (present_it) asp_present_external(rbuf);
++
++		pthread_mutex_lock(&m);
++		busy = 0;
++		pthread_cond_broadcast(&c_done);
++		pthread_mutex_unlock(&m);
++	}
++	return NULL;
++}
++
++void asp_async_stop()
++{
++	if (!running) return;
++	pthread_mutex_lock(&m);
++	while (busy) pthread_cond_wait(&c_done, &m);
++	stop_req = 1;
++	pthread_cond_signal(&c_req);
++	pthread_mutex_unlock(&m);
++	pthread_join(th, NULL);
++	running = 0; stop_req = 0;
++	free(rbuf); rbuf = NULL; rsize = 0;
++	asp_async_live = 0;
++}
++
++// Called by a driver where it would draw. Returns 0 if it should draw inline.
++int asp_async_draw(void (*capture)(void), void (*bind)(void), INT32 (*draw)(void), INT32 height)
++{
++	if (!asp_async_mode || !pBurnDraw || nBurnPitch <= 0 || height <= 0) return 0;
++
++	size_t need = (size_t)nBurnPitch * height;
++	if (!running || need != rsize) {
++		asp_async_stop();
++		rbuf = (unsigned char *)malloc(need);
++		if (!rbuf) return 0;
++		rsize = need;
++		busy = 0; stop_req = 0;
++		if (pthread_create(&th, NULL, worker, NULL) != 0) { free(rbuf); rbuf = NULL; rsize = 0; return 0; }
++		running = 1;
++		asp_async_live = 1;
++	}
++
++	// The previous picture must be finished before its snapshot is reused.
++	pthread_mutex_lock(&m);
++	if (busy) asp_async_waits++;
++	while (busy) pthread_cond_wait(&c_done, &m);
++	pthread_mutex_unlock(&m);
++
++	capture();
++	g_bind = bind; g_draw = draw;
++	rpitch = nBurnPitch; rbpp = nBurnBpp;
++	present_it = (asp_async_mode == 1);
++	asp_async_frames++;
++
++	pthread_mutex_lock(&m);
++	busy = 1;
++	pthread_cond_signal(&c_req);
++	if (asp_async_mode == 2) {
++		while (busy) pthread_cond_wait(&c_done, &m);
++		pthread_mutex_unlock(&m);
++		memcpy(pBurnDraw, rbuf, rsize);     // inline-equivalent: normal present and hash
++		return 1;
++	}
++	pthread_mutex_unlock(&m);
++	asp_async_frame_pending = 1;
++	return 1;
++}
+diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
+index ed9cc68..eaf0d29 100755
+--- a/src/burner/pi/main_pi.cpp
++++ b/src/burner/pi/main_pi.cpp
+@@ -348,6 +348,9 @@ static int asp_tuning_apply(const char *key, int value)
+ 		asp_z80_idle = value;
+ 	} else if (strcmp(key, "idle_skips") == 0) {
+ 		asp_idle_skips = value;
++	} else if (strcmp(key, "async_draw") == 0) {
++		extern int asp_async_mode;
++		asp_async_mode = value;
+ 	} else if (strcmp(key, "snd_jit_ms") == 0) {
+ 		// read by our SDL's OSS backend when the audio opens (SDL_dspaudio.c)
+ 		char v[16]; snprintf(v, sizeof v, "%d", value);
+diff --git a/src/intf/video/asp/vid_asp.cpp b/src/intf/video/asp/vid_asp.cpp
+index 6c5d079..942ac94 100644
+--- a/src/intf/video/asp/vid_asp.cpp
++++ b/src/intf/video/asp/vid_asp.cpp
+@@ -311,8 +311,30 @@ static int AspRunFrame(bool bRedraw)
+ 	return 0;
+ }
+ 
++// Set by burner/pi/asp_async.cpp when the render thread owns this frame's
++// picture and will present it itself.
++int asp_async_frame_pending = 0;
++
++void asp_present_external(const unsigned char *buf)
++{
++	if (!buf || !asp_buffer) return;
++	if (!asp_pt_running) {
++		asp_present_from(buf);
++		return;
++	}
++	pthread_mutex_lock(&asp_pt_lock);
++	memcpy(asp_pt_pending, buf, asp_pt_size);
++	asp_pt_have = 1;
++	pthread_cond_signal(&asp_pt_cond);
++	pthread_mutex_unlock(&asp_pt_lock);
++}
++
+ static int AspPaint(int /*bValidate*/)
+ {
++	if (asp_async_frame_pending) {
++		asp_async_frame_pending = 0;
++		return 0;
++	}
+ 	asp_present();
+ 	return 0;
+ }
+-- 
+2.43.0
+

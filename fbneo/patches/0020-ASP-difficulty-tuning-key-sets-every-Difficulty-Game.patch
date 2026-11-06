@@ -1,0 +1,134 @@
+From f97c52fd266e7f61c98870a165af47322b56bae1 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 17:03:56 +0000
+Subject: [PATCH 20/21] ASP: difficulty tuning key sets every Difficulty / Game
+ Level DIP group to Easy
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/burner/pi/main_pi.cpp | 87 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 87 insertions(+)
+
+diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
+index 472e002..9db66b3 100755
+--- a/src/burner/pi/main_pi.cpp
++++ b/src/burner/pi/main_pi.cpp
+@@ -2,6 +2,10 @@
+ #include <sys/stat.h>
+ #include <fcntl.h>
+ #include <signal.h>
++#include <ctype.h>
++#ifdef BUILD_ASP
++static int asp_difficulty = 0;   // asp_tuning.txt "difficulty", see asp_apply_difficulty
++#endif
+ #include <strings.h>		// strcasecmp, for per-game tuning section names
+ #include <unistd.h>
+ 
+@@ -338,6 +342,8 @@ static int asp_tuning_apply(const char *key, int value)
+ 		asp_hash_frames = value;
+ 	} else if (strcmp(key, "exit_after_frames") == 0) {
+ 		asp_exit_after_frames = value;
++	} else if (strcmp(key, "difficulty") == 0) {
++		asp_difficulty = value;
+ 	} else if (strcmp(key, "speed_hacks") == 0) {
+ 		asp_speed_hacks = value;
+ 	} else if (strcmp(key, "present_thread") == 0) {
+@@ -366,6 +372,86 @@ static int asp_tuning_apply(const char *key, int value)
+ 	return 1;
+ }
+ 
++// ASP: difficulty switches, set by asp_tuning.txt "difficulty".
++//   0  leave every switch at the game's default (FBNeo's default)
++//   1  easy
++// The stick's launcher has no way to reach a board's DIP switches, so this
++// finds them by name instead: every switch group called Difficulty, Game
++// Level, Level or similar. Within a group the option labelled "Easy" wins;
++// boards that number their levels (Capcom's CPS1: 1 Easiest ... 4 Normal ...
++// 8 Hardest) get the level halfway between Easiest and Normal. A group with
++// neither is left alone and listed in the log with its options, so it can be
++// handled by name later. Applied after DrvInit, like the -f freeplay switch,
++// and before the first frame.
++
++static int asp_dip_is_difficulty(const char *name)
++{
++	char low[64]; int i;
++	for (i = 0; name[i] && i < 63; i++) low[i] = tolower((unsigned char)name[i]);
++	low[i] = '\0';
++	if (strstr(low, "difficult")) return 1;
++	if (strstr(low, "game level")) return 1;
++	if (strcmp(low, "level") == 0) return 1;
++	return 0;
++}
++
++static int asp_word(const char *text, const char *word)
++{
++	// case-insensitive whole-word search
++	size_t n = strlen(word);
++	for (const char *p = text; *p; p++) {
++		if (strncasecmp(p, word, n) == 0
++			&& (p == text || !isalnum((unsigned char)p[-1]))
++			&& !isalnum((unsigned char)p[n]))
++			return (int)(p - text);
++	}
++	return -1;
++}
++
++static void asp_apply_difficulty(void)
++{
++	if (asp_difficulty != 1) return;
++	BurnDIPInfo d, g;
++	int dipOffset = 0, groups = 0, set = 0;
++	for (int i = 0; BurnDrvGetDIPInfo(&d, i) == 0; i++) {
++		if (d.nFlags == 0xF0) { dipOffset = d.nInput; continue; }
++		if (!(d.nFlags & 0x40) || !d.szText || !asp_dip_is_difficulty(d.szText)) continue;
++		g = d;
++		int n = g.nSetting, first = i + 1, pick = -1, easiest = -1, normal = -1;
++		groups++;
++		for (int j = 0; j < n; j++) {
++			BurnDIPInfo o;
++			if (BurnDrvGetDIPInfo(&o, first + j) != 0 || !o.szText) break;
++			int e = asp_word(o.szText, "easy");
++			if (e >= 0 && asp_word(o.szText, "very") < 0 && pick < 0) pick = j;
++			if (asp_word(o.szText, "easiest") >= 0 || (e >= 0 && asp_word(o.szText, "very") >= 0)) easiest = j;
++			if (asp_word(o.szText, "normal") >= 0 || asp_word(o.szText, "medium") >= 0 || asp_word(o.szText, "standard") >= 0) normal = j;
++		}
++		if (pick < 0 && easiest >= 0 && normal >= 0 && easiest != normal) {
++			pick = (easiest + normal) / 2;
++			if (pick == normal) pick = easiest;
++		}
++		if (pick < 0) {
++			fprintf(stderr, "asp: difficulty: \"%s\" has no Easy option, left at default:", g.szText);
++			for (int j = 0; j < n; j++) {
++				BurnDIPInfo o;
++				if (BurnDrvGetDIPInfo(&o, first + j) != 0 || !o.szText) break;
++				fprintf(stderr, " [%s]", o.szText);
++			}
++			fprintf(stderr, "\n");
++			continue;
++		}
++		BurnDIPInfo o;
++		BurnDrvGetDIPInfo(&o, first + pick);
++		struct GameInp *pgi = GameInp + o.nInput + dipOffset;
++		pgi->Input.Constant.nConst = (pgi->Input.Constant.nConst & ~o.nMask) | (o.nSetting & o.nMask);
++		fprintf(stderr, "asp: difficulty: \"%s\" set to \"%s\"\n", g.szText, o.szText);
++		set++;
++	}
++	if (groups == 0)
++		fprintf(stderr, "asp: difficulty: this game has no difficulty switch (CPS2, CPS3 and some others keep it in the game's own test menu)\n");
++}
++
+ // One sweep of the tuning file. want_section NULL reads only the keys that sit
+ // before any [section] header, i.e. the globals; otherwise it reads only the
+ // keys inside the section whose name matches, and ignores the globals.
+@@ -727,6 +813,7 @@ int main(int argc, char *argv[])
+ #ifdef BUILD_ASP
+ 	// Before the log closes, so whether it took is on the record.
+ 	asp_apply_speed_hacks();
++	asp_apply_difficulty();
+ 
+ 	// Init succeeded, so there is nothing more worth logging and every
+ 	// further line would be a write to the card during play.
+-- 
+2.43.0
+

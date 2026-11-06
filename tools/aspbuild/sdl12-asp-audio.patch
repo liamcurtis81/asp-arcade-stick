@@ -1,0 +1,228 @@
+diff --git a/src/audio/SDL_audiodev.c b/src/audio/SDL_audiodev.c
+index 396156c..73089f9 100644
+--- a/src/audio/SDL_audiodev.c
++++ b/src/audio/SDL_audiodev.c
+@@ -54,8 +54,18 @@ int SDL_OpenAudioPath(char *path, int maxlen, int flags, int classic)
+ 	char audiopath[1024];
+ 
+ 	/* Figure out what our audio device is */
+-	if ( ((audiodev=SDL_getenv("SDL_PATH_DSP")) == NULL) &&
++	if ( ((audiodev=SDL_getenv("SDL_DSP_DEV")) == NULL) &&
++	     ((audiodev=SDL_getenv("SDL_PATH_DSP")) == NULL) &&
+ 	     ((audiodev=SDL_getenv("AUDIODEV")) == NULL) ) {
++		/* Neo Geo Arcade Stick Pro / MVSX: the OSS node is at
++		   /dev/snd/actsnd, and the stock boot script advertises it
++		   through SDL_DSP_DEV (checked above). Fall back to it by
++		   path too, in case the variable is not exported. */
++		struct stat asb;
++		if ( !classic && (stat("/dev/snd/actsnd", &asb) == 0)
++		     && S_ISCHR(asb.st_mode) ) {
++			audiodev = "/dev/snd/actsnd";
++		} else
+ 		if ( classic ) {
+ 			audiodev = _PATH_DEV_AUDIO;
+ 		} else {
+diff --git a/src/audio/dsp/SDL_dspaudio.c b/src/audio/dsp/SDL_dspaudio.c
+index f2346a5..d8e152d 100644
+--- a/src/audio/dsp/SDL_dspaudio.c
++++ b/src/audio/dsp/SDL_dspaudio.c
+@@ -35,6 +35,8 @@
+ #include <sys/time.h>
+ #include <sys/ioctl.h>
+ #include <sys/stat.h>
++#include <poll.h>
++#include <stdlib.h>
+ 
+ #if SDL_AUDIO_DRIVER_OSS_SOUNDCARD_H
+ /* This is installed on some systems */
+@@ -57,6 +59,13 @@
+ /* Open the audio device for playback, and don't block if busy */
+ #define OPEN_FLAGS	(O_WRONLY|O_NONBLOCK)
+ 
++/* The format /dev/snd/actsnd on the Neo Geo Arcade Stick Pro is hard-wired to.
++   Taken from what the stock firmware's own emulators push at it, which is the
++   only way to learn it: the node answers no SNDCTL ioctl. Overridable at run
++   time through ASP_SND_RATE and ASP_SND_CHANNELS. */
++#define ASP_SINK_FREQ		44100
++#define ASP_SINK_CHANNELS	2
++
+ /* Audio driver functions */
+ static int DSP_OpenAudio(_THIS, SDL_AudioSpec *spec);
+ static void DSP_WaitAudio(_THIS);
+@@ -124,19 +133,85 @@ AudioBootStrap DSP_bootstrap = {
+ 	Audio_Available, Audio_CreateDevice
+ };
+ 
++/* ASP (private local build, not for upstream): just-in-time writes.
++   /dev/snd/actsnd takes audio in whole periods of about 46 ms: once one frees,
++   the next 8 KB are accepted at once and the following write blocks for the
++   next 46 ms. SDL mixes each chunk the moment the device will take it, so
++   every sample waits a full extra period in the kernel. With ASP_SND_JIT_MS
++   set, the thread waits that many milliseconds after a period frees before
++   mixing the chunks that fill it, so they are mixed later and spend that much
++   less time queued. Too large and the period is not refilled in time: a
++   crackle. 0 or unset = the stock behaviour. */
++static int asp_jit_ms = -1;
++static int asp_jit_done = 0;
++/* read by the emulator's exit report */
++int asp_sdl_jit_ms = -1, asp_sdl_driver_dsp = 0;
++unsigned int asp_sdl_poll_waits = 0, asp_sdl_poll_calls = 0, asp_sdl_write_blocks = 0, asp_sdl_writes = 0, asp_sdl_sleeps = 0;
++long asp_sdl_write_max_ms = 0, asp_sdl_poll_max_ms = 0;
++/* SNDCTL_DSP_SETFRAGMENT probe on actsnd (ASP_SND_FRAG_COUNT / _SIZE). The
++   node rejects GETFMTS, but the stock emulator sets fragments, rate and
++   channels on it, so it may honour those. -1 = not tried. */
++int asp_sdl_frag_req = -1, asp_sdl_frag_rc = -1, asp_sdl_frag_errno = 0, asp_sdl_frag_got = 0;
++int asp_sdl_ospace_rc = -1, asp_sdl_ospace_frags = 0, asp_sdl_ospace_total = 0, asp_sdl_ospace_size = 0;
++
++static long asp_ms_since(const struct timeval *t0)
++{
++	struct timeval t1;
++	gettimeofday(&t1, NULL);
++	return (t1.tv_sec - t0->tv_sec) * 1000L + (t1.tv_usec - t0->tv_usec) / 1000L;
++}
++
+ /* This function waits until it is possible to write a full sound buffer */
+ static void DSP_WaitAudio(_THIS)
+ {
+-	/* Not needed at all since OSS handles waiting automagically */
++	struct pollfd p;
++	struct timeval t0;
++	if ( asp_jit_ms < 0 ) {
++		const char *e = SDL_getenv("ASP_SND_JIT_MS");
++		asp_jit_ms = e ? SDL_atoi(e) : 0;
++		if ( asp_jit_ms < 0 || asp_jit_ms > 40 ) asp_jit_ms = 0;
++		asp_sdl_jit_ms = asp_jit_ms;
++	}
++	asp_jit_done = 0;
++	if ( asp_jit_ms == 0 ) return;
++	p.fd = audio_fd; p.events = POLLOUT; p.revents = 0;
++	gettimeofday(&t0, NULL);
++	asp_sdl_poll_calls++;
++	{
++		int r = poll(&p, 1, 200);
++		long w = asp_ms_since(&t0);
++		if ( w > asp_sdl_poll_max_ms ) asp_sdl_poll_max_ms = w;
++		if ( r > 0 && w >= 5 ) {
++			asp_sdl_poll_waits++;
++			usleep(asp_jit_ms * 1000);
++			asp_sdl_sleeps++;
++			asp_jit_done = 1;
++		}
++	}
+ }
+ 
+ static void DSP_PlayAudio(_THIS)
+ {
++	struct timeval t0;
++	gettimeofday(&t0, NULL);
+ 	if (write(audio_fd, mixbuf, mixlen)==-1)
+ 	{
+ 		perror("Audio write");
+ 		this->enabled = 0;
+ 	}
++	/* poll() not honoured by the driver: the blocking write itself marks the
++	   period boundary, so wait after it instead. */
++	{
++		long w = asp_ms_since(&t0);
++		asp_sdl_writes++;
++		asp_sdl_driver_dsp = 1;
++		if ( w > asp_sdl_write_max_ms ) asp_sdl_write_max_ms = w;
++		if ( w >= 5 ) asp_sdl_write_blocks++;
++		if ( asp_jit_ms > 0 && !asp_jit_done && w >= 5 ) {
++			usleep(asp_jit_ms * 1000);
++			asp_sdl_sleeps++;
++		}
++	}
+ 
+ #ifdef DEBUG_AUDIO
+ 	fprintf(stderr, "Wrote %d bytes of audio data\n", mixlen);
+@@ -198,10 +273,85 @@ static int DSP_OpenAudio(_THIS, SDL_AudioSpec *spec)
+ 
+ 	/* Get a list of supported hardware formats */
+ 	if ( ioctl(audio_fd, SNDCTL_DSP_GETFMTS, &value) < 0 ) {
+-		perror("SNDCTL_DSP_GETFMTS");
+-		SDL_SetError("Couldn't get audio format list");
+-		DSP_CloseAudio(this);
+-		return(-1);
++		if ( errno != EINVAL && errno != ENOTTY ) {
++			perror("SNDCTL_DSP_GETFMTS");
++			SDL_SetError("Couldn't get audio format list");
++			DSP_CloseAudio(this);
++			return(-1);
++		}
++
++		/* The Neo Geo Arcade Stick Pro's audio node, /dev/snd/actsnd,
++		   accepts open() and write() but answers every SNDCTL ioctl
++		   with EINVAL. It is not a negotiable OSS device at all: it is
++		   a sink wired to one fixed format, and whatever we write is
++		   played back at that format regardless of what we asked for.
++		   Reporting the caller's own request back as if it had been
++		   granted is therefore wrong, and audibly so - a 16 kHz stream
++		   comes out 2.75x fast, and a mono stream comes out at half
++		   speed because consecutive samples are taken as a left/right
++		   pair. The stock firmware's own emulators drive this node at
++		   44100 Hz, 16-bit signed little-endian, stereo, so state that
++		   as the format obtained and let SDL's conversion layer bring
++		   the caller's stream to it. */
++		int want_freq = ASP_SINK_FREQ, want_chans = ASP_SINK_CHANNELS;
++		const char *e;
++		Uint32 pow2;
++
++		if ( (e = SDL_getenv("ASP_SND_RATE")) != NULL && SDL_atoi(e) > 0 )
++			want_freq = SDL_atoi(e);
++		if ( (e = SDL_getenv("ASP_SND_CHANNELS")) != NULL && SDL_atoi(e) > 0 )
++			want_chans = SDL_atoi(e);
++
++		fprintf(stderr, "SDL dsp: %s implements no SNDCTL ioctls; it is a "
++			"fixed sink. Caller asked for %d Hz %d ch; reporting the "
++			"hardware's %d Hz %d ch S16LE so SDL resamples.\n",
++			audiodev, spec->freq, spec->channels, want_freq, want_chans);
++
++		spec->format   = AUDIO_S16LSB;
++		spec->freq     = want_freq;
++		spec->channels = want_chans;
++
++		{
++			const char *fc = SDL_getenv("ASP_SND_FRAG_COUNT");
++			const char *fs = SDL_getenv("ASP_SND_FRAG_SIZE");
++			if ( fc && fs && SDL_atoi(fc) > 0 && SDL_atoi(fs) > 0 ) {
++				int lg = 0, arg;
++				audio_buf_info info;
++				while ( (1 << lg) < SDL_atoi(fs) ) lg++;
++				arg = (SDL_atoi(fc) << 16) | lg;
++				asp_sdl_frag_req = arg;
++				errno = 0;
++				asp_sdl_frag_rc = ioctl(audio_fd, SNDCTL_DSP_SETFRAGMENT, &arg);
++				asp_sdl_frag_errno = errno;
++				asp_sdl_frag_got = arg;
++				SDL_memset(&info, 0, sizeof info);
++				asp_sdl_ospace_rc = ioctl(audio_fd, SNDCTL_DSP_GETOSPACE, &info);
++				asp_sdl_ospace_frags = info.fragments;
++				asp_sdl_ospace_total = info.fragstotal;
++				asp_sdl_ospace_size = info.fragsize;
++			}
++		}
++
++		/* SDL_CalculateAudioSpec derives spec->size from spec->samples,
++		   and the fragment check below insists size be a power of two.
++		   The caller's sample count was chosen for the format it asked
++		   for, so round it up here rather than failing the open. */
++		for ( pow2 = 1; pow2 < spec->samples; pow2 <<= 1 )
++			;
++		spec->samples = (Uint16)pow2;
++
++		SDL_CalculateAudioSpec(spec);
++
++		mixlen = spec->size;
++		mixbuf = (Uint8 *)SDL_AllocAudioMem(mixlen);
++		if ( mixbuf == NULL ) {
++			DSP_CloseAudio(this);
++			return(-1);
++		}
++		SDL_memset(mixbuf, spec->silence, spec->size);
++
++		parent = getpid();
++		return(0);
+ 	}
+ 
+ 	/* Try for a closest match on audio format */

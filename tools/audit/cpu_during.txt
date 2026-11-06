@@ -1,0 +1,144 @@
+===== sample 0 =====
+Mem: 133136K used, 129008K free, 0K shrd, 1K buff, 5K cached
+CPU:  2.5% usr  0.0% sys  0.0% nic 75.0% idle 22.5% io  0.0% irq  0.0% sirq
+Load average: 1.70 0.50 0.17 1/88 1356
+  PID  PPID USER     STAT   VSZ %MEM CPU %CPU COMMAND
+ 1354  1309 0        D     8456  3.2   0  0.8 /mnt/hdisk/ASPh/retroarch/bin/retr
+    5     2 0        DW       0  0.0   2  0.8 [kworker/u:0]
+ 1111     2 0        DW       0  0.0   0  0.8 [usb-storage]
+ 1164  1158 0        S     125m 49.0   3  0.0 ././QUI_G1 
+ 1078  1061 0        S    51252 19.5   3  0.0 .//misc/SNK_MAIN 
+ 1299  1164 0        S    36508 13.9   1  0.0 /mnt/hdisk/ASPh/biosme metamrph 
+temp = 47
+===== sample 1 =====
+Mem: 165740K used, 96404K free, 0K shrd, 1K buff, 5K cached
+CPU: 22.7% usr  4.5% sys  0.0% nic 70.4% idle  2.2% io  0.0% irq  0.0% sirq
+Load average: 1.72 0.52 0.18 3/89 1387
+  PID  PPID USER     STAT   VSZ %MEM CPU %CPU COMMAND
+ 1354  1309 0        D    73224 27.9   2 22.6 /mnt/hdisk/ASPh/retroarch/bin/retr
+ 1164  1158 0        S     125m 49.0   3  0.0 ././QUI_G1 
+ 1078  1061 0        S    51252 19.5   3  0.0 .//misc/SNK_MAIN 
+ 1299  1164 0        S    36508 13.9   1  0.0 /mnt/hdisk/ASPh/biosme metamrph 
+ 1153  1135 0        S    35952 13.7   0  0.0 ././splash 
+ 1387  1353 0        S     2244  0.8   0  0.0 busybox head -10 
+temp = 49
+===== sample 2 =====
+Mem: 239168K used, 22976K free, 0K shrd, 1K buff, 5K cached
+CPU: 21.4% usr  4.7% sys  0.0% nic 71.4% idle  0.0% io  0.0% irq  2.3% sirq
+Load average: 1.74 0.55 0.19 2/89 1418
+  PID  PPID USER     STAT   VSZ %MEM CPU %CPU COMMAND
+ 1354  1309 0        R     139m 54.3   2 23.7 /mnt/hdisk/ASPh/retroarch/bin/retr
+ 1417  1353 0        R     2240  0.8   0  2.3 busybox top -b -n 1 
+ 1164  1158 0        S     125m 49.0   3  0.0 ././QUI_G1 
+ 1078  1061 0        S    51252 19.5   3  0.0 .//misc/SNK_MAIN 
+ 1299  1164 0        S    36508 13.9   1  0.0 /mnt/hdisk/ASPh/biosme metamrph 
+ 1153  1135 0        S    35952 13.7   0  0.0 ././splash 
+temp = 48
+===== sample 3 =====
+Mem: 258176K used, 3968K free, 0K shrd, 1K buff, 5K cached
+CPU: 44.6% usr  4.2% sys  0.0% nic 51.0% idle  0.0% io  0.0% irq  0.0% sirq
+Load average: 1.85 0.59 0.21 3/90 1449
+  PID  PPID USER     STAT   VSZ %MEM CPU %CPU COMMAND
+ 1354  1309 0        R     171m 67.1   3 44.6 /mnt/hdisk/ASPh/retroarch/bin/retr
+ 1447  1353 0        R     2240  0.8   0  4.2 busybox top -b -n 1 
+ 1164  1158 0        S     125m 49.0   3  0.0 ././QUI_G1 
+ 1078  1061 0        S    51252 19.5   3  0.0 .//misc/SNK_MAIN 
+ 1299  1164 0        S    36508 13.9   1  0.0 /mnt/hdisk/ASPh/biosme metamrph 
+ 1153  1135 0        S    35952 13.7   0  0.0 ././splash 
+temp = 48
+===== sample 4 =====
+Mem: 257944K used, 4200K free, 0K shrd, 1K buff, 5K cached
+CPU: 58.0% usr  3.2% sys  0.0% nic 38.7% idle  0.0% io  0.0% irq  0.0% sirq
+Load average: 1.85 0.59 0.21 3/86 1480
+  PID  PPID USER     STAT   VSZ %MEM CPU %CPU COMMAND
+ 1354  1309 0        R     171m 67.1   3 53.2 /mnt/hdisk/ASPh/retroarch/bin/retr
+ 1479  1353 0        R     2240  0.8   0  5.3 busybox top -b -n 1 
+    5     2 0        DW       0  0.0   0  2.6 [kworker/u:0]
+ 1164  1158 0        S     125m 49.0   3  0.0 ././QUI_G1 
+ 1078  1061 0        S    51252 19.5   3  0.0 .//misc/SNK_MAIN 
+ 1299  1164 0        S    36508 13.9   1  0.0 /mnt/hdisk/ASPh/biosme metamrph 
+temp = 52
+===== sample 5 =====
+Mem: 258028K used, 4116K free, 0K shrd, 1K buff, 5K cached
+CPU: 55.5% usr  8.3% sys  0.0% nic 36.1% idle  0.0% io  0.0% irq  0.0% sirq
+Load average: 2.02 0.65 0.23 3/86 1510
+  PID  PPID USER     STAT   VSZ %MEM CPU %CPU COMMAND
+ 1354  1309 0        R     171m 67.1   3 58.2 /mnt/hdisk/ASPh/retroarch/bin/retr
+ 1508  1353 0        R     2240  0.8   0  5.5 busybox top -b -n 1 
+ 1164  1158 0        S     125m 49.0   3  0.0 ././QUI_G1 
+ 1078  1061 0        S    51252 19.5   3  0.0 .//misc/SNK_MAIN 
+ 1299  1164 0        S    36508 13.9   1  0.0 /mnt/hdisk/ASPh/biosme metamrph 
+ 1153  1135 0        S    35952 13.7   0  0.0 ././splash 
+temp = 50
+===== sample 6 =====
+Mem: 258296K used, 3848K free, 0K shrd, 1K buff, 5K cached
+CPU: 65.7% usr 14.2% sys  0.0% nic 20.0% idle  0.0% io  0.0% irq  0.0% sirq
+Load average: 2.10 0.68 0.24 3/86 1540
+  PID  PPID USER     STAT   VSZ %MEM CPU %CPU COMMAND
+ 1354  1309 0        R     171m 67.1   3 57.1 /mnt/hdisk/ASPh/retroarch/bin/retr
+ 1533  1353 0        R     2240  0.8   0  5.7 busybox top -b -n 1 
+ 1159  1158 0        S      968  0.3   0  2.8 /system/bin/sh /mnt/data/usb/lang_
+ 1164  1158 0        S     125m 49.0   3  0.0 ././QUI_G1 
+ 1078  1061 0        S    51252 19.5   3  0.0 .//misc/SNK_MAIN 
+ 1299  1164 0        S    36508 13.9   1  0.0 /mnt/hdisk/ASPh/biosme metamrph 
+temp = 53
+===== sample 7 =====
+Mem: 258156K used, 3988K free, 0K shrd, 1K buff, 5K cached
+CPU: 66.6% usr  8.3% sys  0.0% nic 25.0% idle  0.0% io  0.0% irq  0.0% sirq
+Load average: 2.09 0.71 0.25 4/86 1570
+  PID  PPID USER     STAT   VSZ %MEM CPU %CPU COMMAND
+ 1354  1309 0        R     171m 67.1   3 58.2 /mnt/hdisk/ASPh/retroarch/bin/retr
+ 1563  1353 0        R     2240  0.8   0  5.5 busybox top -b -n 1 
+    5     2 0        RW       0  0.0   0  2.7 [kworker/u:0]
+ 1164  1158 0        S     125m 49.0   3  0.0 ././QUI_G1 
+ 1078  1061 0        S    51252 19.5   3  0.0 .//misc/SNK_MAIN 
+ 1299  1164 0        S    36508 13.9   1  0.0 /mnt/hdisk/ASPh/biosme metamrph 
+temp = 56
+===== sample 8 =====
+Mem: 258260K used, 3884K free, 0K shrd, 1K buff, 5K cached
+CPU: 55.5% usr  8.3% sys  0.0% nic 36.1% idle  0.0% io  0.0% irq  0.0% sirq
+Load average: 2.00 0.71 0.26 3/86 1594
+  PID  PPID USER     STAT   VSZ %MEM CPU %CPU COMMAND
+ 1354  1309 0        R     171m 67.1   0 58.2 /mnt/hdisk/ASPh/retroarch/bin/retr
+ 1164  1158 0        S     125m 49.0   3  2.7 ././QUI_G1 
+ 1593  1353 0        R     2240  0.8   3  2.7 busybox top -b -n 1 
+ 1078  1061 0        S    51252 19.5   3  0.0 .//misc/SNK_MAIN 
+ 1299  1164 0        S    36508 13.9   1  0.0 /mnt/hdisk/ASPh/biosme metamrph 
+ 1153  1135 0        S    35952 13.7   0  0.0 ././splash 
+temp = 56
+===== sample 9 =====
+Mem: 260660K used, 1484K free, 0K shrd, 1K buff, 5K cached
+CPU: 37.1% usr  2.8% sys  0.0% nic 60.0% idle  0.0% io  0.0% irq  0.0% sirq
+Load average: 2.00 0.73 0.26 2/86 1624
+  PID  PPID USER     STAT   VSZ %MEM CPU %CPU COMMAND
+ 1354  1309 0        S     179m 69.9   3 31.4 /mnt/hdisk/ASPh/retroarch/bin/retr
+ 1623  1353 0        R     2240  0.8   1  5.7 busybox top -b -n 1 
+    5     2 0        DW       0  0.0   0  2.8 [kworker/u:0]
+ 1164  1158 0        S     125m 49.0   3  0.0 ././QUI_G1 
+ 1078  1061 0        S    51252 19.5   3  0.0 .//misc/SNK_MAIN 
+ 1299  1164 0        S    36508 13.9   1  0.0 /mnt/hdisk/ASPh/biosme metamrph 
+temp = 53
+===== sample 10 =====
+Mem: 260596K used, 1548K free, 0K shrd, 1K buff, 5K cached
+CPU: 30.3% usr  6.0% sys  0.0% nic 63.6% idle  0.0% io  0.0% irq  0.0% sirq
+Load average: 2.00 0.73 0.26 2/86 1654
+  PID  PPID USER     STAT   VSZ %MEM CPU %CPU COMMAND
+ 1354  1309 0        S     179m 69.9   3 33.2 /mnt/hdisk/ASPh/retroarch/bin/retr
+ 1653  1353 0        R     2240  0.8   1  3.0 busybox top -b -n 1 
+ 1164  1158 0        S     125m 49.0   3  0.0 ././QUI_G1 
+ 1078  1061 0        S    51252 19.5   3  0.0 .//misc/SNK_MAIN 
+ 1299  1164 0        S    36508 13.9   1  0.0 /mnt/hdisk/ASPh/biosme metamrph 
+ 1153  1135 0        S    35952 13.7   0  0.0 ././splash 
+temp = 54
+===== sample 11 =====
+Mem: 260356K used, 1788K free, 0K shrd, 1K buff, 5K cached
+CPU: 34.2% usr  5.7% sys  0.0% nic 60.0% idle  0.0% io  0.0% irq  0.0% sirq
+Load average: 2.00 0.75 0.27 2/86 1684
+  PID  PPID USER     STAT   VSZ %MEM CPU %CPU COMMAND
+ 1354  1309 0        S     179m 69.9   0 34.2 /mnt/hdisk/ASPh/retroarch/bin/retr
+ 1683  1353 0        R     2240  0.8   0  5.7 busybox top -b -n 1 
+ 1164  1158 0        S     125m 49.0   3  0.0 ././QUI_G1 
+ 1078  1061 0        S    51252 19.5   3  0.0 .//misc/SNK_MAIN 
+ 1299  1164 0        S    36508 13.9   1  0.0 /mnt/hdisk/ASPh/biosme metamrph 
+ 1153  1135 0        S    35952 13.7   0  0.0 ././splash 
+temp = 53

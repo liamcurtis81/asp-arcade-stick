@@ -1,0 +1,13 @@
+===== launch: metamrph =====
+asp: tuning: per-game draw_every_n = 1
+asp: tuning: per-game exit_after_frames = 1200
+asp: tuning: per-game present_thread = 1
+----- metamrph: 29.5s, emulated 1742 frames (59.1 fps), rendered 1200 frames (40.7 fps), target 59.18 -----
+----- cost per frame: emulate 10.62 ms (n=542), emulate+blit 16.05 ms (n=1200), present 0.44 ms (n=1199); drawing adds 5.86 ms, so every-frame would be 60.7 fps against a 16.90 ms budget -----
+----- emulate+blit spread (n=1200): p50 16.78, p95 19.92, p99 20.45 ms, worst 33.06 ms -----
+----- present spread (n=1199): p50 0.52, p95 0.52, p99 2.10 ms, worst 5.43 ms -----
+----- frame gap spread (n=1198): p50 28.84, p95 42.47, p99 46.66 ms, worst 48.99 ms -----
+----- present: on a second core (the emulation thread only hands off a copy) -----
+----- audio catch-up batch sizes: 1:702 2:454 3:44 of 5 segments; 0 of 1200 batches (0%) at the 4-segment limit (shallow ring: the limit is also the normal maximum, so this is not by itself starvation)) -----
+
+v25 benchA konami lines: draw clear 0.22, mixer 3.26, blend-copy 1.89, total 5.36 ms; mixer split sprites 0.23 ms (4384 calls), tilemaps 2.09 ms (4372 calls)

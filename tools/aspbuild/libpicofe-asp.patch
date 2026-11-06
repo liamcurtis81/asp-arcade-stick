@@ -1,0 +1,372 @@
+diff --git a/in_sdl.c b/in_sdl.c
+index 64df96d..785a72c 100644
+--- a/in_sdl.c
++++ b/in_sdl.c
+@@ -10,10 +10,36 @@
+  */
+ 
+ #include <stdio.h>
++#include <stdlib.h>
+ #include <SDL.h>
+ #include "input.h"
+ #include "in_sdl.h"
+ 
++#ifdef ASP_BUILD
++/* Input tracing, off unless ASP_INPUT_LOG is set in the environment.
++ *
++ * This was written to discover the stick's button numbering, which could not
++ * be taken from the device's own RetroArch config, and it should have come out
++ * once that was known. Left on it costs seconds at a time during play: stderr
++ * is line buffered onto the USB card, so every press, release and direction
++ * change becomes a synchronous write to flash, and flash stalls for hundreds
++ * of milliseconds while it erases blocks. In a beat-em-up, where the button
++ * state changes several times a second, that is Streets of Rage 2 freezing
++ * mid-fight.
++ *
++ * Turn it back on for one run when a mapping needs establishing, not for play. */
++static int asp_input_log(void)
++{
++	static int on = -1;
++
++	if (on < 0) {
++		const char *e = getenv("ASP_INPUT_LOG");
++		on = (e != NULL && *e != '0');
++	}
++	return on;
++}
++#endif
++
+ #define IN_SDL_PREFIX "sdl:"
+ /* should be machine word for best performace */
+ typedef unsigned long keybits_t;
+@@ -24,6 +50,7 @@ struct in_sdl_state {
+ 	SDL_Joystick *joy;
+ 	int joy_id;
+ 	int axis_keydown[2];
++	int hat_prev;          /* last SDL_HAT_* bitmask seen */
+ #ifdef SDL_REDRAW_EVT
+ 	int redraw;
+ 	SDL_Event revent;
+@@ -273,6 +300,12 @@ static int handle_event(struct in_sdl_state *state, SDL_Event *event,
+ 	if (event->type != SDL_KEYDOWN && event->type != SDL_KEYUP)
+ 		return -1;
+ 
++#ifdef ASP_BUILD
++	if (event->type == SDL_KEYDOWN && asp_input_log())
++		fprintf(stderr, "asp-input: KEY %d down\n",
++			(int)event->key.keysym.sym);
++#endif
++
+ 	emu = get_keystate(state->emu_keys, event->key.keysym.sym);
+ 	update_keystate(state->keystate, event->key.keysym.sym,
+ 		event->type == SDL_KEYDOWN);
+@@ -291,6 +324,63 @@ static int handle_joy_event(struct in_sdl_state *state, SDL_Event *event,
+ {
+ 	int kc = -1, down = 0, emu = 0, ret = 0;
+ 
++#ifdef ASP_BUILD
++	/* Report what the stick actually sends. The ASP's controls appear as
++	 * "atc260x-adckeypad" and the button numbering could not be assumed
++	 * from the RetroArch config, which runs under a different userland.
++	 * Press each control once and the log gives the real indices. */
++	switch (event->type) {
++	case SDL_JOYBUTTONDOWN:
++		if (asp_input_log())
++			fprintf(stderr, "asp-input: joy %d BUTTON %d down\n",
++				(int)event->jbutton.which, (int)event->jbutton.button);
++		break;
++	case SDL_JOYAXISMOTION:
++		if (asp_input_log() &&
++		    (event->jaxis.value < -16384 || event->jaxis.value > 16384))
++			fprintf(stderr, "asp-input: joy %d AXIS %d = %d\n",
++				(int)event->jaxis.which, (int)event->jaxis.axis,
++				(int)event->jaxis.value);
++		break;
++	case SDL_JOYHATMOTION:
++		if (asp_input_log())
++			fprintf(stderr, "asp-input: joy %d HAT %d = %d\n",
++				(int)event->jhat.which, (int)event->jhat.hat,
++				(int)event->jhat.value);
++		/* libpicofe maps joystick AXES to the direction keys but has no hat
++		 * handling at all - hats fall through to default and are discarded.
++		 * On a pad whose D-pad reports as a hat that leaves every direction
++		 * dead, which is exactly what happened here when the stick
++		 * enumerated as something other than the built-in panel.
++		 *
++		 * Rather than return a single keycode, which cannot express a
++		 * diagonal or a release, the key states are updated directly; that
++		 * is what in_sdl_update reads. Falls through to default afterwards,
++		 * so nothing else changes. */
++		if (event->jhat.which == state->joy_id) {
++			static const struct { int bit, sym; } hatmap[4] = {
++				{ SDL_HAT_UP,    SDLK_UP    },
++				{ SDL_HAT_DOWN,  SDLK_DOWN  },
++				{ SDL_HAT_LEFT,  SDLK_LEFT  },
++				{ SDL_HAT_RIGHT, SDLK_RIGHT },
++			};
++			int now = event->jhat.value, was = state->hat_prev, k;
++			for (k = 0; k < 4; k++) {
++				int is_now = (now & hatmap[k].bit) != 0;
++				int was_then = (was & hatmap[k].bit) != 0;
++				if (is_now == was_then)
++					continue;
++				emu |= get_keystate(state->emu_keys, hatmap[k].sym);
++				update_keystate(state->keystate, hatmap[k].sym, is_now);
++			}
++			state->hat_prev = now;
++		}
++		break;
++	default:
++		break;
++	}
++#endif
++
+ 	/* TODO: remaining axis */
+ 	switch (event->type) {
+ 	case SDL_JOYAXISMOTION:
+@@ -463,8 +553,49 @@ static int in_sdl_update(void *drv_data, const int *binds, int *result)
+ 
+ 			for (b = 0; b < IN_BINDTYPE_COUNT; b++)
+ 				result[b] |= binds[IN_BIND_OFFS(sym, b)];
++
++#ifdef ASP_BUILD
++			/* Mega Drive input has twice been "fixed" on a theory and
++			 * twice stayed dead, so report the whole chain instead of
++			 * reasoning about it: which key symbol is held, and what
++			 * each bind type yields for it. If the symbol appears with
++			 * all-zero binds, the defaults never reached this device;
++			 * if the binds are non-zero but the game does not respond,
++			 * the fault is downstream of here. Logged on change only,
++			 * so it does not flood. */
++			{
++				static int last_sym = -1, last_e, last_p12;
++				int e   = binds[IN_BIND_OFFS(sym, IN_BINDTYPE_EMU)];
++				int p12 = binds[IN_BIND_OFFS(sym, IN_BINDTYPE_PLAYER12)];
++				if (asp_input_log() &&
++				    (sym != last_sym || e != last_e || p12 != last_p12)) {
++					fprintf(stderr, "asp-bind: dev=%s sym=%d (WORLD_0+%d) "
++						"emu=%08x player12=%08x\n",
++						state->joy ? "joy" : "keys",
++						sym, sym - SDLK_WORLD_0, e, p12);
++					last_sym = sym; last_e = e; last_p12 = p12;
++				}
++			}
++#endif
++		}
++	}
++
++#ifdef ASP_BUILD
++	{
++		static int last[IN_BINDTYPE_COUNT];
++		int b2, changed = 0;
++		for (b2 = 0; b2 < IN_BINDTYPE_COUNT; b2++)
++			if (result[b2] != last[b2]) changed = 1;
++		if (changed && asp_input_log()) {
++			fprintf(stderr, "asp-actions: emu=%08x player12=%08x "
++				"player34=%08x kbd=%08x\n",
++				result[IN_BINDTYPE_EMU], result[IN_BINDTYPE_PLAYER12],
++				result[IN_BINDTYPE_PLAYER34], result[IN_BINDTYPE_KEYBOARD]);
++			for (b2 = 0; b2 < IN_BINDTYPE_COUNT; b2++)
++				last[b2] = result[b2];
+ 		}
+ 	}
++#endif
+ 
+ 	return 0;
+ }
+diff --git a/linux/sndout_oss.c b/linux/sndout_oss.c
+index 6d4eded..92d513d 100644
+--- a/linux/sndout_oss.c
++++ b/linux/sndout_oss.c
+@@ -11,6 +11,7 @@
+ 
+ /* sound output via OSS */
+ #include <stdio.h>
++#include <stdlib.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <fcntl.h>
+@@ -68,15 +69,32 @@ int sndout_oss_start(int rate, int stereo)
+ 		return 0;
+ 
+ 	sndout_oss_stop();
+-	sounddev = open("/dev/dsp", O_WRONLY);
+-	if (sounddev == -1)
+ 	{
+-		perror("open(\"/dev/dsp\")");
+-		sounddev = open("/dev/dsp1", O_WRONLY);
+-		if (sounddev == -1) {
+-			perror("open(\"/dev/dsp1\")");
+-			return -1;
++		/* ASP/MVSX: the SNK firmware exposes its OSS node at
++		 * /dev/snd/actsnd and advertises it via SDL_DSP_DEV.
++		 * Honour that first, then the stock SDL variable, then
++		 * the usual OSS paths. */
++		static const char *const envs[] = { "SDL_DSP_DEV", "SDL_PATH_DSP" };
++		static const char *const paths[] = { "/dev/snd/actsnd", "/dev/dsp", "/dev/dsp1" };
++		const char *p;
++		int i;
++
++		sounddev = -1;
++		for (i = 0; i < 2 && sounddev == -1; i++) {
++			p = getenv(envs[i]);
++			if (p != NULL && *p != 0) {
++				sounddev = open(p, O_WRONLY);
++				if (sounddev == -1)
++					perror(p);
++			}
++		}
++		for (i = 0; i < 3 && sounddev == -1; i++) {
++			sounddev = open(paths[i], O_WRONLY);
++			if (sounddev == -1)
++				perror(paths[i]);
+ 		}
++		if (sounddev == -1)
++			return -1;
+ 	}
+ 
+ 	// try to fit sndout_oss_frag_frames (video) frames
+@@ -94,13 +112,19 @@ int sndout_oss_start(int rate, int stereo)
+ 		perror("SNDCTL_DSP_SETFRAGMENT failed");
+ 
+ 	bits = 16;
++	/* OSS wants format, then channels, then rate, in that order; the ASP's
++	 * driver rejects the stereo-first sequence with EINVAL. Each call is
++	 * also reported separately so a failure names itself instead of
++	 * collapsing into one "failed to set audio format". */
++	ret = ioctl(sounddev, SNDCTL_DSP_SETFMT, &bits);
++	if (ret < 0)
++		perror("SNDCTL_DSP_SETFMT");
+ 	ret = ioctl(sounddev, SNDCTL_DSP_STEREO, &stereo);
+-	if (ret == 0)
+-		ret = ioctl(sounddev, SNDCTL_DSP_SETFMT, &bits);
+-	if (ret == 0)
+-		ret = ioctl(sounddev, SNDCTL_DSP_SPEED, &rate);
+ 	if (ret < 0)
+-		perror("failed to set audio format");
++		perror("SNDCTL_DSP_STEREO");
++	ret = ioctl(sounddev, SNDCTL_DSP_SPEED, &rate);
++	if (ret < 0)
++		perror("SNDCTL_DSP_SPEED");
+ 
+ #ifdef __GP2X__
+ 	// not sure if this is still needed (avoiding driver bugs?)
+diff --git a/plat_sdl.c b/plat_sdl.c
+index c2b7bde..0e524fe 100644
+--- a/plat_sdl.c
++++ b/plat_sdl.c
+@@ -10,6 +10,7 @@
+  */
+ 
+ #include <stdio.h>
++#include <stdlib.h>
+ #include <stdint.h>
+ #include <SDL.h>
+ #include <SDL_syswm.h>
+@@ -42,6 +43,25 @@ int plat_sdl_change_video_mode(int w, int h, int force)
+ {
+   static int prev_w, prev_h;
+ 
++#ifdef ASP_BUILD
++  /* The ASP's mode is established once in plat_sdl_init and must never be
++   * touched again: this function hardcodes 16bpp, and a depth change hangs
++   * the display driver hard enough to take the device down. It was also
++   * silently converting the 32bpp surface to 16bpp after init, which is
++   * what made every blit land in a fraction of each row. Refuse outright
++   * rather than guard each caller, since any future caller is wrong too. */
++  if (plat_sdl_screen != NULL) {
++    static int told;
++    if (!told) {
++      told = 1;
++      fprintf(stderr, "asp: ignoring video mode change request (%dx%d), "
++        "keeping %dx%d %dbpp\n", w, h, plat_sdl_screen->w,
++        plat_sdl_screen->h, plat_sdl_screen->format->BitsPerPixel);
++    }
++    return 0;
++  }
++#endif
++
+   // skip GL recreation if window doesn't change - avoids flicker
+   if (plat_target.vout_method == vout_mode_gl && plat_sdl_gl_active
+       && plat_target.vout_fullscreen == old_fullscreen
+@@ -212,6 +232,52 @@ int plat_sdl_init(void)
+     printf("plat_sdl: using %dx%d as fullscreen resolution\n", fs_w, fs_h);
+   }
+ 
++#ifdef ASP_BUILD
++  /* The ASP framebuffer is 1280x720 at 32bpp and its display driver will
++   * not survive a depth change: asking for 1280x720x16 hangs the device
++   * outright. Take the mode exactly as it already is - native geometry,
++   * native depth (bpp 0) - so SDL_SetVideoMode never alters the hardware.
++   * Upstream's 640x480 cap is also skipped: at 640 wide SDL hands back a
++   * surface whose pitch is still the real framebuffer's 5120-byte line,
++   * and every blit then lands in the left quarter of each row. */
++  g_menuscreen_w = (fs_w > 0) ? fs_w : 1280;
++  g_menuscreen_h = (fs_h > 0) ? fs_h : 720;
++  {
++    /* Request the depth the display already reports, rather than 0 ("any"),
++     * which is driver-dependent - SDL's dummy driver answers 0 with 8bpp.
++     * This keeps the call as close to a no-op as a mode set can be.
++     * Logged either side because a depth change hangs this driver inside
++     * SDL_SetVideoMode, and a hard hang leaves no other trace. */
++    int bpp = (info != NULL && info->vfmt != NULL) ? info->vfmt->BitsPerPixel : 16;
++    /* test hook: lets the 32bpp path be exercised off-device, where the
++     * dummy video driver reports 8bpp */
++    const char *force = getenv("ASP_FORCE_BPP");
++    if (force != NULL && atoi(force) > 0)
++      bpp = atoi(force);
++    fprintf(stderr, "asp: SDL_SetVideoMode(%d,%d,%d) ...\n",
++      g_menuscreen_w, g_menuscreen_h, bpp);
++    plat_sdl_screen = SDL_SetVideoMode(g_menuscreen_w, g_menuscreen_h,
++      bpp, SDL_SWSURFACE);
++    fprintf(stderr, "asp: SDL_SetVideoMode returned %p\n", (void *)plat_sdl_screen);
++  }
++  /* Only 16bpp and 32bpp surfaces can be drawn to: the blits below write
++   * 2 or 4 bytes per pixel, so anything else would run past the end of
++   * every row. If the native depth is something else, ask for 16 and give
++   * up rather than scribble over the framebuffer. */
++  if (plat_sdl_screen != NULL) {
++    int bpp = plat_sdl_screen->format->BytesPerPixel;
++    if (bpp != 2 && bpp != 4) {
++      fprintf(stderr, "asp: native depth is %dbpp, retrying at 16\n", bpp * 8);
++      plat_sdl_screen = SDL_SetVideoMode(g_menuscreen_w, g_menuscreen_h,
++        16, SDL_SWSURFACE);
++      if (plat_sdl_screen != NULL &&
++          plat_sdl_screen->format->BytesPerPixel != 2) {
++        fprintf(stderr, "asp: cannot get a 16 or 32bpp surface, giving up\n");
++        goto fail;
++      }
++    }
++  }
++#else
+   g_menuscreen_w = 640;
+   if (fs_w != 0 && g_menuscreen_w > fs_w)
+     g_menuscreen_w = fs_w;
+@@ -225,6 +291,7 @@ int plat_sdl_init(void)
+   }
+ 
+   plat_sdl_screen = SDL_SetVideoMode(g_menuscreen_w, g_menuscreen_h, 16, SDL_HWSURFACE);
++#endif
+   if (plat_sdl_screen == NULL) {
+     plat_sdl_screen = SDL_SetVideoMode(0, 0, 16, SDL_SWSURFACE);
+     if (plat_sdl_screen == NULL) {
+@@ -243,12 +310,19 @@ int plat_sdl_init(void)
+   g_menuscreen_pp = g_menuscreen_w;
+ 
+   // overlay/gl require native bpp in some cases..
++#ifndef ASP_BUILD
+   plat_sdl_screen = SDL_SetVideoMode(g_menuscreen_w, g_menuscreen_h,
+     0, plat_sdl_screen->flags);
++#endif
+   if (plat_sdl_screen == NULL) {
+     fprintf(stderr, "SDL_SetVideoMode failed: %s\n", SDL_GetError());
+     goto fail;
+   }
++#ifdef ASP_BUILD
++  fprintf(stderr, "asp: init surface %dx%d %dbpp pitch %d\n",
++    plat_sdl_screen->w, plat_sdl_screen->h,
++    plat_sdl_screen->format->BitsPerPixel, plat_sdl_screen->pitch);
++#endif
+ 
+   plat_sdl_overlay = SDL_CreateYUVOverlay(plat_sdl_screen->w, plat_sdl_screen->h,
+     SDL_UYVY_OVERLAY, plat_sdl_screen);
