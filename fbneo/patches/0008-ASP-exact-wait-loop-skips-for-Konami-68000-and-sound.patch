@@ -1,7 +1,7 @@
 From 1c91626017a9732a2eeca8fb4c93d5ddfa513349 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 31 Oct 2026 15:46:25 +0000
-Subject: [PATCH 08/21] ASP: exact wait-loop skips for Konami 68000 and sound
+Subject: [PATCH 08/22] ASP: exact wait-loop skips for Konami 68000 and sound
  Z80 (idle_skips), NS draw split, harness sound hash
 
 Work in progress: proof runs (frames and sound identical with skips off/on) in progress.

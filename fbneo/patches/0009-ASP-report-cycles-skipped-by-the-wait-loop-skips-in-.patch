@@ -1,7 +1,7 @@
 From 5ac0fa5749c37c88c75776d8bd920d486249c34d Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 31 Oct 2026 15:59:13 +0000
-Subject: [PATCH 09/21] ASP: report cycles skipped by the wait-loop skips in
+Subject: [PATCH 09/22] ASP: report cycles skipped by the wait-loop skips in
  the exit log
 
 All ten Konami games proved identical (frames to 2000, sound to 2000 frames) with skips off vs on.

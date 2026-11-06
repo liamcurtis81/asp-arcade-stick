@@ -181,6 +181,10 @@ speed_hacks 1
 # safe cadence for them is the global 1. This section is here to be read, not
 # to change anything.
 [metamrph]
+# 6 Nov, v41: picture drawn on a second core, as Xexex and Night Slashers.
+# Harness, 2400 frames: render-thread pictures identical to inline at all ten
+# checkpoints, sound identical.
+async_draw 1
 draw_every_n 1
 # 31 Oct, trial: the sound device's own buffer 512 -> 256 samples (11.6 ms ->
 # 5.8 ms), about 6 ms less lag. v28 gameplay log: drawn frame 15.67 ms against
@@ -205,4 +209,10 @@ speed_hacks 1
 # pictures identical to inline at all ten checkpoints, sound identical,
 # emulation waited for the render thread twice. On the stick Xexex ran at
 # 91-93% with drawing inline; drawing was 5.8 ms of tilemaps alone.
+async_draw 1
+
+[viostorm]
+# 6 Nov, v41: picture drawn on a second core, as Xexex and Night Slashers.
+# Harness, 2400 frames: render-thread pictures identical to inline at all ten
+# checkpoints, sound identical.
 async_draw 1

@@ -1,7 +1,7 @@
 From f8ba3ace61ac1824ed6c61844096b21627ad4f31 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 31 Oct 2026 14:41:19 +0000
-Subject: [PATCH 07/21] ASP: Metamorphic Force sound Z80 idle-loop skip
+Subject: [PATCH 07/22] ASP: Metamorphic Force sound Z80 idle-loop skip
  (z80_idle), output identical
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

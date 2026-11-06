@@ -1,0 +1,316 @@
+From a3a807c80ca33f058b8964be60b59a5ada1716ad Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 21:05:06 +0000
+Subject: [PATCH 22/22] ASP: async draw for Metamorphic Force and Violent
+ Storm; per-thread GX mixer and K055555 state
+
+Harness, 2400 frames: render-thread pictures identical to inline at all ten
+checkpoints, sound identical. Mystic Warriors left inline: on the render
+thread it draws 81 stray sprite pixels at frame 50, cause not yet found.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/burn/drv/konami/d_mystwarr.cpp | 82 +++++++++++++++++++++++++-----
+ src/burn/drv/konami/k055555.cpp    | 11 +++-
+ src/burn/drv/konami/konamigx.cpp   | 63 ++++++++++++++++-------
+ src/burn/drv/konami/konamiic.cpp   |  4 +-
+ src/burn/drv/konami/konamiic.h     |  4 +-
+ 5 files changed, 128 insertions(+), 36 deletions(-)
+
+diff --git a/src/burn/drv/konami/d_mystwarr.cpp b/src/burn/drv/konami/d_mystwarr.cpp
+index 1423e00..3d96c54 100644
+--- a/src/burn/drv/konami/d_mystwarr.cpp
++++ b/src/burn/drv/konami/d_mystwarr.cpp
+@@ -69,10 +69,10 @@ static UINT8 *DrvGfxROMExp2;
+ static UINT8 *DrvSndROM;
+ static UINT8 *DrvEeprom;
+ static UINT8 *AllRam;
+-static UINT8 *Drv68KRAM;
++static ASP_TLS UINT8 *Drv68KRAM;
+ static UINT8 *DrvSpriteRam;
+ static UINT8 *DrvZ80RAM;
+-static UINT8 *DrvPalRAM;
++static ASP_TLS UINT8 *DrvPalRAM;
+ static UINT8 *DrvK053936Ctrl;
+ static UINT8 *DrvK053936RAM;
+ static UINT8 *RamEnd;
+@@ -84,14 +84,14 @@ static UINT8 *soundlatch;
+ static UINT8 *soundlatch2;
+ static UINT8 *soundlatch3;
+ 
+-static UINT32 *DrvPalette;
++static ASP_TLS UINT32 *DrvPalette;
+ static UINT8 DrvRecalc;
+ 
+-static INT32 layer_colorbase[4];
+-static INT32 sprite_colorbase = 0;
+-static INT32 sub1_colorbase;
+-static INT32 cbparam;
+-static INT32 oinprion;
++static ASP_TLS INT32 layer_colorbase[4];
++static ASP_TLS INT32 sprite_colorbase = 0;
++static ASP_TLS INT32 sub1_colorbase;
++static ASP_TLS INT32 cbparam;
++static ASP_TLS INT32 oinprion;
+ 
+ static UINT8 DrvJoy1[16];
+ static UINT8 DrvJoy2[16];
+@@ -1743,10 +1743,10 @@ static UINT8 __fastcall mystwarr_sound_read(UINT16 address)
+ }
+ 
+ //--------------------------------------------------------------------------------------------------------------
+-static INT32 superblend = 0;
+-static INT32 oldsuperblend = 0;
+-static INT32 superblendoff = 0;
+-static INT32 superblendl0 = 0;
++static ASP_TLS INT32 superblend = 0;
++static ASP_TLS INT32 oldsuperblend = 0;
++static ASP_TLS INT32 superblendoff = 0;
++static ASP_TLS INT32 superblendl0 = 0;
+ 
+ static void mystwarr_tile_callback(INT32 layer, INT32 *code, INT32 *color, INT32 *flags)
+ {
+@@ -2833,6 +2833,10 @@ static INT32 DadandrnInit()
+ 
+ static INT32 DrvExit()
+ {
++#ifdef BUILD_ASP
++	extern void asp_async_stop();
++	asp_async_stop();
++#endif
+ 	gamma_exit();
+ 
+ 	GenericTilesExit();
+@@ -3102,6 +3106,56 @@ static INT32 asp_mw_zet_slice(INT32 target, INT32 done)
+ 	return ran;
+ }
+ 
++#ifdef BUILD_ASP
++// ASP: picture drawn on a second core for Mystic Warriors, Metamorphic Force
++// and Violent Storm (nGame 1-3), as Xexex. The draw reads palette RAM, one
++// work-RAM byte (Mystic Warriors' superblend scene id at 0x2335) and the GX
++// mixer's chips: K056832, K053247, K053250 (Metamorphic Force, Violent
++// Storm), K054338, K055555. The superblend counters live in the render
++// thread's own copies, which carry over from picture to picture as they did
++// on one thread. Martial Champion, Gaiapolis and Monster Maulers (K053936
++// roz) keep drawing inline.
++extern int asp_async_draw(void (*capture)(void), void (*bind)(void), INT32 (*draw)(void), INT32 height);
++extern void asp_async_stop();
++static UINT8 asp_mw_palram[0x2000];
++static UINT8 asp_mw_ram[0x10000];
++static UINT32 *asp_mw_palette = NULL;
++
++static void asp_mw_capture()
++{
++	memcpy(asp_mw_palram, DrvPalRAM, sizeof(asp_mw_palram));
++	asp_mw_ram[0x2335] = Drv68KRAM[0x2335];
++	K056832AspCapture(); K053247AspCapture(); K054338AspCapture(); K055555AspCapture();
++	if (nGame == 2 || nGame == 3) K053250AspCapture();
++	KonamiGXAspCapture();
++}
++
++static void asp_mw_bind()
++{
++	if (asp_mw_palette == NULL) asp_mw_palette = (UINT32*)calloc(0x0800, sizeof(UINT32));
++	DrvPalRAM = asp_mw_palram;
++	Drv68KRAM = asp_mw_ram;
++	DrvPalette = konami_palette32 = asp_mw_palette;
++	K056832AspBind(); K053247AspBind(); K054338AspBind(); K055555AspBind();
++	if (nGame == 2 || nGame == 3) K053250AspBind();
++	KonamiAspBindBitmaps();
++	KonamiGXAspBind();
++}
++
++static void asp_mw_draw_or_async()
++{
++	// Mystic Warriors (nGame 1) stays inline: on the render thread it draws a
++	// line of stray sprite pixels the inline draw does not (harness, frame 50,
++	// 81 pixels), cause not yet found. Metamorphic Force and Violent Storm are
++	// identical at all ten checkpoints.
++	if ((nGame == 2 || nGame == 3) && asp_async_draw(asp_mw_capture, asp_mw_bind, DrvDraw, nScreenHeight)) return;
++	DrvDraw();
++}
++#define ASP_MW_DRAW() asp_mw_draw_or_async()
++#else
++#define ASP_MW_DRAW() DrvDraw()
++#endif
++
+ static INT32 DrvFrame()
+ {
+ #ifdef BUILD_ASP
+@@ -3185,7 +3239,7 @@ static INT32 DrvFrame()
+ 
+ 				if (pBurnDraw && nGame == 2) { // metamrph only
+ 					// draw here to fix flickery and missing text in service mode
+-					DrvDraw();
++					ASP_MW_DRAW();
+ 					drawn = 1;
+ 				}
+ 			}
+@@ -3273,7 +3327,7 @@ static INT32 DrvFrame()
+ 
+ 	if (!drawn) {
+ 		if (pBurnDraw) {
+-			DrvDraw();
++			ASP_MW_DRAW();
+ 		}
+ 	}
+ 
+diff --git a/src/burn/drv/konami/k055555.cpp b/src/burn/drv/konami/k055555.cpp
+index 2023026..095444d 100644
+--- a/src/burn/drv/konami/k055555.cpp
++++ b/src/burn/drv/konami/k055555.cpp
+@@ -6,8 +6,15 @@
+ #include "burnint.h"
+ #include "konamiic.h"
+ 
+-static UINT8 m_regs[128];
+-INT32 K055555_enabled = 0;
++static ASP_TLS UINT8 m_regs[128];
++ASP_TLS INT32 K055555_enabled = 0;
++
++#ifdef BUILD_ASP
++static UINT8 k055555_snap_regs[128];
++static INT32 k055555_snap_en;
++void K055555AspCapture() { memcpy(k055555_snap_regs, m_regs, sizeof(m_regs)); k055555_snap_en = K055555_enabled; }
++void K055555AspBind() { memcpy(m_regs, k055555_snap_regs, sizeof(m_regs)); K055555_enabled = k055555_snap_en; }
++#endif
+ 
+ void K055555WriteReg(UINT8 regnum, UINT8 regdat)
+ {
+diff --git a/src/burn/drv/konami/konamigx.cpp b/src/burn/drv/konami/konamigx.cpp
+index f33ea1c..5408d58 100644
+--- a/src/burn/drv/konami/konamigx.cpp
++++ b/src/burn/drv/konami/konamigx.cpp
+@@ -12,32 +12,35 @@ static INT32 konamigx_wrport1_0 = 0;
+ //static UINT8 m_sound_intck;
+ //static UINT32 m_fantjour_dma[8];
+ //static INT32 m_konamigx_current_frame;
+-static INT32 m_gx_objdma, m_gx_primode;
++static INT32 m_gx_objdma;
++static ASP_TLS INT32 m_gx_primode;
+ 
+ #define GX_MAX_SPRITES 512
+ #define GX_MAX_LAYERS  6
+ #define GX_MAX_OBJECTS (GX_MAX_SPRITES + GX_MAX_LAYERS)
+ 
+-static struct GX_OBJ { INT32 order, offs, code, color; } *gx_objpool;
+-static UINT16 *gx_spriteram;
++struct GX_OBJ { INT32 order, offs, code, color; };
++static ASP_TLS struct GX_OBJ *gx_objpool;
++static ASP_TLS UINT16 *gx_spriteram;
+ 
+-static INT32 *K054338_shdRGB;
++static ASP_TLS INT32 *K054338_shdRGB;
+ 
+-static UINT8 *gx_shdzbuf, *gx_objzbuf;
++static ASP_TLS UINT8 *gx_shdzbuf;
++static ASP_TLS UINT8 *gx_objzbuf;
+ 
+-static INT32 k053247_vrcbk[4];
+-static INT32 k053247_opset;
+-static INT32 k053247_coreg;
+-static INT32 k053247_coregshift;
++static ASP_TLS INT32 k053247_vrcbk[4];
++static ASP_TLS INT32 k053247_opset;
++static ASP_TLS INT32 k053247_coreg;
++static ASP_TLS INT32 k053247_coregshift;
+ 
+-static INT32 opri;
+-static INT32 oinprion;
+-static INT32 vcblk[6];
+-static INT32 ocblk;
+-static INT32 vinmix;
+-static INT32 vmixon;
+-static INT32 osinmix;
+-static INT32 osmixon;
++static ASP_TLS INT32 opri;
++static ASP_TLS INT32 oinprion;
++static ASP_TLS INT32 vcblk[6];
++static ASP_TLS INT32 ocblk;
++static ASP_TLS INT32 vinmix;
++static ASP_TLS INT32 vmixon;
++static ASP_TLS INT32 osinmix;
++static ASP_TLS INT32 osmixon;
+ 
+ void konamigx_precache_registers()
+ {
+@@ -78,6 +81,29 @@ void konamigx_precache_registers()
+ 	osmixon  = K055555ReadRegister(K55_OSBLEND_ON);
+ }
+ 
++#ifdef BUILD_ASP
++// Async draw: the render thread gets its own mixing scratch (z-buffers and the
++// object pool), its own pointer to K054338's shadow table, and the sprite list
++// it should read. The register caches above are refilled by the mixer itself
++// (konamigx_precache_registers) from the K053247/K055555 copies bound for it.
++static UINT16 *konamigx_snap_spriteram = NULL;
++void KonamiGXAspCapture()
++{
++	if (m_gx_objdma && gx_spriteram) {
++		if (!konamigx_snap_spriteram) konamigx_snap_spriteram = (UINT16*)BurnMalloc(0x1000);
++		memcpy(konamigx_snap_spriteram, gx_spriteram, 0x1000);
++	}
++}
++void KonamiGXAspBind()
++{
++	if (!gx_shdzbuf) gx_shdzbuf = (UINT8*)calloc(1, 512 * 256 * 2);
++	if (!gx_objzbuf) gx_objzbuf = (UINT8*)calloc(1, 512 * 256 * 2);
++	if (!gx_objpool) gx_objpool = (struct GX_OBJ*)calloc(GX_MAX_OBJECTS, sizeof(GX_OBJ));
++	K054338_export_config(&K054338_shdRGB);   // this thread's m_shd_rgb
++	gx_spriteram = m_gx_objdma ? konamigx_snap_spriteram : (UINT16*)K053247Ram;
++}
++#endif
++
+ void konamigx_mixer_init(INT32 objdma)
+ {
+ 	KonamiIC_GX_MixerInUse = 1;
+@@ -108,6 +134,9 @@ void konamigx_mixer_init(INT32 objdma)
+ 
+ void konamigx_mixer_exit()
+ {
++#ifdef BUILD_ASP
++	BurnFree(konamigx_snap_spriteram);
++#endif
+ 	BurnFree(gx_shdzbuf);
+ 	BurnFree(gx_objzbuf);
+ 	if (m_gx_objdma && gx_spriteram) {
+diff --git a/src/burn/drv/konami/konamiic.cpp b/src/burn/drv/konami/konamiic.cpp
+index b75412f..2a6733f 100644
+--- a/src/burn/drv/konami/konamiic.cpp
++++ b/src/burn/drv/konami/konamiic.cpp
+@@ -20,8 +20,8 @@ ASP_TLS UINT32 *konami_palette32;
+ // konami_priority_bitmap start NULL there). Allocated once, kept.
+ void KonamiAspBindBitmaps()
+ {
+-	if (konami_bitmap32 == NULL) konami_bitmap32 = (UINT32*)malloc(nScreenWidth * nScreenHeight * sizeof(UINT32));
+-	if (konami_priority_bitmap == NULL) konami_priority_bitmap = (UINT8*)malloc(nScreenWidth * nScreenHeight);
++	if (konami_bitmap32 == NULL) konami_bitmap32 = (UINT32*)calloc(nScreenWidth * nScreenHeight, sizeof(UINT32));
++	if (konami_priority_bitmap == NULL) konami_priority_bitmap = (UINT8*)calloc(nScreenWidth * nScreenHeight, 1);
+ }
+ #endif
+ 
+diff --git a/src/burn/drv/konami/konamiic.h b/src/burn/drv/konami/konamiic.h
+index 72093d7..6ff1bc8 100644
+--- a/src/burn/drv/konami/konamiic.h
++++ b/src/burn/drv/konami/konamiic.h
+@@ -435,7 +435,7 @@ extern ASP_TLS INT32 m_shd_rgb[12];
+ #define K055555_SKIPSHADOW  0x40000000
+ #define K055555_FULLSHADOW  0x80000000
+ 
+-extern INT32 K055555_enabled;
++extern ASP_TLS INT32 K055555_enabled;
+ void K055555WriteReg(UINT8 regnum, UINT8 regdat);
+ void K055555LongWrite(INT32 offset, UINT32 data); // not implimented
+ void K055555WordWrite(INT32 offset, UINT16 data);
+@@ -478,4 +478,6 @@ void K053250AspCapture(); void K053250AspBind();
+ void K054338AspCapture(); void K054338AspBind();
+ void K053251AspCapture(); void K053251AspBind();
+ void KonamiAspBindBitmaps();
++void K055555AspCapture(); void K055555AspBind();
++void KonamiGXAspCapture(); void KonamiGXAspBind();
+ #endif
+-- 
+2.43.0
+

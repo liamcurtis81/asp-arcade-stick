@@ -1,7 +1,7 @@
 From e35a698de3b1455818df2443400ec8ac4c2a868d Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Thu, 29 Oct 2026 21:00:11 +0000
-Subject: [PATCH 01/21] ASP port: Actions Semi gs702c backend, tuning, and
+Subject: [PATCH 01/22] ASP port: Actions Semi gs702c backend, tuning, and
  renderer instrumentation
 
 Carries the Arcade Stick Pro work that has been living uncommitted in the
