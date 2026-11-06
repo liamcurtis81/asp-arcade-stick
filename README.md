@@ -1,8 +1,11 @@
 # Neo Geo Arcade Stick Pro: private mods
 
-Private. Do not make public: the SDL changes are not for upstream (SDL asks
-that AI-generated code not be contributed), and the FBNeo changes stay off the
-public FBNeo project.
+Personal modding work for the SNK Neo Geo Arcade Stick Pro. Not affiliated
+with SNK, FinalBurn Neo or SDL. No ROMs or game artwork are included.
+
+The SDL changes are a private fork only and are not to be submitted to the
+SDL project, which asks that AI-generated code not be contributed. The FBNeo
+changes are not intended for the upstream FBNeo project either.
 
 ## Layout
 
