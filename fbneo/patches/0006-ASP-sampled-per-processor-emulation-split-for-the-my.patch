@@ -1,7 +1,7 @@
 From 90957b7e180948927c8d1fbc95b578972d81185e Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 31 Oct 2026 09:47:55 +0000
-Subject: [PATCH 06/22] ASP: sampled per-processor emulation split for the
+Subject: [PATCH 06/23] ASP: sampled per-processor emulation split for the
  mystwarr driver
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

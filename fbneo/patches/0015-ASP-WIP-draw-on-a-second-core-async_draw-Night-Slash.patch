@@ -1,7 +1,7 @@
 From 4f724191fd31f2c0e8702d9d5deeee56000d88e2 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sun, 1 Nov 2026 16:34:27 +0000
-Subject: [PATCH 15/22] ASP WIP: draw on a second core (async_draw), Night
+Subject: [PATCH 15/23] ASP WIP: draw on a second core (async_draw), Night
  Slashers first - unproven, building
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

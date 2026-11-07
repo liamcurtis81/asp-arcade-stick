@@ -1,0 +1,40 @@
+From 796cab2dd557226766936f86a0de9a7d5c4246b6 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 15:06:40 +0000
+Subject: [PATCH 23/23] ASP: bind TEST/SERVICE/RESET only when joystick 0 is
+ the stick (12 buttons)
+
+Through the Mayflash adaptor the SFC30's Start is button 12, which opened the
+test menu with no way to leave it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/intf/input/pi/inp_pi.cpp | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/src/intf/input/pi/inp_pi.cpp b/src/intf/input/pi/inp_pi.cpp
+index 4f9518f..f400422 100644
+--- a/src/intf/input/pi/inp_pi.cpp
++++ b/src/intf/input/pi/inp_pi.cpp
+@@ -782,6 +782,17 @@ static int readConfigFile(int pindex, const char *path, int sixButton)
+ 				"ignored\n", line);
+ 			continue;
+ 		}
++		// ASP: TEST / SERVICE / RESET are numbered for the stick's own 12
++		// buttons. A pad on the Mayflash adaptor takes over as joystick 0 with
++		// 16 buttons numbered differently - on the SFC30, Start is 12, which
++		// opened the test menu with no d-pad to leave it. Until each pad has
++		// its own map, these three bind only when joystick 0 is the stick.
++		if (pindex == 0 && (strncmp(line, "TEST", 4) == 0 || strncmp(line, "SERVICE", 7) == 0 || strncmp(line, "RESET", 5) == 0)
++			&& !(nJoystickCount > 0 && JoyList[0] && SDL_JoystickNumButtons(JoyList[0]) == 12)) {
++			fprintf(stderr, "joyconfig: %s skipped - joystick 0 is not the stick (%d buttons)\n", line,
++				nJoystickCount > 0 && JoyList[0] ? SDL_JoystickNumButtons(JoyList[0]) : -1);
++			continue;
++		}
+ 		if (pindex == 0 && strncmp(line, "TEST", 4) == 0) {
+ 			joyLookupTable[FBK_F2] = JOY_MAP_BUTTON(pindex, hbindex);
+ 		} else if (pindex == 0 && strncmp(line, "SERVICE", 7) == 0) {
+-- 
+2.43.0
+
