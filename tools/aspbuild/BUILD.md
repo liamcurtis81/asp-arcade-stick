@@ -3703,3 +3703,13 @@ PNGs, commit the zip (not stamped), and extract on the Mac with device_bash,
 writing in place (open r+b, truncate) because deletion is not permitted on the
 card. Then grep the card for caBX: must be zero. Covers written by the Mac-side
 python (pills) were never affected.
+
+## Pad mode (Mayflash Magic-S Pro 2)
+
+With the adaptor plugged in, SDL sees a 16-button joystick and each console
+emulator switches to a pad layout at start-up; without it, the stick layout
+is unchanged.
+
+- SNES, SFC30: every button on its SNES counterpart. Exit: hold Select + Start for 1 s.
+- NES, SFC30: B and A as printed, Y and X are turbo B and turbo A. Exit: hold Select + Start for 1.5 s.
+- Mega Drive, M30: A B C X Y Z and Start as printed, Mode on heart, emulator menu on minus.

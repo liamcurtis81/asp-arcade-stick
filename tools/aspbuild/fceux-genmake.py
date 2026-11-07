@@ -10,7 +10,7 @@ import glob
 import os
 import re
 
-SRC = '/home/claude/nesbuild/fceux/trunk/src'
+SRC = '/home/claude/aspwork/src/fceux/trunk/src'
 
 
 def split_block(path, var='source_list'):
