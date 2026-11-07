@@ -1,5 +1,5 @@
 diff --git a/in_sdl.c b/in_sdl.c
-index 64df96d..785a72c 100644
+index 64df96d..0811d3e 100644
 --- a/in_sdl.c
 +++ b/in_sdl.c
 @@ -10,10 +10,36 @@
@@ -60,7 +60,7 @@ index 64df96d..785a72c 100644
  	emu = get_keystate(state->emu_keys, event->key.keysym.sym);
  	update_keystate(state->keystate, event->key.keysym.sym,
  		event->type == SDL_KEYDOWN);
-@@ -291,6 +324,63 @@ static int handle_joy_event(struct in_sdl_state *state, SDL_Event *event,
+@@ -291,6 +324,80 @@ static int handle_joy_event(struct in_sdl_state *state, SDL_Event *event,
  {
  	int kc = -1, down = 0, emu = 0, ret = 0;
  
@@ -112,8 +112,25 @@ index 64df96d..785a72c 100644
 +					continue;
 +				emu |= get_keystate(state->emu_keys, hatmap[k].sym);
 +				update_keystate(state->keystate, hatmap[k].sym, is_now);
++				/* The menu reads one keycode per event, not key states, so
++				 * also hand back a direction: a new press if there is one,
++				 * otherwise the release. Without this the d-pad steers the
++				 * game but is dead in the menu. */
++				if (kc < 0 || (is_now && !down)) {
++					kc = hatmap[k].sym;
++					down = is_now;
++				}
 +			}
 +			state->hat_prev = now;
++			if (kc >= 0) {
++				if (kc_out != NULL)
++					*kc_out = kc;
++				if (down_out != NULL)
++					*down_out = down;
++				if (emu_out != NULL)
++					*emu_out = emu;
++				return 1;
++			}
 +		}
 +		break;
 +	default:
@@ -124,7 +141,7 @@ index 64df96d..785a72c 100644
  	/* TODO: remaining axis */
  	switch (event->type) {
  	case SDL_JOYAXISMOTION:
-@@ -463,8 +553,49 @@ static int in_sdl_update(void *drv_data, const int *binds, int *result)
+@@ -463,8 +570,49 @@ static int in_sdl_update(void *drv_data, const int *binds, int *result)
  
  			for (b = 0; b < IN_BINDTYPE_COUNT; b++)
  				result[b] |= binds[IN_BIND_OFFS(sym, b)];
