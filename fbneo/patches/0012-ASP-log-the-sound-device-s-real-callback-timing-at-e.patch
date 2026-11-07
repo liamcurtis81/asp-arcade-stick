@@ -1,7 +1,7 @@
 From e921afeb700d7f2341247aa50aed74d3beee4fed Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sun, 1 Nov 2026 16:05:14 +0000
-Subject: [PATCH 12/23] ASP: log the sound device's real callback timing at
+Subject: [PATCH 12/24] ASP: log the sound device's real callback timing at
  exit
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

@@ -1,0 +1,25 @@
+# 8BitDo pad on the Mayflash adaptor - six-button fighters (CPS1, CPS2, CPS3).
+# Loaded instead of capcom6.jc when the adaptor is player 1 (16 buttons).
+#
+# Laid out for the M30, like Capcom's own six-button pads: punches on the top
+# row, kicks on the bottom, light to heavy left to right.
+#
+#   top row:     X (LP)   Y (MP)   Z (HP)
+#   bottom row:  A (LK)   B (MK)   C (HK)
+#
+# 1-based SDL button numbers through the adaptor:
+#   Y 1  B 2  C/R 3  X 4  A 5  heart 6  Z/L 7  star 8  minus 10  Select 11  Start 12
+# On the SFC30 the same numbers land on X/Y/L top and A/B/R bottom.
+#
+# Credit is minus (M30) or Select (SFC30). Hold credit + Start for a second
+# to leave the game; the pad has no Options button.
+
+BUTTON1=4
+BUTTON2=1
+BUTTON3=7
+BUTTON4=5
+BUTTON5=2
+BUTTON6=3
+
+COIN=10
+START=12

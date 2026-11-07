@@ -1,7 +1,7 @@
 From 547eb8d3aa5e0ff10c6a9c68e7cc9fb3f6673f70 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 30 Oct 2026 16:15:17 +0000
-Subject: [PATCH 04/23] ASP: present worker thread (present_thread), present
+Subject: [PATCH 04/24] ASP: present worker thread (present_thread), present
  mode in exit report
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

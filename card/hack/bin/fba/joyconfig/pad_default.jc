@@ -1,0 +1,25 @@
+# 8BitDo pad on the Mayflash adaptor - every other arcade game.
+# Loaded instead of default.jc when the adaptor is player 1 (16 buttons).
+#
+# Neo Geo style: A B C along the M30's bottom row, D on X, then Y and Z for
+# games with five or six buttons.
+#
+#   game button:  1   2   3   4   5   6
+#   M30:          A   B   C   X   Y   Z
+#   SFC30:        A   B   R   X   Y   L
+#
+# 1-based SDL button numbers through the adaptor:
+#   Y 1  B 2  C/R 3  X 4  A 5  heart 6  Z/L 7  star 8  minus 10  Select 11  Start 12
+#
+# Credit is minus (M30) or Select (SFC30). Hold credit + Start for a second
+# to leave the game; the pad has no Options button.
+
+BUTTON1=5
+BUTTON2=2
+BUTTON3=3
+BUTTON4=4
+BUTTON5=1
+BUTTON6=7
+
+COIN=10
+START=12

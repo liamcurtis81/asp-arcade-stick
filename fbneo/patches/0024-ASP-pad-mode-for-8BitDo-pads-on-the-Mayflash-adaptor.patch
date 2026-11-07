@@ -1,0 +1,131 @@
+From c91be55615b07f1469b297dd622a6c0b6a3f8d3f Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 15:29:46 +0000
+Subject: [PATCH 24/24] ASP: pad mode for 8BitDo pads on the Mayflash adaptor -
+ pad_*.jc maps, hat directions, Select as credit, credit+Start held to exit
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/intf/input/pi/inp_pi.cpp | 70 ++++++++++++++++++++++++++++++++----
+ 1 file changed, 64 insertions(+), 6 deletions(-)
+
+diff --git a/src/intf/input/pi/inp_pi.cpp b/src/intf/input/pi/inp_pi.cpp
+index f400422..dcbcf81 100644
+--- a/src/intf/input/pi/inp_pi.cpp
++++ b/src/intf/input/pi/inp_pi.cpp
+@@ -83,6 +83,23 @@ static int asp_kbd_fd[ASP_MAX_KBD];
+ static int asp_kbd_count = -1;			// -1 = not yet opened
+ static unsigned char asp_dir_down[4];	// up, down, left, right
+ 
++// ASP: a pad on the Mayflash Magic-S Pro 2 adaptor (8BitDo SFC30 or M30).
++// The adaptor appears as SDL joystick 0, "JJ", with 16 buttons and a hat,
++// and while it is plugged in the stick's own buttons do not reach SDL (the
++// stick's directions still arrive through evdev). Button numbers, from
++// fba_input.log with each pad (0-based SDL index = evdev code - 304):
++//   SFC30  Y 0  B 1  R 2  X 3  A 4  L 6  Select 10  Start 11
++//   M30    Y 0  B 1  C 2  X 3  A 4  heart 5  Z 6  star 7  minus 9  Start 11
++// In pad mode the maps come from pad_*.jc, the d-pad is read from the hat,
++// Select (10) counts as minus (9) so both pads insert a credit, and holding
++// credit + Start for a second exits the game - the pad has no Options.
++static int asp_pad_mode = 0;
++static unsigned char asp_hat_down[4];	// up, down, left, right from the pad's hat
++static Uint32 asp_pad_exit_since = 0;
++#define ASP_PAD_COIN 9
++#define ASP_PAD_SELECT 10
++#define ASP_PAD_START 11
++
+ static int asp_dir_index(int code)
+ {
+ 	switch (code) {
+@@ -513,10 +530,10 @@ static int piInputState(int nCode)
+ 	// the keyboard table because keyLookupTable holds -1 for anything SDL
+ 	// never mapped, and KEY_IS_DOWN(-1) reads off the front of the array.
+ 	switch (nCode) {
+-	case FBK_UPARROW:    if (asp_dir_down[0]) return 1; break;
+-	case FBK_DOWNARROW:  if (asp_dir_down[1]) return 1; break;
+-	case FBK_LEFTARROW:  if (asp_dir_down[2]) return 1; break;
+-	case FBK_RIGHTARROW: if (asp_dir_down[3]) return 1; break;
++	case FBK_UPARROW:    if (asp_dir_down[0] || asp_hat_down[0]) return 1; break;
++	case FBK_DOWNARROW:  if (asp_dir_down[1] || asp_hat_down[1]) return 1; break;
++	case FBK_LEFTARROW:  if (asp_dir_down[2] || asp_hat_down[2]) return 1; break;
++	case FBK_RIGHTARROW: if (asp_dir_down[3] || asp_hat_down[3]) return 1; break;
+ 	default: break;
+ 	}
+ #endif
+@@ -653,6 +670,10 @@ static void scanJoysticks()
+ 		}
+ 		for (int button = 0, shift = 4; button < buttonCount; button++, shift++) {
+ 			int state = SDL_JoystickGetButton(joystick, button);
++#ifdef BUILD_ASP
++			if (asp_pad_mode && joy == 0 && button == ASP_PAD_COIN && SDL_JoystickGetButton(joystick, ASP_PAD_SELECT))
++				state = 1;
++#endif
+ 			joyButtonStates[joy] |= ((state & 1) << shift);
+ 
+ 			if (state && isExitBinding(JOY_MAP_BUTTON(joy, button))) {
+@@ -661,6 +682,26 @@ static void scanJoysticks()
+ 			}
+ 		}
+ 
++#ifdef BUILD_ASP
++		if (asp_pad_mode && joy == 0) {
++			Uint8 hat = SDL_JoystickNumHats(joystick) > 0 ? SDL_JoystickGetHat(joystick, 0) : 0;
++			asp_hat_down[0] = (hat & SDL_HAT_UP) != 0;
++			asp_hat_down[1] = (hat & SDL_HAT_DOWN) != 0;
++			asp_hat_down[2] = (hat & SDL_HAT_LEFT) != 0;
++			asp_hat_down[3] = (hat & SDL_HAT_RIGHT) != 0;
++			int credit = SDL_JoystickGetButton(joystick, ASP_PAD_COIN) || SDL_JoystickGetButton(joystick, ASP_PAD_SELECT);
++			if (credit && SDL_JoystickGetButton(joystick, ASP_PAD_START)) {
++				if (asp_pad_exit_since == 0) asp_pad_exit_since = SDL_GetTicks();
++				else if (SDL_GetTicks() - asp_pad_exit_since > 1000) {
++					fprintf(stderr, "asp: pad credit + Start held, exiting\n");
++					nExitEmulator = 1;
++					return;
++				}
++			} else {
++				asp_pad_exit_since = 0;
++			}
++		}
++#endif
+ 		if (joyButtonStates[joy] != 0) {
+ 			inputEventOccurred = 1;
+ 		}
+@@ -885,7 +926,24 @@ static void resetJoystickMap()
+ 	char path[512];
+ 	int sixButton = usesStreetFighterLayout();
+ 
+-	int loadConfig = configExists(path, sizeof(path), BurnDrvGetText(DRV_NAME))
++	int loadConfig = 0;
++#ifdef BUILD_ASP
++	asp_pad_mode = (nJoystickCount > 0 && JoyList[0] && SDL_JoystickNumButtons(JoyList[0]) == 16);
++	memset(asp_hat_down, 0, sizeof(asp_hat_down));
++	if (asp_pad_mode) {
++		char pn[96], pp[96];
++		snprintf(pn, sizeof pn, "pad_%s", BurnDrvGetText(DRV_NAME));
++		snprintf(pp, sizeof pp, "pad_%s", BurnDrvGetText(DRV_PARENT) ? BurnDrvGetText(DRV_PARENT) : "");
++		loadConfig = configExists(path, sizeof(path), pn)
++			|| (BurnDrvGetText(DRV_PARENT) && configExists(path, sizeof(path), pp))
++			|| (sixButton && configExists(path, sizeof(path), "pad_capcom6"))
++			|| configExists(path, sizeof(path), "pad_default");
++		fprintf(stderr, "asp: pad on the adaptor is player 1 (\"%s\", 16 buttons): %s\n",
++			SDL_JoystickName(0), loadConfig ? path : "no pad_*.jc found, using the stick's maps");
++	}
++	if (!loadConfig)
++#endif
++	loadConfig = configExists(path, sizeof(path), BurnDrvGetText(DRV_NAME))
+ 		|| configExists(path, sizeof(path), BurnDrvGetText(DRV_PARENT))
+ 		|| (sixButton && configExists(path, sizeof(path), "capcom6"))
+ 		|| configExists(path, sizeof(path), "default");
+@@ -908,7 +966,7 @@ static void resetJoystickMap()
+ 	// missing or unreadable joyconfig would leave a game with no way out but
+ 	// the power switch - and power-cycling to exit is what corrupted the USB
+ 	// card twice. A built-in exit is worth more than a tidy abstraction.
+-	if (joyLookupTable[FBK_ESCAPE] == -1 && joyLookupTable[FBK_F12] == -1) {
++	if (!asp_pad_mode && joyLookupTable[FBK_ESCAPE] == -1 && joyLookupTable[FBK_F12] == -1) {
+ 		joyLookupTable[FBK_ESCAPE] = JOY_MAP_BUTTON(0, ASP_OPTIONS_BUTTON);
+ 		// stderr, like the other asp: lines: stdout is block-buffered here,
+ 		// and a message about how to quit is no use if it is still sitting in
+-- 
+2.43.0
+

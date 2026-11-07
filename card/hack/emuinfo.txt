@@ -17,4 +17,4 @@ fba
 fbneo
 /mnt/hdisk/ASPh/retroarch/bin/fbneo
 fbax
-/mnt/hdisk/ASPh/hack/bin/fba/fba_v41.dge
+/mnt/hdisk/ASPh/hack/bin/fba/fba_v43.dge

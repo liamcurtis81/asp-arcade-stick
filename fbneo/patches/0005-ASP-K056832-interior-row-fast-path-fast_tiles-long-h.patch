@@ -1,7 +1,7 @@
 From 5cd9a363dcb5baa983aaed29c35a0449d2a7e4ee Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 30 Oct 2026 18:02:30 +0000
-Subject: [PATCH 05/23] ASP: K056832 interior-row fast path (fast_tiles), long
+Subject: [PATCH 05/24] ASP: K056832 interior-row fast path (fast_tiles), long
  hash checkpoints
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
