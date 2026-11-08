@@ -3713,3 +3713,24 @@ is unchanged.
 - SNES, SFC30: every button on its SNES counterpart. Exit: hold Select + Start for 1 s.
 - NES, SFC30: B and A as printed, Y and X are turbo B and turbo A. Exit: hold Select + Start for 1.5 s.
 - Mega Drive, M30: A B C X Y Z and Start as printed, Mode on heart, emulator menu on minus.
+
+## gpSP -> gba_emu_p1.dge (Game Boy Advance)
+
+Source: `libretro/gpsp` at 5819380. Apply `gpsp-asp.patch` (adds `asp/`: a
+standalone SDL frontend that links the core statically, plus the shared
+screen helpers) and run `asp/build.sh`. Built for armv7-a, translator on;
+no divide instructions. The frontend unzips the game to /tmp, fits the 3:2
+picture with asp_geom.h (`ASP_SYS_AR_W/H` now set the system shape, 4:3 by
+default), resamples 32768 Hz sound to 44100 Hz, saves to
+/mnt/data/save/gba/<game>.sav every five seconds when it changes.
+
+Registered as `gbax` in emuinfo, not `gba`: the launcher patches the files it
+knows by name (md, sfc, fc, gba, gbc) on every launch, which is what damaged
+the first console pad builds. Game files must not contain `$` or `!`: the
+launcher passes the path through a shell inside double quotes.
+
+The page is Traditional_Chinese (ninth language slot): global_bg_8.png and
+game_focus_8 from `gba_page.py`, logo supplied by Liam. PNGs must not go
+through device_commit_files (C2PA chunk breaks the stick's libpng); write
+them as NEW files from the Mac shell. Overwriting an existing file there
+without delete permission removes it.
