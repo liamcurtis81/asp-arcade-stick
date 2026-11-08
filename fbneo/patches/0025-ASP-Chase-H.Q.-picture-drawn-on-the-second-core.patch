@@ -1,7 +1,7 @@
 From 624b91c9646c383da2715262c8324f6f71a5aaa8 Mon Sep 17 00:00:00 2001
 From: Liam Curtis <liamcurtis81@users.noreply.github.com>
 Date: Sun, 8 Nov 2026 15:31:55 +0000
-Subject: [PATCH 25/25] ASP: Chase H.Q. picture drawn on the second core
+Subject: [PATCH 25/26] ASP: Chase H.Q. picture drawn on the second core
 
 On the stick the Taito Z draw (road, scaled sprites) cost 13.5 ms against
 12.2 ms of emulation, so the game fell to 54.9 fps with broken sound. The

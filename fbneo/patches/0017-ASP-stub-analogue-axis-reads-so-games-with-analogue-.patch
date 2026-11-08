@@ -1,7 +1,7 @@
 From 2c0ca4060a2675578fde0ca34dcdee88cd548727 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sun, 1 Nov 2026 17:30:05 +0000
-Subject: [PATCH 17/25] ASP: stub analogue axis reads so games with analogue
+Subject: [PATCH 17/26] ASP: stub analogue axis reads so games with analogue
  inputs don't jump to NULL
 
 Forgotten Worlds crashed on its first frame in InputMake.

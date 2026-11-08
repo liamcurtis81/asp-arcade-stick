@@ -1,7 +1,7 @@
 From fd8e68ea2098676ed0de056ed58824632742361f Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 15:29:46 +0000
-Subject: [PATCH 24/25] ASP: pad mode for 8BitDo pads on the Mayflash adaptor -
+Subject: [PATCH 24/26] ASP: pad mode for 8BitDo pads on the Mayflash adaptor -
  pad_*.jc maps, hat directions, Select as credit, credit+Start held to exit
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

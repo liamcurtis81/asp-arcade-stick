@@ -1,7 +1,7 @@
 From dc532cef8a8888da09f1b9626da2016e719aa605 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sun, 1 Nov 2026 16:47:50 +0000
-Subject: [PATCH 16/25] ASP: hash async-drawn pictures for A/B proof against
+Subject: [PATCH 16/26] ASP: hash async-drawn pictures for A/B proof against
  inline draw
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

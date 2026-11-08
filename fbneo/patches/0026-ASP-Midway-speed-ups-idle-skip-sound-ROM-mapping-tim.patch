@@ -1,0 +1,529 @@
+From d1db6821fd51bc23ae6c5d63a012e9fa4a259396 Mon Sep 17 00:00:00 2001
+From: Liam Curtis <liamcurtis81@users.noreply.github.com>
+Date: Sun, 8 Nov 2026 16:43:41 +0000
+Subject: [PATCH 26/26] ASP: Midway speed-ups (idle skip, sound ROM mapping,
+ timer division)
+
+- TMS34010 idle skipping for Mortal Kombat and MK II: the wait-for-vblank
+  loop (list walk + flag poll) was over half the CPU's time. When the flag
+  is zero, from that loop, and the lists are empty, the rest of the slice up
+  to the CPU timer is counted as spent. Pictures and sound identical to
+  before for 1500 frames; after that the attract demo picks different
+  fighters, as the timing feeds the game's randomness.
+- MK/NBA Jam sound ROM mapped directly instead of through the read handler.
+- BurnTimer's 64-bit divisions (software routines on this CPU) replaced by
+  an exact VFP-estimated quotient with integer correction.
+Also: profiling hooks under ASP_PCPROF (not in normal builds).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/burn/drv/midway/d_yunit.cpp        |  76 +++++++++++++++
+ src/burn/drv/midway/midtunit.cpp       | 122 +++++++++++++++++++++++++
+ src/burn/drv/midway/williams_adpcm.cpp |   6 ++
+ src/burn/timer.h                       |  20 ++++
+ src/cpu/tms34/tms34010.cpp             |  44 +++++++++
+ src/cpu/tms34/tms34010.h               |   3 +
+ src/cpu/tms34_intf.cpp                 |   7 ++
+ src/cpu/tms34_intf.h                   |   3 +
+ 8 files changed, 281 insertions(+)
+
+diff --git a/src/burn/drv/midway/d_yunit.cpp b/src/burn/drv/midway/d_yunit.cpp
+index 72b225c..68c1d86 100644
+--- a/src/burn/drv/midway/d_yunit.cpp
++++ b/src/burn/drv/midway/d_yunit.cpp
+@@ -1678,6 +1678,54 @@ static UINT8 term2_nvram_chunk[] = {
+ 	0x00,0x00,0xfb,0x00,0xfe,0x00,0x09,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+ };
+ 
++#ifdef BUILD_ASP
++// ASP: idle skipping, as on the T-unit (midtunit.cpp): between frames the game
++// calls a list routine and polls a 16-bit RAM flag the vblank interrupt sets.
++// When the flag is zero, from that loop, and the list is empty, the rest of
++// the timeslice (up to the CPU's own timer) is counted as spent. Smash TV:
++// found by profiling, the loop was 27% of the TMS34010's time in the demo.
++struct asp_idle_y_def { const char *name; UINT32 flag, pc_lo, pc_hi; INT32 nlists; UINT32 list[3]; };
++// Smash TV's loop (flag 0x01086760, PCs ffe0a310-ffe0a340, list 0x01000040)
++// was tried and removed: its object list is rarely empty while it waits, so
++// the skip seldom applied and gave no measurable gain.
++static const asp_idle_y_def asp_idle_y_defs[] = {
++	{ NULL, 0, 0, 0, 0, { 0 } },
++};
++static const asp_idle_y_def *asp_idle_y = NULL;
++UINT32 asp_idle_y_hits = 0;
++
++static inline UINT32 asp_yram32(UINT32 bitaddr)
++{
++	UINT16 *w = (UINT16*)(DrvMainRAM + ((bitaddr - 0x01000000) >> 3));
++	return w[0] | ((UINT32)w[1] << 16);
++}
++
++static UINT16 asp_idle_y_read(UINT32 address)
++{
++	UINT16 v = *(UINT16*)(DrvMainRAM + (((address & ~0xf) - 0x01000000) >> 3));
++	if (address == asp_idle_y->flag && v == 0) {
++		UINT32 pc = TMS34010GetPC();
++		if (pc >= asp_idle_y->pc_lo && pc <= asp_idle_y->pc_hi) {
++			INT32 i;
++			for (i = 0; i < asp_idle_y->nlists; i++)
++				if (asp_yram32(asp_idle_y->list[i]) != 0) break;
++			if (i == asp_idle_y->nlists) { TMS34010BurnTimeslice(); asp_idle_y_hits++; }
++		}
++	}
++	return v;
++}
++
++static void asp_idle_install_y()
++{
++	asp_idle_y = NULL;
++	for (UINT32 i = 0; i < sizeof(asp_idle_y_defs) / sizeof(asp_idle_y_defs[0]); i++)
++		if (asp_idle_y_defs[i].name && strcmp(BurnDrvGetTextA(DRV_NAME), asp_idle_y_defs[i].name) == 0) asp_idle_y = &asp_idle_y_defs[i];
++	if (asp_idle_y == NULL || getenv("ASP_NO_IDLE_SKIP")) return;
++	TMS34010SetReadHandler(4, asp_idle_y_read);
++	TMS34010MapHandler(4, asp_idle_y->flag & ~0xfff, (asp_idle_y->flag & ~0xfff) + 0xfff, MAP_READ);
++}
++#endif
++
+ static INT32 CommonInit(void (*load_callback)(), INT32 sound_system, UINT32 clock, INT32 gfx_depth, INT32 sndprot_start, INT32 sndprot_end)
+ {
+ 	GenericTilesInit(); // get screen dims
+@@ -1727,6 +1775,10 @@ static INT32 CommonInit(void (*load_callback)(), INT32 sound_system, UINT32 cloc
+ 		TMS34010SetReadHandler(3, 			midyunit_mkyturbo_hack);
+ 	}
+ 
++#ifdef BUILD_ASP
++	asp_idle_install_y();
++#endif
++
+ 	TMS34010SetPixClock((nScreenHeight == 400 ? 48000000 : 24000000) / 6, 1);
+ 	TMS34010SetCpuCyclesPerFrame((INT32)((master_clock / 8) * 100) / nBurnFPS);
+ 	TMS34010SetToShift(to_shiftreg);
+@@ -1816,6 +1868,9 @@ static INT32 CommonInit(void (*load_callback)(), INT32 sound_system, UINT32 cloc
+ 
+ static INT32 DrvExit()
+ {
++#ifdef ASP_PCPROF
++	{ extern void pp_dump_y(); pp_dump_y(); }
++#endif
+ 	GenericTilesExit();
+ 	BurnFreeMemIndex();
+ 	TMS34010Exit();
+@@ -1883,6 +1938,18 @@ static INT32 DrvDraw()
+ 	return 0;
+ }
+ 
++#ifdef ASP_PCPROF
++#include <time.h>
++static double pp_t[5], pp_prev;
++static int pp_slot;
++static double pp_now() { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec + t.tv_nsec * 1e-9; }
++#define PP_T(k) do { double n_ = pp_now(); if ((k) != 0) pp_t[k] += n_ - pp_prev; pp_prev = n_; } while (0)
++extern "C++" void asp_pcprof_dump();
++void pp_dump_y() { double s = pp_t[1]+pp_t[2]+pp_t[3]+pp_t[4]; FILE *pf = fopen("/tmp/claude-0/pcprof.txt", "a"); if (pf) { fprintf(pf, "pptime tms %.1f%% scanline %.1f%% sound-cpu %.1f%% sound-render %.1f%%\n", 100*pp_t[1]/s, 100*pp_t[2]/s, 100*pp_t[3]/s, 100*pp_t[4]/s); fclose(pf); } asp_pcprof_dump(); }
++#else
++#define PP_T(k) do {} while (0)
++#endif
++
+ static INT32 DrvFrame()
+ {
+ 	if (DrvReset) {
+@@ -1934,8 +2001,11 @@ static INT32 DrvFrame()
+ 
+ 		M6809Open(0); // main (TMS340) accesses this via sound*
+ 
++		PP_T(0);
+ 		CPU_RUN(0, TMS34010);
++		PP_T(1);
+ 		TMS34010GenerateScanline(our_line);
++		PP_T(2);
+ 
+ 		if (sound_in_reset()) {
+ 			CPU_IDLE(1, M6809);
+@@ -1943,6 +2013,7 @@ static INT32 DrvFrame()
+ 			CPU_RUN_TIMER(1);
+ 		}
+ 		M6809Close();
++		PP_T(3);
+ 
+ 		if (palette_mask != 0x1fff) continue; // only narc!
+ 
+@@ -1963,11 +2034,16 @@ static INT32 DrvFrame()
+ 		BurnDrvRedraw();
+ 	}
+ 
++	PP_T(0);
+ 	if (pBurnSoundOut) {
+ 		M6809Open(0);
+ 		if (sound_update) sound_update(pBurnSoundOut, nBurnSoundLen);
+ 		M6809Close();
+     }
++	PP_T(4);
++#ifdef ASP_PCPROF
++	{ static int pp_n; if (++pp_n == 2300) pp_dump_y(); }
++#endif
+ 
+     return 0;
+ }
+diff --git a/src/burn/drv/midway/midtunit.cpp b/src/burn/drv/midway/midtunit.cpp
+index 9069c24..6fc4f7a 100644
+--- a/src/burn/drv/midway/midtunit.cpp
++++ b/src/burn/drv/midway/midtunit.cpp
+@@ -151,8 +151,31 @@ static INT32 sound_inreset;
+ 
+ static void MKsound_bankswitch(INT32 bank)
+ {
++#ifdef BUILD_ASP
++	static UINT8 *asp_mapped = NULL;   // remap only when the window moves
++	if (asp_mapped == DrvSoundProgROM + (bank & 7) * 0x8000 && sound_bank == (bank & 7)) return;
++	asp_mapped = DrvSoundProgROM + (bank & 7) * 0x8000;
++#endif
+ 	sound_bank = bank & 7;
++#ifdef BUILD_ASP
++	// ASP: the banked ROM window is mapped directly, so opcode fetches and
++	// reads skip MKSoundRead (they were 40% of the frame on the stick). Must be
++	// called with the 6809 open, as every caller already does.
++	M6809MapMemory(DrvSoundProgROM + sound_bank * 0x8000, 0x4000, 0xbfff, MAP_ROM);
++#endif
++}
++
++#ifdef BUILD_ASP
++// The fixed ROM at 0xc000-0xffff, mapped directly except the 256-byte pages
++// that hold the protection RAM, which still need MKSoundRead/MKSoundWrite.
++static void asp_mk_map_fixed()
++{
++	UINT8 *fixed = DrvSoundProgROM + (0x4000 + 7 * 0x8000);
++	UINT16 p0 = SoundProtAddressStart & 0xff00, p1 = SoundProtAddressEnd | 0x00ff;
++	if (p0 > 0xc000) M6809MapMemory(fixed, 0xc000, p0 - 1, MAP_ROM);
++	if (p1 < 0xffff) M6809MapMemory(fixed + (p1 + 1 - 0xc000), p1 + 1, 0xffff, MAP_ROM);
+ }
++#endif
+ 
+ static void MKsound_msm6295bankswitch(INT32 bank)
+ {
+@@ -977,6 +1000,58 @@ static void JdreddpProtWrite(UINT32 address, UINT16 value)
+ }
+ 
+ // init, exit, etc.
++#ifdef BUILD_ASP
++// ASP: idle skipping. Between frames these games spin in a loop that calls a
++// list-walking routine and then polls a RAM flag the vblank interrupt sets.
++// When the flag reads zero, from that loop, and every list the routine walks
++// is empty, the rest of the loop iteration can do nothing until the next
++// interrupt; interrupts are only raised between timeslices, so the rest of
++// the timeslice is counted as spent instead of executed. Found by profiling
++// (the loop was over half the TMS34010's time on Mortal Kombat); the same
++// check MAME used for these boards. Any mismatch in code (other revisions)
++// fails the PC test and simply runs as before.
++struct asp_idle_def { UINT32 flag, pc_lo, pc_hi; INT32 nlists; UINT32 list[3]; };
++static const asp_idle_def asp_idle_mk = { 0x01053360, 0xffce20d0, 0xffce2100, 3, { 0x0104f9d0, 0x0104fa10, 0x0104fa30 } };
++static const asp_idle_def asp_idle_mk2 = { 0x01068e70, 0xff80db40, 0xff80db70, 3, { 0x0105d480, 0x0105d4a0, 0x0105d4c0 } };
++static const asp_idle_def *asp_idle = NULL;
++UINT32 asp_idle_hits = 0, asp_idle_calls = 0, asp_idle_flagreads = 0, asp_idle_lastpc = 0, asp_idle_zero = 0;
++
++static inline UINT32 asp_ram32(UINT32 bitaddr)
++{
++	UINT16 *w = (UINT16*)(DrvRAM + ((bitaddr - 0x01000000) >> 3));
++	return w[0] | ((UINT32)w[1] << 16);
++}
++
++static UINT16 asp_idle_read(UINT32 address)
++{
++	UINT16 v = *(UINT16*)(DrvRAM + (((address & ~0xf) - 0x01000000) >> 3));
++	asp_idle_calls++;
++	if (address == asp_idle->flag) { asp_idle_flagreads++; asp_idle_lastpc = TMS34010GetPC(); if (v == 0) asp_idle_zero++; }
++	// the flag is a 16-bit field (the word above it is a different variable)
++	if (address == asp_idle->flag && v == 0) {
++		UINT32 pc = TMS34010GetPC();
++		if (pc >= asp_idle->pc_lo && pc <= asp_idle->pc_hi) {
++			INT32 i;
++			for (i = 0; i < asp_idle->nlists; i++)
++				if (asp_ram32(asp_idle->list[i]) != 0) break;
++			if (i == asp_idle->nlists) { TMS34010BurnTimeslice(); asp_idle_hits++; }
++		}
++	}
++	return v;
++}
++
++static void asp_idle_install()
++{
++	asp_idle = NULL;
++	if (TUnitIsMK && !TUnitIsMKTurbo) asp_idle = &asp_idle_mk;
++	if (TUnitIsMK2) asp_idle = &asp_idle_mk2;
++	if (asp_idle == NULL || getenv("ASP_NO_IDLE_SKIP")) return;
++	// reads of the flag's 512-byte page go through the check; writes stay direct
++	TMS34010SetReadHandler(20, asp_idle_read);
++	TMS34010MapHandler(20, asp_idle->flag & ~0xfff, (asp_idle->flag & ~0xfff) + 0xfff, MAP_READ);
++}
++#endif
++
+ INT32 TUnitInit()
+ {
+ 	BurnSetRefreshRate(54.71);
+@@ -1093,6 +1168,10 @@ INT32 TUnitInit()
+ 	TMS34010SetReadHandler(12, TUnitGfxRead);
+ 	TMS34010MapHandler(12, 0x02000000, 0x07ffffff, MAP_READ);
+ 
++#ifdef BUILD_ASP
++	asp_idle_install();
++#endif
++
+ 	if (TUnitIsMKTurbo) {
+ 		TMS34010SetReadHandler(13, MKTurboProtRead);
+ 		TMS34010MapHandler(13, 0xffffe000, 0xffffffff, MAP_READ);
+@@ -1160,6 +1239,11 @@ INT32 TUnitInit()
+ 			SoundProtAddressStart = 0xfbec;
+ 			SoundProtAddressEnd = 0xfc16;
+ 		}
++#ifdef BUILD_ASP
++		M6809Open(0);
++		asp_mk_map_fixed();
++		M6809Close();
++#endif
+ 	}
+ 
+ 	if (TUnitIsMK2) {
+@@ -1239,6 +1323,26 @@ INT32 TUnitDraw()
+ 	return 0;
+ }
+ 
++#ifdef ASP_PCPROF
++#include <time.h>
++#include <signal.h>
++#include <sys/time.h>
++#include <ucontext.h>
++static unsigned long pp_samp[1<<16]; static unsigned pp_sampn;
++static volatile int pp_in_snd;
++static void pp_sig(int, siginfo_t *, void *uc) { if (pp_in_snd && pp_sampn < (1<<16)) pp_samp[pp_sampn++] = ((ucontext_t*)uc)->uc_mcontext.arm_pc; }
++static void pp_start() { struct sigaction sa; memset(&sa, 0, sizeof(sa)); sa.sa_sigaction = pp_sig; sa.sa_flags = SA_SIGINFO | SA_RESTART; sigaction(SIGPROF, &sa, NULL); struct itimerval it = { {0, 500}, {0, 500} }; setitimer(ITIMER_PROF, &it, NULL); }
++static void pp_samples_dump() { FILE *pf = fopen("/tmp/claude-0/pcsamples.txt", "w"); if (!pf) return; for (unsigned i = 0; i < pp_sampn; i++) fprintf(pf, "%lx\n", pp_samp[i]); fclose(pf); }
++static double pp_t[5], pp_prev;
++long pp_dac, pp_ymr;
++static double pp_now() { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec + t.tv_nsec * 1e-9; }
++#define PP_T(k) do { double n_ = pp_now(); if ((k) != 0) pp_t[k] += n_ - pp_prev; pp_prev = n_; } while (0)
++void asp_pcprof_dump();
++static void pp_dump_t() { double s = pp_t[1]+pp_t[2]+pp_t[3]+pp_t[4]; FILE *pf = fopen("/tmp/claude-0/pcprof.txt", "a"); if (pf) { fprintf(pf, "pp dac writes %ld ym reads %ld m6809 cycles/frame %d\n", pp_dac, pp_ymr, nSoundType == SOUND_ADPCM ? (int)M6809TotalCycles() : 0); fprintf(pf, "pptime tms %.1f%% scanline %.1f%% sound-cpu %.1f%% sound-render %.1f%% total %.2fs\n", 100*pp_t[1]/s, 100*pp_t[2]/s, 100*pp_t[3]/s, 100*pp_t[4]/s, s); fclose(pf); } asp_pcprof_dump(); }
++#else
++#define PP_T(k) do {} while (0)
++#endif
++
+ INT32 TUnitFrame()
+ {
+ 	if (nTUnitReset) TUnitDoReset();
+@@ -1264,9 +1368,12 @@ INT32 TUnitFrame()
+ 	for (INT32 i = 0; i < nInterleave; i++) {
+ 		INT32 our_line = (i + 274) % 289; // start at vblank
+ 
++		PP_T(0);
+ 		CPU_RUN(0, TMS34010);
++		PP_T(1);
+ 
+ 		TMS34010GenerateScanline(our_line);
++		PP_T(2);
+ 
+ 		if (nSoundType == SOUND_DCS) {
+ 			dcs_sound_sync(); // sync to main cpu
+@@ -1274,10 +1381,18 @@ INT32 TUnitFrame()
+ 		}
+ 
+ 		if (nSoundType == SOUND_ADPCM && !sound_inreset) {
++#ifdef ASP_PCPROF
++			pp_in_snd = 1;
++#endif
+ 			CPU_RUN_TIMER(1);
++#ifdef ASP_PCPROF
++			pp_in_snd = 0;
++#endif
+ 		}
++		PP_T(3);
+ 	}
+ 
++	PP_T(0);
+ 	if (pBurnSoundOut) {
+ 		if (nSoundType == SOUND_ADPCM) {
+ 			BurnYM2151Render(pBurnSoundOut, nBurnSoundLen);
+@@ -1290,6 +1405,13 @@ INT32 TUnitFrame()
+ 		}
+ 	}
+ 
++	PP_T(4);
++#ifdef ASP_PCPROF
++	{ static int pp_n; ++pp_n; if (pp_n == 600 && getenv("PP_SIG")) pp_start(); if (pp_n == 1200) { pp_dump_t(); pp_samples_dump(); } }
++#endif
++#ifdef BUILD_ASP
++	if (getenv("ASP_IDLE_REPORT")) { static int n; if (++n == 2300) { FILE *f = fopen(getenv("ASP_IDLE_REPORT"), "w"); if (f) { fprintf(f, "idle hits %u calls %u flagreads %u zero %u lastpc %08x\n", asp_idle_hits, asp_idle_calls, asp_idle_flagreads, asp_idle_zero, asp_idle_lastpc); fclose(f); } } }
++#endif
+ 	nExtraCycles = TMS34010TotalCycles() - nCyclesTotal[0];
+ 
+ 	if (nSoundType == SOUND_ADPCM) M6809Close();
+diff --git a/src/burn/drv/midway/williams_adpcm.cpp b/src/burn/drv/midway/williams_adpcm.cpp
+index f08d15b..3ea234a 100644
+--- a/src/burn/drv/midway/williams_adpcm.cpp
++++ b/src/burn/drv/midway/williams_adpcm.cpp
+@@ -53,6 +53,9 @@ static void adpcm_write(UINT16 address, UINT8 data)
+ 		return;
+ 
+ 		case 0x2800:
++#ifdef ASP_PCPROF
++			{ extern long pp_dac; pp_dac++; }
++#endif
+ 			DACWrite(0, data);
+ 		return;
+ 
+@@ -75,6 +78,9 @@ static UINT8 adpcm_read(UINT16 address)
+ 	switch (address & ~0x3ff)
+ 	{
+ 		case 0x2400:
++#ifdef ASP_PCPROF
++			{ extern long pp_ymr; pp_ymr++; }
++#endif
+ 			return BurnYM2151Read();
+ 
+ 		case 0x2c00:
+diff --git a/src/burn/timer.h b/src/burn/timer.h
+index 0b5d70a..a3c7a33 100644
+--- a/src/burn/timer.h
++++ b/src/burn/timer.h
+@@ -4,8 +4,28 @@
+ // FM timers
+ 
+ #define TIMER_TICKS_PER_SECOND (2048000000)
++#if defined(BUILD_ASP)
++// ASP: the stick's Cortex-A7 has no integer divide, so every 64-bit division
++// here became a call to a slow software routine; these run several times per
++// timer step in every game with FM sound (12% of the sound time on Mortal
++// Kombat). The VFP unit does divide, so the quotient is estimated in double
++// and corrected with integer multiplies: the result is exactly what the
++// 64-bit integer division gives (truncation toward zero).
++static inline INT64 asp_muldiv64(INT64 a, INT64 b, INT64 c)
++{
++	INT64 n = a * b;
++	if (n < 0 || c <= 0 || n > ((INT64)1 << 52)) return n / c;
++	INT64 q = (INT64)((double)n / (double)c);
++	while (q > 0 && q * c > n) q--;
++	while ((q + 1) * c <= n) q++;
++	return q;
++}
++#define MAKE_TIMER_TICKS(n, m) asp_muldiv64((INT64)(n), TIMER_TICKS_PER_SECOND, (m))
++#define MAKE_CPU_CYLES(n, m) asp_muldiv64((INT64)(n), (m), TIMER_TICKS_PER_SECOND)
++#else
+ #define MAKE_TIMER_TICKS(n, m) ((INT64)(n) * TIMER_TICKS_PER_SECOND / (m))
+ #define MAKE_CPU_CYLES(n, m) ((INT64)(n) * (m) / TIMER_TICKS_PER_SECOND)
++#endif
+ 
+ extern "C" double BurnTimerGetTime();
+ 
+diff --git a/src/cpu/tms34/tms34010.cpp b/src/cpu/tms34/tms34010.cpp
+index 1ca49a3..b4c32df 100644
+--- a/src/cpu/tms34/tms34010.cpp
++++ b/src/cpu/tms34/tms34010.cpp
+@@ -857,6 +857,9 @@ int tms34010_run(int cycles)
+ 	do
+ 	{
+ 		check_interrupt();
++#ifdef ASP_PCPROF
++		{ extern void asp_pcprof_hit(UINT32 pc, INT32 icount); asp_pcprof_hit(PC, tms34010_ICount); }
++#endif
+ 		state.op = ROPCODE();
+ 		(*opcode_table[state.op >> 4])();
+ 
+@@ -876,6 +879,22 @@ void tms34010_stop()
+ 	state.stop = 1;
+ }
+ 
++#ifdef BUILD_ASP
++// ASP: count the rest of this timeslice as spent and end it. Used when a game
++// is provably idling (spinning until an interrupt); unlike tms34010_stop the
++// cycles are accounted, so the frame's timing is unchanged.
++void tms34010_burn_timeslice()
++{
++	// stop at the internal timer if it would expire first: it is advanced by
++	// executed cycles, so skipping past it would delay its interrupt (DMA end)
++	INT32 burn = tms34010_ICount;
++	if (state.timer_active && state.timer_cyc < burn) burn = state.timer_cyc;
++	if (burn <= 0) return;
++	tms34010_ICount -= burn;
++	check_timer(burn);
++}
++#endif
++
+ void tms34010_modify_timeslice(int cycles)
+ { // only call this from a read/write handler while cpu is running!
+ 	tms34010_ICount += cycles;
+@@ -2051,3 +2070,28 @@ void tms34020_get_info(UINT32 _state, cpuinfo *info)
+ #endif
+ 
+ #endif
++
++#ifdef ASP_PCPROF
++// Profiling build only: cycles spent per instruction address, to find the
++// loops the game idles in. Dumped at exit.
++#include <stdlib.h>
++static UINT32 *pp_pc; static UINT64 *pp_cyc; static UINT32 pp_last_pc; static INT32 pp_last_ic = -1;
++void asp_pcprof_hit(UINT32 pc, INT32 icount)
++{
++	if (!pp_pc) { pp_pc = (UINT32*)calloc(1<<20, 4); pp_cyc = (UINT64*)calloc(1<<20, 8); }
++	if (pp_last_ic >= 0 && pp_last_ic >= icount) { UINT32 k = (pp_last_pc >> 4) & 0xfffff; pp_pc[k] = pp_last_pc; pp_cyc[k] += pp_last_ic - icount; }
++	pp_last_pc = pc; pp_last_ic = icount;
++}
++void asp_pcprof_dump()
++{
++	if (!pp_pc) return;
++	FILE *pf = fopen("/tmp/claude-0/pcprof.txt", "a"); if (!pf) return;
++	UINT64 tot = 0; for (int i = 0; i < (1<<20); i++) tot += pp_cyc[i];
++	for (int n = 0; n < 40; n++) {
++		int b = -1; for (int i = 0; i < (1<<20); i++) if (pp_cyc[i] && (b < 0 || pp_cyc[i] > pp_cyc[b])) b = i;
++		if (b < 0) break;
++		fprintf(pf, "pcprof %08x %6.2f%%\n", pp_pc[b], 100.0 * pp_cyc[b] / tot); pp_cyc[b] = 0;
++	}
++	fclose(pf);
++}
++#endif
+diff --git a/src/cpu/tms34/tms34010.h b/src/cpu/tms34/tms34010.h
+index e273a38..826e641 100644
+--- a/src/cpu/tms34/tms34010.h
++++ b/src/cpu/tms34/tms34010.h
+@@ -108,6 +108,9 @@ void tms34010_scan(INT32 nAction);
+ void tms34010_set_irq_line(int irqline, int linestate);
+ int tms34010_run(int cycles);
+ void tms34010_stop();
++#ifdef BUILD_ASP
++void tms34010_burn_timeslice();
++#endif
+ int tms34010_idle(int cycles);
+ INT64 tms34010_total_cycles();
+ void tms34010_new_frame();
+diff --git a/src/cpu/tms34_intf.cpp b/src/cpu/tms34_intf.cpp
+index 4a55362..e32ecd6 100644
+--- a/src/cpu/tms34_intf.cpp
++++ b/src/cpu/tms34_intf.cpp
+@@ -248,6 +248,13 @@ void TMS34010RunEnd()
+ 	tms34010_stop();
+ }
+ 
++#ifdef BUILD_ASP
++void TMS34010BurnTimeslice()
++{
++	tms34010_burn_timeslice();
++}
++#endif
++
+ INT32 TMS34010Scan(INT32 nAction)
+ {
+ 	for (INT32 i = 0; i < total_cpus; i++) {
+diff --git a/src/cpu/tms34_intf.h b/src/cpu/tms34_intf.h
+index e386ce1..acc1ebc 100644
+--- a/src/cpu/tms34_intf.h
++++ b/src/cpu/tms34_intf.h
+@@ -26,6 +26,9 @@ INT32 TMS34010TotalCycles();
+ INT32 TMS34010GetActive();
+ INT32 TMS34010Scan(INT32 nAction);
+ void TMS34010RunEnd();
++#ifdef BUILD_ASP
++void TMS34010BurnTimeslice();
++#endif
+ void TMS34010NewFrame();
+ void TMS34010Reset();
+ void TMS34010GenerateIRQ(UINT32 line);
+-- 
+2.43.0
+
