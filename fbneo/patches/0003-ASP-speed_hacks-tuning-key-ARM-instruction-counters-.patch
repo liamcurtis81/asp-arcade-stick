@@ -1,7 +1,7 @@
 From b383b25bfb8c12a67e87918a5412a79094d9920f Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 30 Oct 2026 10:15:11 +0000
-Subject: [PATCH 03/24] ASP: speed_hacks tuning key, ARM instruction counters,
+Subject: [PATCH 03/25] ASP: speed_hacks tuning key, ARM instruction counters,
  driver reset pulse
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

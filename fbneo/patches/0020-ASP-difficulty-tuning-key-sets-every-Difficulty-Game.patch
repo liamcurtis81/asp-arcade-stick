@@ -1,7 +1,7 @@
 From 76da5a95ba32040cf3d09175d05e8f3309a5816b Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 17:03:56 +0000
-Subject: [PATCH 20/24] ASP: difficulty tuning key sets every Difficulty / Game
+Subject: [PATCH 20/25] ASP: difficulty tuning key sets every Difficulty / Game
  Level DIP group to Easy
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

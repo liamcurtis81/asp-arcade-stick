@@ -1,7 +1,7 @@
 From 5939ab2608b445b85e5447dd753de744edea9230 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 21:05:06 +0000
-Subject: [PATCH 22/24] ASP: async draw for Metamorphic Force and Violent
+Subject: [PATCH 22/25] ASP: async draw for Metamorphic Force and Violent
  Storm; per-thread GX mixer and K055555 state
 
 Harness, 2400 frames: render-thread pictures identical to inline at all ten

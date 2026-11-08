@@ -1,7 +1,7 @@
 From f8b277f132b7d4e2a91a358689aae8b5fc9697eb Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Thu, 29 Oct 2026 23:26:38 +0000
-Subject: [PATCH 02/24] ASP: per-game tuning sections, frame-time spread
+Subject: [PATCH 02/25] ASP: per-game tuning sections, frame-time spread
  histograms, frame-count exit
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>

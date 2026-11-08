@@ -1,7 +1,7 @@
 From 3cf67636a95e43fc2e7a65f534a046373ab496db Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sun, 1 Nov 2026 16:17:05 +0000
-Subject: [PATCH 13/24] ASP: snd_jit_ms tuning key (just-in-time writes in our
+Subject: [PATCH 13/25] ASP: snd_jit_ms tuning key (just-in-time writes in our
  SDL OSS backend)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

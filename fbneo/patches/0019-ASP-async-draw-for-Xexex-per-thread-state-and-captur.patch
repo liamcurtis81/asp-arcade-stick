@@ -1,7 +1,7 @@
 From d2b678df6fa95b64ef88b48828da63fec4810dc3 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Mon, 2 Nov 2026 11:05:50 +0000
-Subject: [PATCH 19/24] ASP: async draw for Xexex; per-thread state and
+Subject: [PATCH 19/25] ASP: async draw for Xexex; per-thread state and
  capture/bind for K056832, K053247, K053250, K054338, K053251 and the Konami
  mixing bitmaps
 

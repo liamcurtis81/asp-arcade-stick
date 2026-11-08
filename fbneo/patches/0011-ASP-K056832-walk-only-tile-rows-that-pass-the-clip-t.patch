@@ -1,7 +1,7 @@
 From 52f71a8698b296b6cd1e644647fe2ea851fb1799 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sun, 1 Nov 2026 10:28:46 +0000
-Subject: [PATCH 11/24] ASP: K056832 - walk only tile rows that pass the clip
+Subject: [PATCH 11/25] ASP: K056832 - walk only tile rows that pass the clip
  test (line/row-scroll layers)
 
 Harness: frames and sound identical with fast_tiles 0/1 on xexex, mystwarr, metamrph, viostorm, moomesa, bucky, asterix.

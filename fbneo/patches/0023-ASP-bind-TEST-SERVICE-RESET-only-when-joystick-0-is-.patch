@@ -1,7 +1,7 @@
 From 3b8089c4f7a82c2f2f7f6b7114ae7b13747468f2 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 15:06:40 +0000
-Subject: [PATCH 23/24] ASP: bind TEST/SERVICE/RESET only when joystick 0 is
+Subject: [PATCH 23/25] ASP: bind TEST/SERVICE/RESET only when joystick 0 is
  the stick (12 buttons)
 
 Through the Mayflash adaptor the SFC30's Start is button 12, which opened the
