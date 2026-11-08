@@ -1,4 +1,4 @@
-From beaa8784ddbad3f0779e11f3eb2c44e10ad0678d Mon Sep 17 00:00:00 2001
+From 3cf67636a95e43fc2e7a65f534a046373ab496db Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sun, 1 Nov 2026 16:17:05 +0000
 Subject: [PATCH 13/24] ASP: snd_jit_ms tuning key (just-in-time writes in our

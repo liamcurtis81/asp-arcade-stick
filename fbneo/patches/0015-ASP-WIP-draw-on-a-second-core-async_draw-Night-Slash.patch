@@ -1,4 +1,4 @@
-From 4f724191fd31f2c0e8702d9d5deeee56000d88e2 Mon Sep 17 00:00:00 2001
+From d1159d3ec5750640cde2332783ff3159c0623cbb Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sun, 1 Nov 2026 16:34:27 +0000
 Subject: [PATCH 15/24] ASP WIP: draw on a second core (async_draw), Night
@@ -33,7 +33,7 @@ index 3e45754..3e66e9c 100644
  
  
 diff --git a/src/burn/burn.cpp b/src/burn/burn.cpp
-index 3674759..7aa0f0b 100644
+index 2588732..4cd50ad 100644
 --- a/src/burn/burn.cpp
 +++ b/src/burn/burn.cpp
 @@ -68,9 +68,9 @@ INT32 nBurnFPS            = 6000;
@@ -50,10 +50,10 @@ index 3674759..7aa0f0b 100644
  INT32 nBurnSoundRate = 0;			// sample rate of sound or zero for no sound
  INT32 nBurnSoundLen  = 0;			// length in samples per frame
 diff --git a/src/burn/burn.h b/src/burn/burn.h
-index 042b984..accbee8 100644
+index c6c17bf..b50d2da 100644
 --- a/src/burn/burn.h
 +++ b/src/burn/burn.h
-@@ -357,9 +357,16 @@ extern UINT32 nNamesExArray;
+@@ -363,9 +363,16 @@ extern UINT32 nNamesExArray;
  
  extern INT32 nMaxPlayers;
  

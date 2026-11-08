@@ -1,4 +1,4 @@
-From 241d862c351bce5fc29b681375113f364d9a3fe0 Mon Sep 17 00:00:00 2001
+From cc5ff96838c741cfb73a2a3b12577180af38d214 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 20:01:52 +0000
 Subject: [PATCH 21/24] ASP: controller probe - list every input device and SDL

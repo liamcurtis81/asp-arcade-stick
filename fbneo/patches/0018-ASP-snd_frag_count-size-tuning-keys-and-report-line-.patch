@@ -1,4 +1,4 @@
-From 57a2026fcd05dc186be59c4d06d297cef4612eb5 Mon Sep 17 00:00:00 2001
+From 5a27cc218bc8d90987ed2279fa0fae694a990a41 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Mon, 2 Nov 2026 10:41:58 +0000
 Subject: [PATCH 18/24] ASP: snd_frag_count/size tuning keys and report line

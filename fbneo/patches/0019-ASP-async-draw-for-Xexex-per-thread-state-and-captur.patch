@@ -1,4 +1,4 @@
-From 9dd0bad11ad9ede5199ff3b64b30e0d5bcaede94 Mon Sep 17 00:00:00 2001
+From d2b678df6fa95b64ef88b48828da63fec4810dc3 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Mon, 2 Nov 2026 11:05:50 +0000
 Subject: [PATCH 19/24] ASP: async draw for Xexex; per-thread state and

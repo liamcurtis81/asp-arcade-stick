@@ -1,4 +1,4 @@
-From a3a807c80ca33f058b8964be60b59a5ada1716ad Mon Sep 17 00:00:00 2001
+From 5939ab2608b445b85e5447dd753de744edea9230 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 21:05:06 +0000
 Subject: [PATCH 22/24] ASP: async draw for Metamorphic Force and Violent
@@ -19,7 +19,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  5 files changed, 128 insertions(+), 36 deletions(-)
 
 diff --git a/src/burn/drv/konami/d_mystwarr.cpp b/src/burn/drv/konami/d_mystwarr.cpp
-index 1423e00..3d96c54 100644
+index e2550c5..e7ab683 100644
 --- a/src/burn/drv/konami/d_mystwarr.cpp
 +++ b/src/burn/drv/konami/d_mystwarr.cpp
 @@ -69,10 +69,10 @@ static UINT8 *DrvGfxROMExp2;

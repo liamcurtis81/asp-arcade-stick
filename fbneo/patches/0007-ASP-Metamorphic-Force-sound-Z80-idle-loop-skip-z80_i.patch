@@ -1,4 +1,4 @@
-From f8ba3ace61ac1824ed6c61844096b21627ad4f31 Mon Sep 17 00:00:00 2001
+From 6ba002276b5b13ad8ec2348fb144842cabdc7494 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 31 Oct 2026 14:41:19 +0000
 Subject: [PATCH 07/24] ASP: Metamorphic Force sound Z80 idle-loop skip
@@ -12,7 +12,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  2 files changed, 78 insertions(+), 2 deletions(-)
 
 diff --git a/src/burn/drv/konami/d_mystwarr.cpp b/src/burn/drv/konami/d_mystwarr.cpp
-index b630e00..2458daf 100644
+index a524135..bcd8e6c 100644
 --- a/src/burn/drv/konami/d_mystwarr.cpp
 +++ b/src/burn/drv/konami/d_mystwarr.cpp
 @@ -3003,6 +3003,40 @@ unsigned long long asp_mw_t68k = 0, asp_mw_tz80 = 0, asp_mw_ttimer = 0,

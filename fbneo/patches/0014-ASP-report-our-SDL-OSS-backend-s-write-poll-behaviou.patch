@@ -1,4 +1,4 @@
-From 8db9357601c07154a2ba30872baac83fa13ad33e Mon Sep 17 00:00:00 2001
+From 60aeb8ba5f31dbeaecd8e9a4cbe7386205626e3e Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sun, 1 Nov 2026 16:25:38 +0000
 Subject: [PATCH 14/24] ASP: report our SDL OSS backend's write/poll behaviour
