@@ -216,3 +216,46 @@ async_draw 1
 # Harness, 2400 frames: render-thread pictures identical to inline at all ten
 # checkpoints, sound identical.
 async_draw 1
+
+[chasehq]
+# 8 Nov, v45: picture drawn on a second core. On the stick the game itself
+# took 12.2 ms a frame but drawing the road and scaled sprites added 13.5 ms,
+# so it ran at 54.9 fps with broken-up sound. The draw reads three Taito video
+# chips, sprite RAM and the road palette bank; all are copied at the end of
+# the frame. Harness, 2400 frames: render-thread pictures identical to inline
+# at all ten checkpoints, sound identical.
+async_draw 1
+
+# 9 Nov, v48: more games drawn on the second core, as Xexex and Night Slashers.
+# Each was proved in the harness, 2400 frames: render-thread pictures
+# identical to the inline draw at all ten checkpoints, sound identical.
+# Mystic Warriors had been kept inline because of six stray pixels a frame on
+# the render thread; the cause was its layer 3 reading colours just past the
+# palette, into the game's work RAM, which the render thread's copy now
+# reproduces. Asterix (93%) and Mystic Warriors (95%) were the two of these
+# below full speed; the rest were at full speed but drawing about 25 pictures
+# a second.
+[mystwarr]
+async_draw 1
+
+[asterix]
+async_draw 1
+
+[moomesa]
+async_draw 1
+
+[bucky]
+async_draw 1
+
+[ssriders]
+async_draw 1
+
+[simpsons2p]
+async_draw 1
+
+[vendetta]
+async_draw 1
+
+# Crude Buster (Data East), drawn on the second core as Night Slashers.
+[twocrude]
+async_draw 1
