@@ -26,7 +26,7 @@ table the cover pills use; a game with no year sorts last in its series.
 import json, os, re, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from audit_lists import clean_rom_title, sort_key
+from audit_lists import clean_rom_title, sort_key, md_title
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 YEARS = os.path.join(HERE, "..", "pills", "years.json")
@@ -40,6 +40,7 @@ PAGES = [  # folder, label, title source
     ("Russian", "Shooters", "arcade"),
     ("Spanish", "SNES", "rom"),
     ("Simplified_Chinese", "NES", "rom"),
+    ("Portuguese", "Mega Drive", "years"),
 ]
 
 # (series name, pattern on the flattened title). First match wins.
@@ -82,6 +83,27 @@ SERIES = [
     ("puzzle bobble", r"^puzzle bobble"),
 ]
 
+# Mega Drive only. Kept out of SERIES so the arcade pages (Shinobi and Shadow
+# Dancer, OutRun) do not move.
+MD_SERIES = [
+    ("sonic", r"^sonic\b"),
+    ("ecco", r"^ecco\b"),
+    ("shinobi", r"^(the )?revenge of shinobi|^shinobi|^shadow dancer"),
+    ("ea strike", r"^(desert|jungle|urban) strike"),
+    ("phantasy star", r"^phantasy star"),
+    ("wonder boy", r"^wonder boy|^monster world"),
+    ("mickey illusion", r"^(castle|world) of illusion"),
+    ("toe jam", r"^toe ?jam"),
+    ("outrun", r"^outrun"),
+    ("super monaco gp", r"^(ayrton sennas )?super monaco gp"),
+    ("mutant league", r"^mutant league"),
+    ("nba jam", r"^nba jam"),
+]
+
+# Same-year ties the title order gets wrong: Sonic 3 (February 1994) came
+# before Sonic & Knuckles (October 1994).
+YEAR_TWEAK = {"md_sonicthehedgehog3": -0.5}
+
 EDITION = r"\b(special|turbo|plus|deluxe|extra|champion edition|hyper fighting|perfect|jet|the arcade game)\b"
 ROMAN = r"\b(ii|iii|iv|v|vi|vii|viii|x)\b"
 
@@ -93,9 +115,9 @@ def flat(title):
     return re.sub(r"^(the|a) ", "", t.strip())
 
 
-def series_key(title):
+def series_key(title, extra=()):
     f = flat(title)
-    for name, pat in SERIES:
+    for name, pat in list(extra) + SERIES:
         if re.search(pat, f):
             return name
     base = re.split(r" - |: | / | ~ ", re.sub(r"\([^)]*\)", "", title))[0]
@@ -115,7 +137,9 @@ def parse(path):
 def main():
     src, rominfo, out = sys.argv[1:4]
     show = "--show" in sys.argv
-    years = {k.lower(): v.get("year") for k, v in json.load(open(YEARS)).items()}
+    yj = json.load(open(YEARS))
+    years = {k.lower(): v.get("year") for k, v in yj.items()}
+    ytitles = {k.lower(): v.get("title", "") for k, v in yj.items()}
     titles = {}
     for line in open(TSV, encoding="utf-8"):
         p = line.rstrip("\n").split("\t")
@@ -124,19 +148,27 @@ def main():
     ri = open(rominfo, encoding="utf-8", errors="replace").read()
     paths = dict(re.findall(r"^ID=(.*)\nEMU=.*\nPATH=(.*)$", ri, re.M))
 
-    for folder, label, source in PAGES:
+    pages = PAGES
+    if "--page" in sys.argv:
+        want = sys.argv[sys.argv.index("--page") + 1]
+        pages = [p for p in PAGES if p[0] == want]
+    for folder, label, source in pages:
         header, blocks = parse(os.path.join(src, folder, "games.ini"))
         rows = []
         for b in blocks:
             d = re.search(r"\[DIR\]=<(.*?)>", b).group(1)
             if source == "arcade":
                 t = titles.get((label, d))
+            elif source == "years":
+                # Mega Drive: the zips are short-named, so the No-Intro title
+                # matched for the cover pills (years.json) is the title here.
+                t = clean_rom_title(ytitles.get(d.lower(), "")) or md_title(d)[0]
             else:
                 t = clean_rom_title(os.path.basename(paths.get(d, "")))
             if not t:
                 sys.exit(f"{label}: no title for {d}")
             rows.append({"dir": d, "title": t, "block": b, "key": sort_key(t),
-                         "series": series_key(t), "year": years.get(d.lower()) or 9999})
+                         "series": series_key(t, MD_SERIES if folder == "Portuguese" else ()), "year": (years.get(d.lower()) or 9999) + YEAR_TWEAK.get(d.lower(), 0)})
         groups = {}
         for r in rows:
             groups.setdefault(r["series"], []).append(r)

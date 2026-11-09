@@ -2401,6 +2401,11 @@
   "via": "md_booger",
   "year": 1994
  },
+ "md_bubbob": {
+  "title": "Super Bubble Bobble (Unl)",
+  "via": "md_bubbob (year set by hand: Gamtec 1996; the ROM is the unlicensed Super Bubble Bobble, not Taito's)",
+  "year": 1996
+ },
  "md_cadash": {
   "title": "Cadash (USA, Asia, Korea)",
   "via": "md_cadash",
@@ -2633,9 +2638,9 @@
   "year": 1991
  },
  "md_gargoyles": {
-  "title": "Gargoyles (Hack, Spanish v2.0)",
-  "via": "md_gargoyles",
-  "year": 2022
+  "title": "Gargoyles (USA)",
+  "via": "md_gargoyles (year set by hand: Disney 1995, the 2022 match was a fan translation)",
+  "year": 1995
  },
  "md_gauntlet": {
   "candidates": 1,
@@ -3012,6 +3017,11 @@
   "via": "md_pstar3",
   "year": 1990
  },
+ "md_phantasystarivtheend": {
+  "title": "Phantasy Star IV: The End of the Millennium (USA)",
+  "via": "md_phantasystarivtheend (year set by hand: Japan 1993)",
+  "year": 1993
+ },
  "md_phelios": {
   "title": "Phelios (Euro)",
   "via": "md_phelios",
@@ -3084,9 +3094,9 @@
   "year": 1990
  },
  "md_rbislands": {
-  "title": "Rainbow Islands Extra (Hack, Spanish)",
-  "via": "md_rbislands",
-  "year": 2019
+  "title": "Rainbow Islands Extra (Japan)",
+  "via": "md_rbislands (year set by hand: Taito 1990, the 2019 match was a fan translation)",
+  "year": 1990
  },
  "md_revengeofshinobithe": {
   "candidates": 3,

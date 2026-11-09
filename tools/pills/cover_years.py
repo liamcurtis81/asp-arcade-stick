@@ -40,6 +40,11 @@ PILL_H, PAD, TEXT_PX = 24, 9, 17
 SS = 4                                           # supersampling for clean edges
 CACHE = os.path.join(HERE, "pill_src")
 
+# Covers where the sampled colour fails. Darkening a saturated yellow to AA
+# contrast gives olive, which reads as dirt on Pac-Man's yellow artwork
+# (Liam flagged its contrast). The logo's own red is used instead.
+PILL_OVERRIDE = {"pacman": (176, 24, 24)}
+
 
 # ----------------------------------------------------------------- colour
 def _lin(v):
@@ -71,14 +76,14 @@ def pill_colour(art, box):
 
 
 # ------------------------------------------------------------------- pill
-def draw_pill(art, year):
+def draw_pill(art, year, override=None):
     font = ImageFont.truetype(FONT, TEXT_PX * SS)
     text = str(year)
     tb = font.getbbox(text)
     tw, th = tb[2] - tb[0], tb[3] - tb[1]
     pw = tw // SS + 2 * PAD
     x0, y0 = PILL_XY
-    colour = pill_colour(art, (max(0, x0 - 4), max(0, y0 - 4), x0 + pw + 4, y0 + PILL_H + 4))
+    colour = override or pill_colour(art, (max(0, x0 - 4), max(0, y0 - 4), x0 + pw + 4, y0 + PILL_H + 4))
 
     big = Image.new("RGBA", (pw * SS, PILL_H * SS), (0, 0, 0, 0))
     d = ImageDraw.Draw(big)
@@ -151,7 +156,7 @@ def main():
         counts[how] = counts.get(how, 0) + 1
         y = years.get(g.lower(), {}).get("year")
         if y:
-            art, _ = draw_pill(art, y)
+            art, _ = draw_pill(art, y, PILL_OVERRIDE.get(g.lower()))
         else:
             nopill.append(g)
         out = Image.new("RGBA", (W, H), (0, 0, 0, 0))
