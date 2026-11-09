@@ -1,7 +1,7 @@
 From d1db6821fd51bc23ae6c5d63a012e9fa4a259396 Mon Sep 17 00:00:00 2001
 From: Liam Curtis <liamcurtis81@users.noreply.github.com>
 Date: Sun, 8 Nov 2026 16:43:41 +0000
-Subject: [PATCH 26/26] ASP: Midway speed-ups (idle skip, sound ROM mapping,
+Subject: [PATCH 26/27] ASP: Midway speed-ups (idle skip, sound ROM mapping,
  timer division)
 
 - TMS34010 idle skipping for Mortal Kombat and MK II: the wait-for-vblank

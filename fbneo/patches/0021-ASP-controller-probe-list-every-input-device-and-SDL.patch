@@ -1,7 +1,7 @@
 From cc5ff96838c741cfb73a2a3b12577180af38d214 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 20:01:52 +0000
-Subject: [PATCH 21/26] ASP: controller probe - list every input device and SDL
+Subject: [PATCH 21/27] ASP: controller probe - list every input device and SDL
  joystick, trace presses from all of them
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
