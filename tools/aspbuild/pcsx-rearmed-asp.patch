@@ -997,10 +997,10 @@ index 0000000..9a69ada
 +#endif /* ASP_GEOM_H */
 diff --git a/asp/asp_psx.c b/asp/asp_psx.c
 new file mode 100644
-index 0000000..424bdd4
+index 0000000..bbd4eef
 --- /dev/null
 +++ b/asp/asp_psx.c
-@@ -0,0 +1,733 @@
+@@ -0,0 +1,738 @@
 +/* asp_psx.c - standalone frontend that runs the PCSX ReARMed libretro core
 + * on the Neo Geo Arcade Stick Pro. Built from asp_gba.c (the gpSP frontend):
 + * same launch contract, screen code, sound ring and exit combinations.
@@ -1038,6 +1038,7 @@ index 0000000..424bdd4
 +#include <stdarg.h>
 +#include <unistd.h>
 +#include <sys/stat.h>
++#include <time.h>
 +#include <SDL.h>
 +#include "libretro.h"
 +
@@ -1127,7 +1128,7 @@ index 0000000..424bdd4
 +/* ---- sound ------------------------------------------------------------- */
 +#define OUT_RATE   44100
 +#define RING_FR    16384               /* stereo frames, power of two */
-+#define TARGET_FR  3072                /* ~70 ms queued before we wait */
++#define TARGET_FR  1536                /* ~35 ms queued before we wait (was 70; rate control covers dips) */
 +static int16_t ring[RING_FR * 2];
 +static volatile unsigned ring_w, ring_r;   /* in frames, free-running */
 +static int audio_ok;
@@ -1211,7 +1212,7 @@ index 0000000..424bdd4
 +	want.freq = OUT_RATE;
 +	want.format = AUDIO_S16SYS;
 +	want.channels = 2;
-+	want.samples = 1024;
++	want.samples = 512;   /* ~12 ms per device period: less sound queued ahead of the picture */
 +	want.callback = audio_cb;
 +	if (SDL_OpenAudio(&want, &got) < 0) {
 +		fprintf(stderr, "asp: no sound: %s\n", SDL_GetError());
@@ -1690,7 +1691,11 @@ index 0000000..424bdd4
 +	while (!quit_now) {
 +		report_audio_buffer();
 +		{
-+			double t0 = now_ms();
++			/* Held in memory, not a register: the core does not keep the
++			 * VFP registers a caller may hold doubles in (d8-d15) intact
++			 * across retro_run, which is what garbled the first timings. */
++			static volatile double t0;
++			t0 = now_ms();
 +			retro_run();
 +			t_run_ms += now_ms() - t0;
 +		}
