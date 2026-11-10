@@ -1,0 +1,1641 @@
+diff --git a/asp/asp_calib.h b/asp/asp_calib.h
+new file mode 100644
+index 0000000..f6f0791
+--- /dev/null
++++ b/asp/asp_calib.h
+@@ -0,0 +1,218 @@
++/* asp_calib.h - one photograph settles the framebuffer geometry.
++ *
++ * Switched on with calibrate=1 in asp_screen.cfg. The next game launch draws a
++ * test pattern three times before the game starts, once under each candidate
++ * interpretation of the display's contradictory geometry (see asp_fbout.h:
++ * the driver reports 16 bits per pixel and a 5120-byte scanline for a
++ * 1280-wide mode, and those cannot both be true).
++ *
++ * Each pass is numbered by that many large white bars below the centre cross:
++ *
++ *   pass 1  stride = line_length, 2 bytes/pixel
++ *   pass 2  stride = line_length, 4 bytes/pixel
++ *   pass 3  stride = xres * 2,    2 bytes/pixel   (what SDL does today)
++ *
++ * Exactly one pass should render as clean concentric rectangles filling the
++ * screen. The others will shear, wrap, or fill only part of it. That pass
++ * names the correct fb_mode.
++ *
++ * Within the correct pass, the concentric 16-pixel bands then give the
++ * overscan - how much of the framebuffer the panel does not show:
++ *
++ *   white 0   red 16   green 32   blue 48   yellow 64   magenta 80   cyan 96
++ *
++ * Whichever band is the outermost one still visible is the answer, read
++ * separately for top/bottom and left/right since they often differ, and
++ * those two numbers become inset_y and inset_x.
++ *
++ * It draws through asp_fbout, the same path a game frame takes, so it measures
++ * the thing that actually matters rather than a parallel one.
++ *
++ * Include after asp_fbout.h. Needs nothing else.
++ */
++
++#ifndef ASP_CALIB_H
++#define ASP_CALIB_H
++
++#define ASP_CALIB_BAND     16
++#define ASP_CALIB_NBANDS    7
++#define ASP_CALIB_SECONDS   8
++
++static unsigned short asp_calib_rgb(unsigned r, unsigned g, unsigned b)
++{
++	return (unsigned short)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
++}
++
++static void asp_calib_fill(unsigned short *buf, int w, int h,
++                           int x0, int y0, int x1, int y1, unsigned short c)
++{
++	int x, y;
++	if (x0 < 0) x0 = 0;
++	if (y0 < 0) y0 = 0;
++	if (x1 > w) x1 = w;
++	if (y1 > h) y1 = h;
++	for (y = y0; y < y1; y++)
++		for (x = x0; x < x1; x++)
++			buf[(long)y * w + x] = c;
++}
++
++static void asp_calib_pattern(unsigned short *buf, int w, int h, int passno)
++{
++	static const unsigned char band[ASP_CALIB_NBANDS][3] = {
++		{ 255, 255, 255 },   /*   0  white   */
++		{ 255,   0,   0 },   /*  16  red     */
++		{   0, 255,   0 },   /*  32  green   */
++		{   0,   0, 255 },   /*  48  blue    */
++		{ 255, 255,   0 },   /*  64  yellow  */
++		{ 255,   0, 255 },   /*  80  magenta */
++		{   0, 255, 255 },   /*  96  cyan    */
++	};
++	unsigned short wht = asp_calib_rgb(255, 255, 255);
++	int i, cx = w / 2, cy = h / 2;
++
++	asp_calib_fill(buf, w, h, 0, 0, w, h, asp_calib_rgb(24, 24, 24));
++
++	for (i = 0; i < ASP_CALIB_NBANDS; i++) {
++		int a = i * ASP_CALIB_BAND, b = a + ASP_CALIB_BAND;
++		unsigned short c = asp_calib_rgb(band[i][0], band[i][1], band[i][2]);
++		if (a >= w / 2 || a >= h / 2)
++			break;
++		asp_calib_fill(buf, w, h, a,     a,     w - a, b,     c);
++		asp_calib_fill(buf, w, h, a,     h - b, w - a, h - a, c);
++		asp_calib_fill(buf, w, h, a,     b,     b,     h - b, c);
++		asp_calib_fill(buf, w, h, w - b, b,     w - a, h - b, c);
++	}
++
++	/* Corner blocks well inside the bands, so they survive heavy overscan
++	 * and expose any horizontal wrap or shear. */
++	asp_calib_fill(buf, w, h, 120,     120,     180,     180,
++	               asp_calib_rgb(255, 0, 0));
++	asp_calib_fill(buf, w, h, w - 180, 120,     w - 120, 180,
++	               asp_calib_rgb(0, 255, 0));
++	asp_calib_fill(buf, w, h, 120,     h - 180, 180,     h - 120,
++	               asp_calib_rgb(0, 0, 255));
++	asp_calib_fill(buf, w, h, w - 180, h - 180, w - 120, h - 120,
++	               asp_calib_rgb(255, 255, 0));
++
++	/* Centre cross: confirms centring and gives a straight edge to judge
++	 * shear against. */
++	asp_calib_fill(buf, w, h, cx - 160, cy, cx + 160, cy + 2, wht);
++	asp_calib_fill(buf, w, h, cx, cy - 160, cx + 2, cy + 160, wht);
++
++	/* Pass number, as that many bars. */
++	for (i = 0; i < passno; i++) {
++		int bx = cx - (passno * 70) / 2 + i * 70;
++		asp_calib_fill(buf, w, h, bx, cy + 40, bx + 46, cy + 150, wht);
++	}
++}
++
++/* Returns 1 if calibration ran. The caller should have set asp_fb_mode_cfg
++ * from the config already; this restores it on the way out. */
++static int asp_run_fb_calibration(void)
++{
++	int want = asp_fb_mode_cfg;
++	int pass, w, h;
++	unsigned short *buf;
++
++	if (!asp_fb_open())
++		return 0;
++	w = asp_fb_w; h = asp_fb_h;
++
++	buf = (unsigned short *)malloc((size_t)w * h * 2);
++	if (buf == NULL) {
++		fprintf(stderr, "asp-calib: out of memory for a %dx%d pattern\n", w, h);
++		return 0;
++	}
++
++	fprintf(stderr, "asp-calib: three passes of %ds. Exactly one should be a "
++		"clean set of rectangles filling the screen; its bar count is the "
++		"fb_mode to use. Within it, the outermost visible band gives the "
++		"overscan: white 0, red 16, green 32, blue 48, yellow 64, "
++		"magenta 80, cyan 96.\n", ASP_CALIB_SECONDS);
++
++	for (pass = 1; pass <= 3; pass++) {
++		if (!asp_fb_reopen(pass)) {
++			fprintf(stderr, "asp-calib: pass %d could not be opened, "
++				"skipping it\n", pass);
++			continue;
++		}
++		asp_fb_clear_all();   /* no residue from the previous pass's stride */
++		asp_calib_pattern(buf, w, h, pass);
++		fprintf(stderr, "asp-calib: pass %d - stride %ld, %d bytes/pixel\n",
++			pass, asp_fb_stride, asp_fb_px);
++		asp_fb_present(buf, w, h, w, 0, 0, asp_fb_w, asp_fb_h);
++		sleep(ASP_CALIB_SECONDS);
++	}
++
++	free(buf);
++	asp_fb_reopen(want);
++	asp_fb_clear_all();   /* and none left under the game that follows */
++	return 1;
++}
++
++
++/* calibrate=2: one pattern, in whatever fb_mode is configured, holding long
++ * enough to photograph. A square and a circle of known size, because "is the
++ * square square?" is a question the eye answers instantly and exactly, while
++ * measuring a hand-held photo of a glossy panel - which is what I had been
++ * doing - carries wider error bars than the effect being measured. */
++static int asp_run_square_test(void)
++{
++	int w, h, cx, cy, i, j, side;
++	unsigned short *buf;
++	unsigned short wht, red, grn, blk;
++
++	if (!asp_fb_open())
++		return 0;
++	w = asp_fb_w; h = asp_fb_h;
++
++	buf = (unsigned short *)malloc((size_t)w * h * 2);
++	if (buf == NULL)
++		return 0;
++
++	wht = asp_calib_rgb(255, 255, 255);
++	red = asp_calib_rgb(255,  40,  40);
++	grn = asp_calib_rgb( 40, 230,  90);
++	blk = asp_calib_rgb(  8,   8,  12);
++
++	asp_calib_fill(buf, w, h, 0, 0, w, h, blk);
++
++	cx = w / 2; cy = h / 2;
++	side = 600;                       /* 600x600 framebuffer pixels */
++
++	/* Outline of the square, 4px, in white. */
++	asp_calib_fill(buf, w, h, cx-side/2, cy-side/2, cx+side/2, cy-side/2+4, wht);
++	asp_calib_fill(buf, w, h, cx-side/2, cy+side/2-4, cx+side/2, cy+side/2, wht);
++	asp_calib_fill(buf, w, h, cx-side/2, cy-side/2, cx-side/2+4, cy+side/2, wht);
++	asp_calib_fill(buf, w, h, cx+side/2-4, cy-side/2, cx+side/2, cy+side/2, wht);
++
++	/* A circle inscribed in it, in red: an ellipse is easier to spot than a
++	 * slightly-off rectangle. */
++	for (i = -side/2; i <= side/2; i++) {
++		double f = 1.0 - ((double)i / (side/2)) * ((double)i / (side/2));
++		int dx;
++		if (f < 0) f = 0;
++		dx = (int)((side/2) * (f > 0 ? __builtin_sqrt(f) : 0));
++		asp_calib_fill(buf, w, h, cx-dx, cy+i, cx-dx+4, cy+i+1, red);
++		asp_calib_fill(buf, w, h, cx+dx-4, cy+i, cx+dx, cy+i+1, red);
++	}
++
++	/* Cross-hairs through the centre, full width and height, in green, so the
++	 * screen edges can be related to the square. */
++	asp_calib_fill(buf, w, h, 0, cy-1, w, cy+1, grn);
++	asp_calib_fill(buf, w, h, cx-1, 0, cx+1, h, grn);
++
++	fprintf(stderr, "asp-calib: square test - a 600x600 framebuffer square with "
++		"an inscribed circle, in fb_mode %d. If it photographs taller than it "
++		"is wide, the display is stretching vertically by that ratio and "
++		"panel_aspect follows directly from it.\n", asp_fb_mode_cfg);
++
++	asp_fb_clear_all();
++	asp_fb_present(buf, w, h, w, 0, 0, asp_fb_w, asp_fb_h);
++	sleep(15);
++	free(buf);
++	asp_fb_clear_all();
++	return 1;
++}
++
++#endif /* ASP_CALIB_H */
+diff --git a/asp/asp_fbout.h b/asp/asp_fbout.h
+new file mode 100644
+index 0000000..bd24e7f
+--- /dev/null
++++ b/asp/asp_fbout.h
+@@ -0,0 +1,619 @@
++/* asp_fbout.h - write frames straight to /dev/fb0 at the stride the display
++ * driver actually reports, bypassing SDL's video surface.
++ *
++ * Why this exists. On this device the driver answers FBIOGET_VSCREENINFO with
++ * bits_per_pixel 16 and FBIOGET_FSCREENINFO with line_length 5120 for a
++ * 1280-wide mode. Those cannot both describe the same thing: 1280 pixels at
++ * 16bpp is a 2560-byte scanline. SDL believes bits_per_pixel, hands out a
++ * surface with pitch 2560, and every row we draw then lands at half the
++ * distance the hardware reads rows from - which is what put a NES cursor in
++ * the top-left corner and made all three emulators' output the wrong shape.
++ * Setting the mode does not reconcile the two numbers; the mismatch is still
++ * there afterwards.
++ *
++ * Rather than argue with SDL about it, the final blit goes here. SDL keeps
++ * input, audio and timing; the picture is ours.
++ *
++ * Which of the two numbers is right is an open question, so it is a setting
++ * rather than an assumption. asp_screen.cfg's fb_mode selects:
++ *
++ *   1  stride = line_length, 2 bytes/pixel  - the scanline is really 2560
++ *      pixels wide and only the left 1280 are visible
++ *   2  stride = line_length, 4 bytes/pixel  - the pixels are really 32-bit
++ *   3  stride = xres * 2,    2 bytes/pixel  - what SDL does today, kept so the
++ *      known-wrong case can be compared against directly
++ *   0  auto: 1 when line_length is exactly xres*4 and the masks are RGB565,
++ *      otherwise 3
++ *
++ * The calibration pattern cycles all three, so one photograph settles it
++ * instead of another round of inference.
++ *
++ * Every write is bounds-checked against smem_len. A wrong stride here would
++ * otherwise walk off the end of the mapping.
++ */
++
++#ifndef ASP_FBOUT_H
++#define ASP_FBOUT_H
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <time.h>
++#include <unistd.h>
++#include <fcntl.h>
++#include <errno.h>
++#include <sys/mman.h>
++#include <sys/time.h>
++#include <sys/ioctl.h>
++#include <linux/fb.h>
++
++#ifndef FBIO_WAITFORVSYNC
++#define FBIO_WAITFORVSYNC _IOW('F', 0x20, unsigned int)
++#endif
++
++static unsigned char *asp_fb_mem;
++static long  asp_fb_len;
++static long  asp_fb_stride;      /* bytes between scanlines */
++static int   asp_fb_px;          /* bytes per pixel: 2 or 4 */
++static int   asp_fb_w, asp_fb_h; /* visible geometry */
++static long  asp_fb_origin;      /* byte offset of the displayed page */
++static int   asp_fb_ready;
++static int   asp_fb_fd = -1;     /* kept open for the vblank wait */
++static int   asp_fb_vsync_ok = 1;
++
++/* Set from asp_screen.cfg before asp_fb_open(). */
++static int asp_fb_mode_cfg;
++
++static int asp_fb_open(void)
++{
++	struct fb_var_screeninfo v;
++	const char *dev;
++	struct fb_fix_screeninfo f;
++	int fd, mode;
++
++	if (asp_fb_ready)
++		return 1;
++
++	/* Test hooks. ASP_FB_DEV points the output at an ordinary file and
++	 * ASP_FB_GEOM supplies the geometry the ioctls would have returned, as
++	 * "xres,yres,line_length,bpp,smem_len". Together they let the blit
++	 * arithmetic and the bounds checks be exercised off-device, which matters
++	 * for code that writes into a raw mapping at a stride taken on trust. */
++	{
++		const char *devenv = getenv("ASP_FB_DEV");
++		dev = devenv ? devenv : "/dev/fb0";
++	}
++
++	fd = open(dev, O_RDWR);
++	if (fd < 0) {
++		fprintf(stderr, "asp-fbout: open %s: %s\n", dev, strerror(errno));
++		return 0;
++	}
++
++	memset(&v, 0, sizeof(v));
++	memset(&f, 0, sizeof(f));
++	if (ioctl(fd, FBIOGET_VSCREENINFO, &v) < 0 ||
++	    ioctl(fd, FBIOGET_FSCREENINFO, &f) < 0) {
++		const char *g = getenv("ASP_FB_GEOM");
++		unsigned xr, yr, ll, bpp, sl;
++		if (g == NULL || sscanf(g, "%u,%u,%u,%u,%u",
++		                        &xr, &yr, &ll, &bpp, &sl) != 5) {
++			fprintf(stderr, "asp-fbout: ioctl: %s\n", strerror(errno));
++			close(fd);
++			return 0;
++		}
++		v.xres = xr; v.yres = yr; v.bits_per_pixel = bpp;
++		v.xres_virtual = xr; v.yres_virtual = yr; v.yoffset = 0;
++		v.red.offset = 11; v.red.length = 5;
++		v.green.offset = 5; v.green.length = 6;
++		v.blue.offset = 0; v.blue.length = 5;
++		f.line_length = ll; f.smem_len = sl;
++		fprintf(stderr, "asp-fbout: using ASP_FB_GEOM %ux%u ll=%u bpp=%u "
++			"smem=%u\n", xr, yr, ll, bpp, sl);
++	}
++
++	asp_fb_w = v.xres ? (int)v.xres : 1280;
++	asp_fb_h = v.yres ? (int)v.yres : 720;
++
++	mode = asp_fb_mode_cfg;
++	if (mode == 0) {
++		int rgb565 = (v.red.length == 5 && v.green.length == 6 &&
++		              v.blue.length == 5);
++		mode = (rgb565 && f.line_length == v.xres * 4u) ? 1 : 3;
++		fprintf(stderr, "asp-fbout: auto-selected fb_mode %d "
++			"(rgb565=%d line_length=%u xres*4=%u)\n",
++			mode, rgb565, f.line_length, v.xres * 4u);
++	}
++
++	switch (mode) {
++	case 1:  asp_fb_stride = f.line_length;      asp_fb_px = 2; break;
++	case 2:  asp_fb_stride = f.line_length;      asp_fb_px = 4; break;
++	default: asp_fb_stride = (long)asp_fb_w * 2; asp_fb_px = 2; break;
++	}
++
++	/* Pin the display to the first page and keep it there.
++	 *
++	 * The driver offers two pages (yres_virtual is twice yres) and SDL_Flip
++	 * pans between them. We write to one fixed address, so a pan we did not
++	 * make means every other frame shows a page nothing ever wrote - which is
++	 * the flicker on the Mega Drive. The emulators no longer call SDL_Flip,
++	 * but SDL_SetVideoMode may already have left the display on the second
++	 * page, so ask for page 0 explicitly rather than inferring where we are.
++	 *
++	 * If the pan is refused, fall back to the page the driver says is live.
++	 * The offset for that is counted in line_length units, not ours: panning
++	 * is the driver's arithmetic, and on this device the two disagree. */
++	v.yoffset = 0;
++	if (ioctl(fd, FBIOPAN_DISPLAY, &v) == 0) {
++		asp_fb_origin = 0;
++	} else {
++		fprintf(stderr, "asp-fbout: pan to page 0 refused (%s); "
++			"using the live page at yoffset %u\n",
++			strerror(errno), v.yoffset);
++		asp_fb_origin = (long)v.yoffset * (long)f.line_length;
++	}
++
++	asp_fb_len = f.smem_len;
++	/* The cast is for the C++ builds. C converts void* silently; C++ does
++	   not, and FBNeo compiles this header as C++. */
++	asp_fb_mem = (unsigned char *)mmap(NULL, asp_fb_len,
++	                                   PROT_READ | PROT_WRITE,
++	                                   MAP_SHARED, fd, 0);
++	asp_fb_fd = fd;
++	if (asp_fb_mem == (unsigned char *)MAP_FAILED) {
++		fprintf(stderr, "asp-fbout: mmap %ld: %s\n",
++			asp_fb_len, strerror(errno));
++		asp_fb_mem = NULL;
++		close(asp_fb_fd);
++		asp_fb_fd = -1;
++		return 0;
++	}
++
++	fprintf(stderr, "asp-fbout: %dx%d visible, stride %ld, %d bytes/pixel, "
++		"page offset %ld, mapping %ld bytes (mode %d)\n",
++		asp_fb_w, asp_fb_h, asp_fb_stride, asp_fb_px,
++		asp_fb_origin, asp_fb_len, mode);
++
++	/* A whole frame must fit, or the stride is wrong in a way that would
++	 * write past the mapping. Refuse rather than corrupt memory. */
++	if (asp_fb_origin + (long)asp_fb_h * asp_fb_stride > asp_fb_len) {
++		fprintf(stderr, "asp-fbout: %d rows at stride %ld exceed the "
++			"%ld byte mapping - refusing this mode\n",
++			asp_fb_h, asp_fb_stride, asp_fb_len);
++		munmap(asp_fb_mem, asp_fb_len);
++		asp_fb_mem = NULL;
++		close(asp_fb_fd);
++		asp_fb_fd = -1;
++		return 0;
++	}
++
++	asp_fb_ready = 1;
++	return 1;
++}
++
++static void asp_fb_close(void)
++{
++	if (asp_fb_mem) {
++		munmap(asp_fb_mem, asp_fb_len);
++		asp_fb_mem = NULL;
++	}
++	if (asp_fb_fd >= 0) {
++		close(asp_fb_fd);
++		asp_fb_fd = -1;
++	}
++	asp_fb_ready = 0;
++}
++
++/* Reopen under a different interpretation of the geometry. Only the
++ * calibration pass uses this. */
++static int asp_fb_reopen(int mode)
++{
++	asp_fb_close();
++	asp_fb_mode_cfg = mode;
++	return asp_fb_open();
++}
++
++/* Block until the display starts a new frame.
++ *
++ * We draw straight into the page being scanned out, so without this the beam
++ * can be halfway down the panel while a frame is being replaced underneath it,
++ * showing the top of the new frame and the bottom of the old one at once. On
++ * fast motion that reads as the picture glitching and shearing.
++ *
++ * Best effort: some drivers do not implement the wait, and one refusal is
++ * enough to stop asking. Costs nothing when unsupported. */
++static void asp_fb_wait_vsync(void)
++{
++	unsigned int zero = 0;
++
++	if (!asp_fb_vsync_ok || asp_fb_fd < 0)
++		return;
++	if (ioctl(asp_fb_fd, FBIO_WAITFORVSYNC, &zero) == 0)
++		return;
++
++	asp_fb_vsync_ok = 0;
++	fprintf(stderr, "asp-fbout: no vblank wait on this driver (%s); "
++		"drawing unsynchronised\n", strerror(errno));
++}
++
++/* Present cost split: the scale pass versus the framebuffer write. */
++/* Timing every row cost about 0.9 ms per frame in clock_gettime calls alone -
++ * 900 of them, more than any saving the measurement was looking for, and it
++ * pushed the measured present from 2.63 ms to 4.39. Off unless asked for. */
++int asp_fb_profile = 0;
++static unsigned long long asp_fb_t_scale = 0, asp_fb_t_copy = 0;
++static unsigned int asp_fb_n_scale = 0, asp_fb_n_copy = 0, asp_fb_n_frames = 0;
++
++static inline unsigned long long asp_fb_now_ns(void)
++{
++	struct timespec ts;
++	clock_gettime(CLOCK_MONOTONIC, &ts);
++	return (unsigned long long)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
++}
++
++static inline unsigned char *asp_fb_row(int y)
++{
++	long off = asp_fb_origin + (long)y * asp_fb_stride;
++	if (y < 0 || y >= asp_fb_h)
++		return NULL;
++	if (off < 0 || off + (long)asp_fb_w * asp_fb_px > asp_fb_len)
++		return NULL;
++	return asp_fb_mem + off;
++}
++
++/* Wipe the whole mapping, not just the visible rectangle at the current
++ * stride. The calibration passes each write at a different stride, so bytes one
++ * pass touches are bytes another pass's "visible area" never covers; clearing
++ * per-interpretation left the earlier passes showing through underneath the
++ * game, which is what put a grid of bright bands over Super Mario World. */
++static void asp_fb_clear_all(void)
++{
++	if (asp_fb_ready && asp_fb_mem)
++		memset(asp_fb_mem, 0, (size_t)asp_fb_len);
++}
++
++static void asp_fb_clear(void)
++{
++	int y;
++	if (!asp_fb_ready)
++		return;
++	for (y = 0; y < asp_fb_h; y++) {
++		unsigned char *p = asp_fb_row(y);
++		if (p)
++			memset(p, 0, (size_t)asp_fb_w * asp_fb_px);
++	}
++}
++
++#ifdef __ARM_NEON
++#include <arm_neon.h>
++#endif
++
++/* RGB565 -> whatever the framebuffer takes. The 32bpp case assumes the usual
++ * XRGB8888 byte order; the masks are checked at open time for the 16bpp case,
++ * which is the one this device actually reports. */
++static inline void asp_fb_putrow16(unsigned char *p, const unsigned short *src,
++                                   const unsigned short *xmap, int dw)
++{
++	unsigned short *q = (unsigned short *)p;
++	int j;
++	for (j = 0; j < dw; j++)
++		q[j] = src[xmap[j]];
++}
++
++/* The same nearest-neighbour row scale, walked along the SOURCE instead.
++ *
++ * The version above costs two loads and a store for every destination pixel,
++ * and the second load is a gather the CPU cannot pipeline well. Measured on
++ * the device it held the picture to 22.3fps while the emulation itself ran at
++ * 58.5 of a 59.18 target - so the drawing, not the emulation, is the limit.
++ *
++ * Upscaling means consecutive destination pixels share a source pixel: at
++ * 288 wide into 1280 each source pixel covers four or five. So walk the
++ * source once and write each pixel as a run of identical values, which needs
++ * no xmap, no gather, and lets a whole run leave in one wide store.
++ *
++ * runlen[] must describe exactly the mapping xmap[] does, or the picture
++ * shifts. Destination j takes source (j*sw)/dw, so source sx covers every j
++ * with sx*dw/sw <= j < (sx+1)*dw/sw, which for integers is
++ * ceil(sx*dw/sw) .. ceil((sx+1)*dw/sw)-1. asp_fb_rowmap builds it that way
++ * and the two are checked against each other in the host-side test. */
++static inline void asp_fb_putrow16_runs(unsigned char *p,
++                                        const unsigned short *src,
++                                        const unsigned short *runlen, int sw)
++{
++	unsigned short *q = (unsigned short *)p;
++	int sx;
++
++	for (sx = 0; sx < sw; sx++) {
++		unsigned short v = src[sx];
++		int n = runlen[sx];
++
++		if (n <= 0)					/* downscaling drops this one */
++			continue;
++
++#ifdef __ARM_NEON
++		if (n >= 8) {
++			uint16x8_t v8 = vdupq_n_u16(v);
++			do { vst1q_u16(q, v8); q += 8; n -= 8; } while (n >= 8);
++		}
++		if (n >= 4) {
++			uint16x4_t v4 = vdup_n_u16(v);
++			vst1_u16(q, v4); q += 4; n -= 4;
++		}
++#else
++		/* Two pixels per 32-bit store, once q is 4-byte aligned. */
++		if (n >= 2 && (((unsigned long)(void *)q) & 2u) != 0) {
++			*q++ = v; n--;
++		}
++		if (n >= 2) {
++			unsigned int vv = ((unsigned int)v << 16) | v;
++			do {
++				*(unsigned int *)(void *)q = vv;
++				q += 2; n -= 2;
++			} while (n >= 2);
++		}
++#endif
++		while (n-- > 0)
++			*q++ = v;
++	}
++}
++
++static inline void asp_fb_putrow32(unsigned char *p, const unsigned short *src,
++                                   const unsigned short *xmap, int dw)
++{
++	unsigned int *q = (unsigned int *)p;
++	int j;
++	for (j = 0; j < dw; j++) {
++		unsigned c = src[xmap[j]];
++		unsigned r = (c >> 11) & 0x1f, g = (c >> 5) & 0x3f, b = c & 0x1f;
++		q[j] = (((r * 255 + 15) / 31) << 16)
++		     | (((g * 255 + 31) / 63) << 8)
++		     |  ((b * 255 + 15) / 31);
++	}
++}
++
++/* How fast can this framebuffer actually be written?
++ *
++ * Every judgement about whether 60fps is reachable has rested on an estimate
++ * of ~104MB/s that was never measured. At 1280x675x16bpp a full frame is
++ * 1.728MB, so 60fps needs 103.7MB/s of writes and nothing else matters until
++ * that number is known. This fills the visible area a few times with wide
++ * stores and reports what the hardware gives, once, at startup. */
++static void asp_fb_bench(void)
++{
++	struct timeval t0, t1;
++	const int reps = 8;
++	long bytes = (long)asp_fb_w * asp_fb_h * asp_fb_px;
++	double secs, mbps, frame_mb, fps_cap;
++	int i, y;
++
++	if (!asp_fb_ready || bytes <= 0)
++		return;
++
++	gettimeofday(&t0, NULL);
++	for (i = 0; i < reps; i++) {
++		for (y = 0; y < asp_fb_h; y++) {
++			unsigned char *p = asp_fb_row(y);
++			if (p) memset(p, (i & 1) ? 0x00 : 0x11,
++				(size_t)asp_fb_w * asp_fb_px);
++		}
++	}
++	gettimeofday(&t1, NULL);
++
++	secs = (t1.tv_sec - t0.tv_sec) + (t1.tv_usec - t0.tv_usec) / 1e6;
++	if (secs <= 0.0) return;
++
++	mbps = (double)bytes * reps / secs / (1024.0 * 1024.0);
++	/* What a full-screen blit of the real target rectangle would cost. */
++	frame_mb = (double)bytes / (1024.0 * 1024.0);
++	fps_cap = mbps / frame_mb;
++
++	/* Write straight to the log file rather than to stderr.
++	 *
++	 * On this device the startup log is closed before the real video init
++	 * runs - AspInit is first called while bDrvOkay is still false, returns
++	 * early, and the call that actually sets the mode up happens later from
++	 * the message loop, by which point stdout and stderr point at
++	 * /dev/null. Three separate diagnostics have been lost that way: the
++	 * evdev probe, this bench, and the "asp: game" line, which has never
++	 * once appeared in a device log despite being printed on every launch.
++	 * Owning its own file handle makes this immune to when it runs. */
++	static const char *paths[] = {
++		"/mnt/hdisk/ASPh/hack/bin/fba/fba_emu.log",
++		"/mnt/udisk/ASPh/hack/bin/fba/fba_emu.log",
++		NULL
++	};
++	FILE *lf = NULL;
++	for (int k = 0; paths[k] && !lf; k++) lf = fopen(paths[k], "a");
++	if (lf) {
++		fprintf(lf, "----- framebuffer write bandwidth %.1f MB/s "
++			"(%ld bytes x%d in %.3fs); a full %dx%d frame is %.2f MB, "
++			"so the drawing ceiling is about %.0f fps -----\n",
++			mbps, bytes, reps, secs, asp_fb_w, asp_fb_h,
++			frame_mb, fps_cap);
++		fflush(lf);
++		fsync(fileno(lf));
++		fclose(lf);
++	}
++
++	fprintf(stderr, "asp: framebuffer write bandwidth %.1f MB/s -> "
++		"ceiling about %.0f fps\n", mbps, fps_cap);
++}
++
++/* Nearest-neighbour scale of an RGB565 frame into the rectangle (ox,oy,dw,dh).
++ * Rows that map to the same source line are copied from the previous row, so
++ * only sh rows are actually built. */
++static void asp_fb_present(const unsigned short *src, int sw, int sh,
++                           int spitch_px, int ox, int oy, int dw, int dh)
++{
++	static unsigned short xmap[2560];
++	static unsigned short runlen[2560];
++	/* One destination row, in cached memory. 4 bytes per pixel so the 32bpp
++	 * path fits too; 8-byte aligned for the wide stores the row writers use. */
++	static unsigned char rowbuf[2560 * 4] __attribute__((aligned(8)));
++	static int cache_dw, cache_sw;
++	unsigned char *prev = NULL;
++	int i, j, prev_sy = -1;
++
++	if (!asp_fb_ready || src == NULL)
++		return;
++	if (sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0)
++		return;
++	if (dw > 2560) dw = 2560;
++	if (ox < 0) ox = 0;
++	if (oy < 0) oy = 0;
++	if (ox + dw > asp_fb_w) dw = asp_fb_w - ox;
++	if (oy + dh > asp_fb_h) dh = asp_fb_h - oy;
++	if (dw <= 0 || dh <= 0)
++		return;
++
++	if (dw != cache_dw || sw != cache_sw) {
++		for (j = 0; j < dw; j++)
++			xmap[j] = (unsigned short)(((unsigned)j * sw) / dw);
++
++		/* The same mapping expressed as a run per source pixel. Boundary
++		 * b(sx) = ceil(sx*dw/sw) is where source sx starts in the
++		 * destination, so its run is b(sx+1) - b(sx). The runs sum to
++		 * exactly dw, and are 0 for pixels a downscale skips. */
++		if (sw > 0 && sw <= (int)(sizeof(runlen) / sizeof(runlen[0]))) {
++			unsigned prev = 0;
++			for (j = 0; j < sw; j++) {
++				unsigned next = ((unsigned)(j + 1) * dw + sw - 1) / sw;
++				runlen[j] = (unsigned short)(next - prev);
++				prev = next;
++			}
++		}
++		cache_dw = dw; cache_sw = sw;
++	}
++
++	/* Each distinct source row is built once into ordinary cached memory and
++	 * then copied out; the framebuffer is only ever written, never read.
++	 *
++	 * The previous version copied a repeated row from the PREVIOUS
++	 * FRAMEBUFFER ROW, which meant reading back out of uncached video
++	 * memory. At 288x224 into 1280x675 two rows in every three are repeats,
++	 * so that was about 1.15MB per frame of reads from the slowest memory on
++	 * the device, to save building a row into the fastest. Staging in RAM
++	 * costs one extra copy of each distinct row and removes all of it. */
++	for (i = 0; i < dh; i++) {
++		unsigned char *p = asp_fb_row(oy + i);
++		int sy;
++		if (p == NULL)
++			continue;
++		p += (long)ox * asp_fb_px;
++		sy = (int)(((unsigned)i * sh) / dh);
++
++		if (sy != prev_sy) {
++			unsigned long long t0 = asp_fb_profile ? asp_fb_now_ns() : 0;
++			if (asp_fb_px == 2) {
++				/* Run-walk when the run table covers this source width,
++				 * which is every real case here; the xmap gather stays as
++				 * the fallback so behaviour cannot depend on the new path. */
++				if (sw > 0 && sw <= (int)(sizeof(runlen) / sizeof(runlen[0])))
++					asp_fb_putrow16_runs(rowbuf,
++						src + (long)sy * spitch_px, runlen, sw);
++				else
++					asp_fb_putrow16(rowbuf,
++						src + (long)sy * spitch_px, xmap, dw);
++			} else {
++				asp_fb_putrow32(rowbuf, src + (long)sy * spitch_px, xmap, dw);
++			}
++			prev_sy = sy;
++			if (asp_fb_profile) {
++				asp_fb_t_scale += asp_fb_now_ns() - t0;
++				asp_fb_n_scale++;
++			}
++		}
++
++		if (asp_fb_profile) {
++			unsigned long long t0 = asp_fb_now_ns();
++			memcpy(p, rowbuf, (size_t)dw * asp_fb_px);
++			asp_fb_t_copy += asp_fb_now_ns() - t0;
++			asp_fb_n_copy++;
++		} else {
++			memcpy(p, rowbuf, (size_t)dw * asp_fb_px);
++		}
++	}
++	asp_fb_n_frames++;
++	(void)prev;
++}
++
++/* The present costs 2.62 ms against a 1.43 ms floor for the bytes it writes.
++ * Which half holds the other 1.19 ms decides whether the scaler is worth
++ * rewriting or the framebuffer write is simply slower than a fill benchmark
++ * suggests, and guessing that wrong has already cost days. */
++void asp_fb_present_split(double *scale_ms, double *copy_ms,
++                          unsigned int *rows_scaled, unsigned int *rows_copied,
++                          unsigned int *frames)
++{
++	unsigned int f = asp_fb_n_frames ? asp_fb_n_frames : 1;
++	*scale_ms = asp_fb_t_scale / 1e6 / f;
++	*copy_ms = asp_fb_t_copy / 1e6 / f;
++	*rows_scaled = asp_fb_n_scale / f;
++	*rows_copied = asp_fb_n_copy / f;
++	*frames = asp_fb_n_frames;
++}
++
++/* Same, for an 8-bit indexed source with an RGB565 palette (FCEUX). */
++static void asp_fb_present_indexed(const unsigned char *src,
++                                   const unsigned short *pal565,
++                                   int sw, int sh, int spitch,
++                                   int ox, int oy, int dw, int dh)
++{
++	static unsigned short xmap[2560];
++	static int cache_dw, cache_sw;
++	unsigned char *prev = NULL;
++	int i, j, prev_sy = -1;
++
++	if (!asp_fb_ready || src == NULL)
++		return;
++	if (sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0)
++		return;
++	if (dw > 2560) dw = 2560;
++	if (ox < 0) ox = 0;
++	if (oy < 0) oy = 0;
++	if (ox + dw > asp_fb_w) dw = asp_fb_w - ox;
++	if (oy + dh > asp_fb_h) dh = asp_fb_h - oy;
++	if (dw <= 0 || dh <= 0)
++		return;
++
++	if (dw != cache_dw || sw != cache_sw) {
++		for (j = 0; j < dw; j++)
++			xmap[j] = (unsigned short)(((unsigned)j * sw) / dw);
++		cache_dw = dw; cache_sw = sw;
++	}
++
++	for (i = 0; i < dh; i++) {
++		unsigned char *p = asp_fb_row(oy + i);
++		const unsigned char *s;
++		int sy;
++		if (p == NULL)
++			continue;
++		p += (long)ox * asp_fb_px;
++		sy = (int)(((unsigned)i * sh) / dh);
++		if (sy == prev_sy && prev) {
++			memcpy(p, prev, (size_t)dw * asp_fb_px);
++			continue;
++		}
++		s = src + (long)sy * spitch;
++		if (asp_fb_px == 2) {
++			unsigned short *q = (unsigned short *)p;
++			for (j = 0; j < dw; j++)
++				q[j] = pal565[s[xmap[j]]];
++		} else {
++			unsigned int *q = (unsigned int *)p;
++			for (j = 0; j < dw; j++) {
++				unsigned c = pal565[s[xmap[j]]];
++				unsigned r = (c >> 11) & 0x1f;
++				unsigned g = (c >> 5) & 0x3f;
++				unsigned b = c & 0x1f;
++				q[j] = (((r * 255 + 15) / 31) << 16)
++				     | (((g * 255 + 31) / 63) << 8)
++				     |  ((b * 255 + 15) / 31);
++			}
++		}
++		prev_sy = sy; prev = p;
++	}
++}
++
++#endif /* ASP_FBOUT_H */
+diff --git a/asp/asp_geom.h b/asp/asp_geom.h
+new file mode 100644
+index 0000000..9a69ada
+--- /dev/null
++++ b/asp/asp_geom.h
+@@ -0,0 +1,142 @@
++/* asp_geom.h - first-frame setup and where on the panel the frame goes.
++ *
++ * Include order is asp_fbout.h, then asp_calib.h, then this. It uses both, and
++ * it reads the configuration variables each emulator declares before them:
++ * asp_inset_x, asp_inset_y, asp_keep_aspect, asp_calibrate, asp_fb_mode, and
++ * the function asp_read_screen_cfg(), which needs a forward declaration above
++ * the includes.
++ *
++ * Two corrections are applied, and they are independent of each other - which
++ * is what several earlier rounds of this work kept conflating:
++ *
++ * Overscan. The panel shows less than the whole framebuffer, so content near
++ * the edges falls off. Drawing into a smaller centred rectangle is the cure.
++ * How much smaller belongs to the display, so it comes from asp_screen.cfg and
++ * can be corrected without a rebuild.
++ *
++ * Aspect. These are all 4:3 systems, and the framebuffer is 16:9, so the frame
++ * has to be fitted rather than stretched to fill.
++ *
++ * But the framebuffer is not the last word on shape. A display that scales
++ * 1280x720 to fill a panel of some other proportion distorts the picture after
++ * it leaves the framebuffer, where nothing here can reach it. On the 1280x1024
++ * 5:4 monitor this was tested against, every frame was coming out 1024/720 =
++ * 1.42x too tall, and fitting a clean 4:3 rectangle in the framebuffer made
++ * that worse rather than better: 960x720 displays as 0.94, while simply
++ * filling the frame displays as 1.25, which is why "stretched" became "tall
++ * and narrow" when the aspect fit was added.
++ *
++ * So panel_aspect says what the display actually is, and the target is solved
++ * for the shape that comes out right after the display has had its way:
++ *
++ *   dw/dh = (4/3) * (framebuffer aspect) / (panel aspect)
++ *
++ * which on a 5:4 panel is 1280x675 - full width, with thin bars top and
++ * bottom - and on a 16:9 panel reduces to the plain 960x720.
++ *
++ * Setting the monitor itself to preserve aspect ratio is the better fix where
++ * the monitor offers it, since it costs no resolution. This is for when it
++ * does not, or is not set that way.
++ */
++
++#ifndef ASP_GEOM_H
++#define ASP_GEOM_H
++
++/* The system's own picture shape. Every console here so far is 4:3; the GBA
++ * screen is 3:2, so its frontend defines these before including this file. */
++#ifndef ASP_SYS_AR_W
++#define ASP_SYS_AR_W 4
++#define ASP_SYS_AR_H 3
++#endif
++
++/* Opens the framebuffer, runs calibration if asked, and clears the screen.
++ * Safe to call every frame; the work happens once. Returns 0 if the
++ * framebuffer could not be opened, in which case the caller should draw
++ * nothing rather than fall back to a path known to be wrong. */
++static int asp_fb_first_frame_setup(void)
++{
++	static int done, ok;
++
++	if (done)
++		return ok;
++	done = 1;
++
++	asp_read_screen_cfg();
++	asp_fb_mode_cfg = asp_fb_mode;
++
++	if (asp_calibrate == 2) {
++		asp_run_square_test();
++		ok = asp_fb_ready;
++	} else if (asp_calibrate) {
++		asp_run_fb_calibration();
++		ok = asp_fb_ready;
++	} else {
++		ok = asp_fb_open();
++	}
++
++	if (!ok) {
++		fprintf(stderr, "asp: no framebuffer output path available; "
++			"drawing nothing rather than writing at a stride known to "
++			"be wrong\n");
++		return 0;
++	}
++
++	asp_fb_clear_all();
++	return 1;
++}
++
++/* Fills in the destination rectangle, and clears the screen whenever that
++ * rectangle moves so the margin never keeps the previous frame's edges. */
++static int last_x, last_y, last_w, last_h = -1;
++
++/* Only the tests use this, to re-solve the target under a different panel. */
++static void asp_reset_target_cache(void) { last_h = -1; }
++
++static void asp_target_rect_fb(int *ox, int *oy, int *dw, int *dh)
++{
++	int availw, availh, w, h;
++
++	availw = asp_fb_w - 2 * asp_inset_x;
++	availh = asp_fb_h - 2 * asp_inset_y;
++	if (availw <= 0 || availh <= 0) {
++		availw = asp_fb_w;
++		availh = asp_fb_h;
++	}
++
++	if (asp_keep_aspect) {
++		/* Target shape, in framebuffer pixels, that comes out as 4:3 once the
++		 * display has scaled the framebuffer onto its own panel:
++		 *   dw/dh = (4/3) * (fb_w/fb_h) / (panel_w/panel_h)
++		 * Kept in integers: num/den = 4 * fb_w * panel_h, 3 * fb_h * panel_w.
++		 */
++		long num = (long)ASP_SYS_AR_W * asp_fb_w * asp_panel_h;
++		long den = (long)ASP_SYS_AR_H * asp_fb_h * asp_panel_w;
++
++		if (num <= 0 || den <= 0) {       /* nonsense config; fall back to 4:3 */
++			num = 4; den = 3;
++		}
++		w = availw;
++		h = (int)((long)w * den / num);
++		if (h > availh) {
++			h = availh;
++			w = (int)((long)h * num / den);
++		}
++	} else {
++		w = availw;
++		h = availh;
++	}
++
++	*dw = w;
++	*dh = h;
++	*ox = asp_inset_x + (availw - w) / 2;
++	*oy = asp_inset_y + (availh - h) / 2;
++
++	if (*ox != last_x || *oy != last_y || w != last_w || h != last_h) {
++		asp_fb_clear();
++		last_x = *ox; last_y = *oy; last_w = w; last_h = h;
++		fprintf(stderr, "asp: drawing into %dx%d at %d,%d "
++			"(framebuffer %dx%d)\n", w, h, *ox, *oy, asp_fb_w, asp_fb_h);
++	}
++}
++
++#endif /* ASP_GEOM_H */
+diff --git a/asp/asp_psx.c b/asp/asp_psx.c
+new file mode 100644
+index 0000000..4a99e3e
+--- /dev/null
++++ b/asp/asp_psx.c
+@@ -0,0 +1,617 @@
++/* asp_psx.c - standalone frontend that runs the PCSX ReARMed libretro core
++ * on the Neo Geo Arcade Stick Pro. Built from asp_gba.c (the gpSP frontend):
++ * same launch contract, screen code, sound ring and exit combinations.
++ *
++ * The firmware launches every emulator as
++ *     <emu> "<game>" /mnt/data/save
++ * The game is a .chd, .cue or .pbp; the core reads it directly.
++ *
++ * Picture: straight to the framebuffer through asp_fbout.h, fitted to 4:3.
++ * The PlayStation changes resolution as it goes (256 to 640 wide); the
++ * presenter scales whatever arrives into the same 4:3 rectangle.
++ *
++ * Sound: the core renders 44100 Hz, the device's own rate, so the resampler
++ * passes it through unchanged. The ring is the clock, as for the GBA.
++ *
++ * BIOS: the core's "auto" setting. A real BIOS beside the binary (the names
++ * on the libretro page, e.g. scph5501.bin) is used if present, otherwise the
++ * core's built-in high-level BIOS.
++ *
++ * Controls:
++ *   A pad on the adaptor (SDL joystick 0 with 16 buttons), by position:
++ *     bottom = Cross, right = Circle, left = Square, top = Triangle,
++ *     SFC30 L/R (M30 Z/C) = L1/R1, M30 heart/star = L2/R2.
++ *     Hold Select + Start for a second to leave.
++ *   The stick on its own: yellow = Cross, blue = Circle, red = Square,
++ *     green = Triangle, greys = L1/R1. Options leaves.
++ *
++ * Memory card 1 is the core's save memory, kept as <savedir>/psx/<game>.mcd,
++ * written every few seconds when it changes and on exit.
++ */
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <stdint.h>
++#include <stdarg.h>
++#include <unistd.h>
++#include <sys/stat.h>
++#include <SDL.h>
++#include "libretro.h"
++
++/* ---- screen helpers shared with the other emulators -------------------- */
++#define ASP_SYS_AR_W 4
++#define ASP_SYS_AR_H 3
++static int asp_inset_x = 0, asp_inset_y = 0;
++static int asp_keep_aspect = 1;
++static int asp_calibrate;
++static int asp_fb_mode;
++static int asp_panel_w = 16, asp_panel_h = 9;
++static void asp_read_screen_cfg(void);
++#include "asp_fbout.h"
++#include "asp_calib.h"
++#include "asp_geom.h"
++
++static char bin_dir[512];
++
++static void asp_read_screen_cfg(void)
++{
++	char path[600], line[256];
++	FILE *f;
++
++	snprintf(path, sizeof(path), "%sasp_screen.cfg", bin_dir);
++	f = fopen(path, "r");
++	if (f == NULL) {
++		fprintf(stderr, "asp: no %s, filling the panel\n", path);
++		return;
++	}
++	while (fgets(line, sizeof(line), f) != NULL) {
++		int v, pw, ph;
++		char word[64];
++		if (line[0] == '#' || line[0] == '\n' || line[0] == '\r')
++			continue;
++		if (sscanf(line, "inset_x = %d", &v) == 1 || sscanf(line, "inset_x=%d", &v) == 1)
++			asp_inset_x = v;
++		else if (sscanf(line, "inset_y = %d", &v) == 1 || sscanf(line, "inset_y=%d", &v) == 1)
++			asp_inset_y = v;
++		else if (sscanf(line, "aspect = %63s", word) == 1 || sscanf(line, "aspect=%63s", word) == 1)
++			asp_keep_aspect = (strncmp(word, "fill", 4) != 0);
++		else if (sscanf(line, "calibrate = %d", &v) == 1 || sscanf(line, "calibrate=%d", &v) == 1)
++			asp_calibrate = v;
++		else if (sscanf(line, "fb_mode = %d", &v) == 1 || sscanf(line, "fb_mode=%d", &v) == 1)
++			asp_fb_mode = v;
++		else if (sscanf(line, "panel_aspect = %d:%d", &pw, &ph) == 2 ||
++		         sscanf(line, "panel_aspect=%d:%d", &pw, &ph) == 2) {
++			if (pw > 0 && ph > 0) { asp_panel_w = pw; asp_panel_h = ph; }
++		}
++	}
++	fclose(f);
++	if (asp_inset_x < 0) asp_inset_x = 0;
++	if (asp_inset_y < 0) asp_inset_y = 0;
++	if (asp_inset_x > 320) asp_inset_x = 320;
++	if (asp_inset_y > 180) asp_inset_y = 180;
++	fprintf(stderr, "asp: %s -> inset_x=%d inset_y=%d aspect=%s calibrate=%d\n",
++		path, asp_inset_x, asp_inset_y, asp_keep_aspect ? "keep" : "fill", asp_calibrate);
++	fprintf(stderr, "asp: fb_mode=%d panel_aspect=%d:%d\n", asp_fb_mode, asp_panel_w, asp_panel_h);
++}
++
++/* ---- logging ----------------------------------------------------------- */
++static void open_log(void)
++{
++	char path[600];
++	struct stat st;
++	const char *mode = "a";
++
++	snprintf(path, sizeof(path), "%spsx_log.txt", bin_dir);
++	if (stat(path, &st) == 0 && st.st_size > 512 * 1024)
++		mode = "w";
++	if (getenv("ASP_LOG_STDERR") == NULL && freopen(path, mode, stderr) == NULL)
++		return;
++	setvbuf(stderr, NULL, _IOLBF, 0);
++	dup2(fileno(stderr), fileno(stdout));
++	setvbuf(stdout, NULL, _IOLBF, 0);
++}
++
++static void core_log(enum retro_log_level level, const char *fmt, ...)
++{
++	va_list ap;
++	(void)level;
++	fputs("pcsx: ", stderr);
++	va_start(ap, fmt);
++	vfprintf(stderr, fmt, ap);
++	va_end(ap);
++}
++
++/* ---- sound ------------------------------------------------------------- */
++#define OUT_RATE   44100
++#define RING_FR    16384               /* stereo frames, power of two */
++#define TARGET_FR  3072                /* ~46 ms queued before we wait */
++static int16_t ring[RING_FR * 2];
++static volatile unsigned ring_w, ring_r;   /* in frames, free-running */
++static int audio_ok;
++static double in_rate = 44100.0;
++static double rs_pos;                  /* position between in_prev and in_cur */
++static int16_t in_prev[2];
++static unsigned underruns, overruns;
++
++static void audio_cb(void *ud, Uint8 *stream, int len)
++{
++	int16_t *out = (int16_t *)stream;
++	int frames = len / 4, i;
++	(void)ud;
++	for (i = 0; i < frames; i++) {
++		if (ring_r == ring_w) {
++			out[2 * i] = out[2 * i + 1] = 0;
++			if (i == 0) underruns++;
++			continue;
++		}
++		out[2 * i]     = ring[(ring_r & (RING_FR - 1)) * 2];
++		out[2 * i + 1] = ring[(ring_r & (RING_FR - 1)) * 2 + 1];
++		ring_r++;
++	}
++}
++
++static void ring_put(int16_t l, int16_t r)
++{
++	if (ring_w - ring_r >= RING_FR - 1) { overruns++; return; }
++	ring[(ring_w & (RING_FR - 1)) * 2] = l;
++	ring[(ring_w & (RING_FR - 1)) * 2 + 1] = r;
++	ring_w++;
++}
++
++/* Linear resample from in_rate to OUT_RATE. */
++static size_t audio_batch(const int16_t *data, size_t frames)
++{
++	const double step = in_rate / OUT_RATE;
++	size_t i;
++
++	if (!audio_ok)
++		return frames;
++	SDL_LockAudio();
++	for (i = 0; i < frames; i++) {
++		int16_t cl = data[2 * i], cr = data[2 * i + 1];
++		while (rs_pos < 1.0) {
++			int l = in_prev[0] + (int)((cl - in_prev[0]) * rs_pos);
++			int r = in_prev[1] + (int)((cr - in_prev[1]) * rs_pos);
++			ring_put((int16_t)l, (int16_t)r);
++			rs_pos += step;
++		}
++		rs_pos -= 1.0;
++		in_prev[0] = cl;
++		in_prev[1] = cr;
++	}
++	SDL_UnlockAudio();
++	return frames;
++}
++
++static void audio_sample(int16_t l, int16_t r)
++{
++	int16_t d[2] = { l, r };
++	audio_batch(d, 1);
++}
++
++static void open_audio(void)
++{
++	SDL_AudioSpec want, got;
++	memset(&want, 0, sizeof(want));
++	want.freq = OUT_RATE;
++	want.format = AUDIO_S16SYS;
++	want.channels = 2;
++	want.samples = 1024;
++	want.callback = audio_cb;
++	if (SDL_OpenAudio(&want, &got) < 0) {
++		fprintf(stderr, "asp: no sound: %s\n", SDL_GetError());
++		return;
++	}
++	fprintf(stderr, "asp: sound %d Hz, %d ch, %d-sample buffer\n",
++		got.freq, got.channels, got.samples);
++	audio_ok = 1;
++	SDL_PauseAudio(0);
++}
++
++/* ---- picture ----------------------------------------------------------- */
++static const void *frame_data;
++static unsigned frame_w, frame_h;
++static size_t frame_pitch;
++static unsigned long frames_shown;
++
++static void video_refresh(const void *data, unsigned w, unsigned h, size_t pitch)
++{
++	if (data == NULL)           /* frame dupe: keep what is on screen */
++		return;
++	frame_data = data;
++	frame_w = w;
++	frame_h = h;
++	frame_pitch = pitch;
++}
++
++static void present(void)
++{
++	int ox, oy, dw, dh;
++	if (frame_data == NULL || !asp_fb_first_frame_setup())
++		return;
++	asp_target_rect_fb(&ox, &oy, &dw, &dh);
++	asp_fb_present((const unsigned short *)frame_data, frame_w, frame_h,
++		(int)(frame_pitch / 2), ox, oy, dw, dh);
++	frames_shown++;
++	if (getenv("ASP_HASH_FRAMES")) {
++		/* Off-device proof: hash the game-resolution frame, as the arcade
++		 * harness does, at fixed checkpoints. */
++		static unsigned long n;
++		n++;
++		if (n % 100 == 0) {
++			uint32_t hsh = 2166136261u;
++			unsigned y, x;
++			for (y = 0; y < frame_h; y++) {
++				const uint16_t *row = (const uint16_t *)((const char *)frame_data + y * frame_pitch);
++				for (x = 0; x < frame_w; x++) { hsh ^= row[x]; hsh *= 16777619u; }
++			}
++			fprintf(stderr, "asp: frame %lu hash %08x\n", n, hsh);
++		}
++	}
++}
++
++/* ---- controls ---------------------------------------------------------- */
++static SDL_Joystick *joy;
++static int pad_mode;
++static int quit_now;
++static uint16_t pad_bits;     /* RETRO_DEVICE_ID_JOYPAD_* bits */
++
++/* Pads through the adaptor, indices from the probe builds. SFC30 and M30
++ * share the face positions: 0 left, 1 bottom, 3 top, 4 right. */
++#define PAD_LEFT 0
++#define PAD_BOTTOM 1
++#define PAD_RSHOULDER 2   /* SFC30 R, M30 C */
++#define PAD_TOP 3
++#define PAD_RIGHT 4
++#define PAD_HEART 5       /* M30 */
++#define PAD_LSHOULDER 6   /* SFC30 L, M30 Z */
++#define PAD_STAR 7        /* M30 */
++#define PAD_MINUS 9       /* M30 select */
++#define PAD_SELECT 10     /* SFC30 select */
++#define PAD_START 11
++/* The stick's own buttons. */
++#define STK_A 0      /* red, top left      */
++#define STK_B 1      /* yellow, bottom left */
++#define STK_C 2      /* green, top         */
++#define STK_GT 3     /* grey, top          */
++#define STK_GB 4     /* grey, bottom       */
++#define STK_D 5      /* blue, bottom       */
++#define STK_SELECT 8
++#define STK_START 9
++#define STK_OPTIONS 10
++
++static int jb(int i)
++{
++	return joy && i < SDL_JoystickNumButtons(joy) && SDL_JoystickGetButton(joy, i);
++}
++
++static void input_poll(void)
++{
++	Uint8 *ks;
++	uint16_t b = 0;
++	SDL_Event ev;
++
++	while (SDL_PollEvent(&ev))
++		if (ev.type == SDL_QUIT)
++			quit_now = 1;
++	SDL_JoystickUpdate();
++	ks = SDL_GetKeyState(NULL);
++
++	/* The stick's lever arrives as arrow keys in both modes. */
++	if (ks[SDLK_UP])    b |= 1 << RETRO_DEVICE_ID_JOYPAD_UP;
++	if (ks[SDLK_DOWN])  b |= 1 << RETRO_DEVICE_ID_JOYPAD_DOWN;
++	if (ks[SDLK_LEFT])  b |= 1 << RETRO_DEVICE_ID_JOYPAD_LEFT;
++	if (ks[SDLK_RIGHT]) b |= 1 << RETRO_DEVICE_ID_JOYPAD_RIGHT;
++
++	if (pad_mode) {
++		Uint8 hat = SDL_JoystickNumHats(joy) > 0 ? SDL_JoystickGetHat(joy, 0) : 0;
++		if (hat & SDL_HAT_UP)    b |= 1 << RETRO_DEVICE_ID_JOYPAD_UP;
++		if (hat & SDL_HAT_DOWN)  b |= 1 << RETRO_DEVICE_ID_JOYPAD_DOWN;
++		if (hat & SDL_HAT_LEFT)  b |= 1 << RETRO_DEVICE_ID_JOYPAD_LEFT;
++		if (hat & SDL_HAT_RIGHT) b |= 1 << RETRO_DEVICE_ID_JOYPAD_RIGHT;
++		/* libretro's B/A/Y/X are the PlayStation's Cross/Circle/Square/Triangle. */
++		if (jb(PAD_BOTTOM))    b |= 1 << RETRO_DEVICE_ID_JOYPAD_B;
++		if (jb(PAD_RIGHT))     b |= 1 << RETRO_DEVICE_ID_JOYPAD_A;
++		if (jb(PAD_LEFT))      b |= 1 << RETRO_DEVICE_ID_JOYPAD_Y;
++		if (jb(PAD_TOP))       b |= 1 << RETRO_DEVICE_ID_JOYPAD_X;
++		if (jb(PAD_LSHOULDER)) b |= 1 << RETRO_DEVICE_ID_JOYPAD_L;
++		if (jb(PAD_RSHOULDER)) b |= 1 << RETRO_DEVICE_ID_JOYPAD_R;
++		if (jb(PAD_HEART))     b |= 1 << RETRO_DEVICE_ID_JOYPAD_L2;
++		if (jb(PAD_STAR))      b |= 1 << RETRO_DEVICE_ID_JOYPAD_R2;
++		if (jb(PAD_SELECT) || jb(PAD_MINUS)) b |= 1 << RETRO_DEVICE_ID_JOYPAD_SELECT;
++		if (jb(PAD_START))     b |= 1 << RETRO_DEVICE_ID_JOYPAD_START;
++		{
++			static Uint32 since;
++			if ((jb(PAD_SELECT) || jb(PAD_MINUS)) && jb(PAD_START)) {
++				if (since == 0) since = SDL_GetTicks();
++				else if (SDL_GetTicks() - since > 1000) quit_now = 1;
++			} else
++				since = 0;
++		}
++	} else {
++		if (jb(STK_B))      b |= 1 << RETRO_DEVICE_ID_JOYPAD_B;   /* Cross */
++		if (jb(STK_D))      b |= 1 << RETRO_DEVICE_ID_JOYPAD_A;   /* Circle */
++		if (jb(STK_A))      b |= 1 << RETRO_DEVICE_ID_JOYPAD_Y;   /* Square */
++		if (jb(STK_C))      b |= 1 << RETRO_DEVICE_ID_JOYPAD_X;   /* Triangle */
++		if (jb(STK_GT))     b |= 1 << RETRO_DEVICE_ID_JOYPAD_L;
++		if (jb(STK_GB))     b |= 1 << RETRO_DEVICE_ID_JOYPAD_R;
++		if (jb(STK_SELECT)) b |= 1 << RETRO_DEVICE_ID_JOYPAD_SELECT;
++		if (jb(STK_START))  b |= 1 << RETRO_DEVICE_ID_JOYPAD_START;
++		if (jb(STK_OPTIONS)) quit_now = 1;
++	}
++	if (ks[SDLK_ESCAPE])
++		quit_now = 1;
++	pad_bits = b;
++}
++
++static int16_t input_state(unsigned port, unsigned device, unsigned index, unsigned id)
++{
++	(void)index;
++	if (port != 0 || device != RETRO_DEVICE_JOYPAD)
++		return 0;
++	if (id == RETRO_DEVICE_ID_JOYPAD_MASK)
++		return pad_bits;
++	return (pad_bits >> id) & 1;
++}
++
++/* ---- environment ------------------------------------------------------- */
++static char save_dir[512] = "/mnt/data/save/psx";
++
++static bool environment(unsigned cmd, void *data)
++{
++	switch (cmd) {
++	case RETRO_ENVIRONMENT_GET_LOG_INTERFACE:
++		((struct retro_log_callback *)data)->log = core_log;
++		return true;
++	case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT:
++		return *(enum retro_pixel_format *)data == RETRO_PIXEL_FORMAT_RGB565;
++	case RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY:
++		*(const char **)data = bin_dir;   /* scph*.bin, if supplied */
++		return true;
++	case RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY:
++		*(const char **)data = save_dir;
++		return true;
++	case RETRO_ENVIRONMENT_GET_INPUT_BITMASKS:
++		return true;
++	case RETRO_ENVIRONMENT_GET_VARIABLE: {
++		struct retro_variable *v = data;
++		static const struct { const char *k, *val; } opts[] = {
++			{ "pcsx_rearmed_drc", "enabled" },
++			{ "pcsx_rearmed_bios", "auto" },
++			{ "pcsx_rearmed_region", "auto" },
++			{ "pcsx_rearmed_memcard1", "libretro" },
++			{ "pcsx_rearmed_memcard2", "none" },
++			{ "pcsx_rearmed_frameskip_type", "disabled" },
++			{ "pcsx_rearmed_gpu_thread_rendering", "enabled" },  /* second core draws */
++			{ "pcsx_rearmed_show_bios_bootlogo", "disabled" },
++			{ "pcsx_rearmed_rgb32_output", "disabled" },
++			{ "pcsx_rearmed_vibration", "disabled" },
++			{ "pcsx_rearmed_display_fps_v2", "disabled" },
++		};
++		unsigned i;
++		if (strcmp(v->key, "pcsx_rearmed_drc") == 0 && getenv("ASP_PSX_NODRC")) {
++			v->value = "disabled";   /* off-device comparison only */
++			return true;
++		}
++		if (strcmp(v->key, "pcsx_rearmed_gpu_thread_rendering") == 0 && getenv("ASP_PSX_NOGPUTHREAD")) {
++			v->value = "disabled";
++			return true;
++		}
++		for (i = 0; i < sizeof(opts) / sizeof(opts[0]); i++)
++			if (strcmp(v->key, opts[i].k) == 0) {
++				v->value = opts[i].val;
++				return true;
++			}
++		v->value = NULL;
++		return false;
++	}
++	case RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE:
++		*(bool *)data = false;
++		return true;
++	case RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO: {
++		const struct retro_system_av_info *av = data;
++		if (av->timing.sample_rate > 0) in_rate = av->timing.sample_rate;
++		return true;
++	}
++	case RETRO_ENVIRONMENT_SET_GEOMETRY:
++	case RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS:
++	case RETRO_ENVIRONMENT_SET_CONTROLLER_INFO:
++	case RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE:
++	case RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL:
++	case RETRO_ENVIRONMENT_SET_MEMORY_MAPS:
++	case RETRO_ENVIRONMENT_SET_MINIMUM_AUDIO_LATENCY:
++		return true;
++	default:
++		return false;
++	}
++}
++
++/* ---- the game file ----------------------------------------------------- */
++static const char *base_name(const char *p)
++{
++	const char *s = strrchr(p, '/');
++	return s ? s + 1 : p;
++}
++
++static int has_ext(const char *p, const char *ext)
++{
++	size_t n = strlen(p), e = strlen(ext);
++	return n > e && strcasecmp(p + n - e, ext) == 0;
++}
++
++/* ---- saves ------------------------------------------------------------- */
++static char sav_path[700];
++static unsigned char *sav_shadow;
++static size_t sav_size;
++
++static void sav_load(void)
++{
++	void *mem = retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);
++	size_t n = retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);
++	FILE *f;
++	if (mem == NULL || n == 0) return;
++	sav_size = n;
++	sav_shadow = malloc(n);
++	f = fopen(sav_path, "rb");
++	if (f) {
++		size_t got = fread(mem, 1, n, f);
++		fclose(f);
++		fprintf(stderr, "asp: loaded %u bytes of save from %s\n", (unsigned)got, sav_path);
++	}
++	if (sav_shadow) memcpy(sav_shadow, mem, n);
++}
++
++static void sav_store(int force)
++{
++	void *mem = retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);
++	char tmp[720];
++	FILE *f;
++	if (mem == NULL || sav_size == 0) return;
++	if (!force && sav_shadow && memcmp(sav_shadow, mem, sav_size) == 0) return;
++	if (access(sav_path, F_OK) != 0) {
++		/* Nothing saved yet and nothing to save: an untouched card is not
++		 * written out. (A freshly formatted card is, which is harmless.) */
++		size_t i;
++		const unsigned char *m = mem;
++		for (i = 0; i < sav_size && m[i] == 0xff; i++) ;
++		if (i == sav_size) return;
++	}
++	/* Write beside, then rename, so pulling the power mid-write cannot leave
++	 * half a save in place of the old one. */
++	snprintf(tmp, sizeof(tmp), "%s.tmp", sav_path);
++	f = fopen(tmp, "wb");
++	if (f == NULL) return;
++	if (fwrite(mem, 1, sav_size, f) == sav_size) {
++		fflush(f);
++		fsync(fileno(f));
++		fclose(f);
++		rename(tmp, sav_path);
++		if (sav_shadow) memcpy(sav_shadow, mem, sav_size);
++		fprintf(stderr, "asp: save written (%u bytes)\n", (unsigned)sav_size);
++	} else
++		fclose(f);
++}
++
++/* ---- main -------------------------------------------------------------- */
++int main(int argc, char **argv)
++{
++	struct retro_game_info gi;
++	struct retro_system_av_info av;
++	char rom[600], name[256], *dot;
++	const char *src;
++	unsigned long frame = 0, exit_after = 0;
++	Uint32 last_save = 0, t_start;
++	double fps = 59.94;
++	int n;
++
++	n = readlink("/proc/self/exe", bin_dir, sizeof(bin_dir) - 32);
++	if (n > 0) {
++		bin_dir[n] = 0;
++		while (n > 0 && bin_dir[n - 1] != '/') n--;
++		bin_dir[n] = 0;
++	} else
++		strcpy(bin_dir, "./");
++	open_log();
++	fprintf(stderr, "\n===== launch: %s =====\n", argc > 1 ? argv[1] : "(no rom)");
++	if (argc < 2) return 1;
++	if (argc > 2 && argv[2][0] == '/') {
++		mkdir(argv[2], 0777);
++		snprintf(save_dir, sizeof(save_dir), "%s/psx", argv[2]);
++	}
++	mkdir(save_dir, 0777);
++	if (getenv("ASP_EXIT_AFTER")) exit_after = strtoul(getenv("ASP_EXIT_AFTER"), NULL, 10);
++
++	src = argv[1];
++	snprintf(name, sizeof(name), "%s", base_name(src));
++	if ((dot = strrchr(name, '.')) != NULL) *dot = 0;
++	snprintf(sav_path, sizeof(sav_path), "%s/%s.mcd", save_dir, name);
++	snprintf(rom, sizeof(rom), "%s", src);
++
++	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK) < 0) {
++		fprintf(stderr, "asp: SDL_Init: %s\n", SDL_GetError());
++		return 1;
++	}
++	SDL_ShowCursor(SDL_DISABLE);
++	{
++		/* Native geometry and native depth only: a depth change hangs this
++		 * display driver. The picture itself goes through asp_fbout.h; SDL
++		 * is here for the keyboard events that carry the stick's lever. */
++		const SDL_VideoInfo *vi = SDL_GetVideoInfo();
++		int w = (vi && vi->current_w >= 240) ? vi->current_w : 1280;
++		int h = (vi && vi->current_h >= 160) ? vi->current_h : 720;
++		int bpp = (vi && vi->vfmt) ? vi->vfmt->BitsPerPixel : 16;
++		SDL_Surface *s = SDL_SetVideoMode(w, h, bpp, SDL_SWSURFACE);
++		fprintf(stderr, "asp: SDL_SetVideoMode(%d,%d,%d) -> %p\n", w, h, bpp, (void *)s);
++	}
++	joy = SDL_NumJoysticks() > 0 ? SDL_JoystickOpen(0) : NULL;
++	pad_mode = joy && SDL_JoystickNumButtons(joy) == 16;
++	fprintf(stderr, "asp: joysticks=%d buttons=%d hats=%d -> %s\n", SDL_NumJoysticks(),
++		joy ? SDL_JoystickNumButtons(joy) : -1, joy ? SDL_JoystickNumHats(joy) : -1,
++		pad_mode ? "pad on the adaptor: PlayStation layout by position, hold Select + Start to exit"
++		         : "the stick: Cross yellow, Circle blue, Square red, Triangle green, L1/R1 greys, Options exits");
++
++	retro_set_environment(environment);
++	retro_set_video_refresh(video_refresh);
++	retro_set_audio_sample(audio_sample);
++	retro_set_audio_sample_batch(audio_batch);
++	retro_set_input_poll(input_poll);
++	retro_set_input_state(input_state);
++	retro_init();
++
++	memset(&gi, 0, sizeof(gi));
++	gi.path = rom;
++	if (!retro_load_game(&gi)) {
++		fprintf(stderr, "asp: the core could not load %s\n", rom);
++		retro_deinit();
++		SDL_Quit();
++		return 1;
++	}
++	retro_get_system_av_info(&av);
++	if (av.timing.sample_rate > 0) in_rate = av.timing.sample_rate;
++	if (av.timing.fps > 0) fps = av.timing.fps;
++	fprintf(stderr, "asp: %ux%u at %.4f fps, sound %.0f Hz -> %d Hz\n",
++		av.geometry.base_width, av.geometry.base_height, fps, in_rate, OUT_RATE);
++	sav_load();
++	if (getenv("SDL_AUDIODRIVER") == NULL || strcmp(getenv("SDL_AUDIODRIVER"), "dummy") != 0)
++		open_audio();
++
++	t_start = SDL_GetTicks();
++	while (!quit_now) {
++		retro_run();
++		present();
++		frame++;
++
++		if (audio_ok) {
++			/* Sound is the clock: wait while more than the target is queued. */
++			int guard = 0;
++			while (ring_w - ring_r > TARGET_FR && guard++ < 100)
++				SDL_Delay(1);
++		} else if (!exit_after) {
++			Uint32 due = t_start + (Uint32)(frame * 1000.0 / fps);
++			Uint32 now = SDL_GetTicks();
++			if (due > now) SDL_Delay(due - now);
++		}
++		if (SDL_GetTicks() - last_save > 5000) {
++			sav_store(0);
++			last_save = SDL_GetTicks();
++		}
++		if (exit_after && frame >= exit_after)
++			break;
++		if (frame % 3600 == 0) {
++			Uint32 el = SDL_GetTicks() - t_start;
++			fprintf(stderr, "asp: %lu frames in %.1f s (%.2f fps), sound underruns %u, overruns %u\n",
++				frame, el / 1000.0, frame * 1000.0 / (el ? el : 1), underruns, overruns);
++		}
++	}
++	{
++		Uint32 el = SDL_GetTicks() - t_start;
++		fprintf(stderr, "asp: leaving after %lu frames in %.1f s (%.2f fps), sound underruns %u, overruns %u\n",
++			frame, el / 1000.0, frame * 1000.0 / (el ? el : 1), underruns, overruns);
++	}
++	sav_store(1);
++	if (audio_ok) SDL_CloseAudio();
++	retro_unload_game();
++	retro_deinit();
++	SDL_Quit();
++	return 0;
++}
+diff --git a/asp/build.sh b/asp/build.sh
+new file mode 100755
+index 0000000..1d66498
+--- /dev/null
++++ b/asp/build.sh
+@@ -0,0 +1,15 @@
++#!/bin/sh
++# Build psx_emu.dge: the PCSX ReARMed core as a static library plus this frontend.
++set -e
++cd "$(dirname "$0")/.."
++S=${SYSROOT:-/home/claude/psxwork/sysroot}
++A="-march=armv7-a -mtune=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=softfp -marm"
++CFLAGS="$A" make -f Makefile.libretro platform=unix STATIC_LINKING=1 HAVE_PHYSICAL_CDROM=0 DYNAREC=ari64 HAVE_NEON=1 BUILTIN_GPU=neon \
++  CC=arm-linux-gnueabi-gcc CXX=arm-linux-gnueabi-g++ AR=arm-linux-gnueabi-ar -j8 >/dev/null
++mv -f pcsx_rearmed_libretro.so libpcsx_asp.a 2>/dev/null || true
++F="-O2 $A -Wall -Wno-unused-function -Wno-unused-variable -Wno-format-truncation -DASP_BUILD"
++arm-linux-gnueabi-gcc $F -I$S/include -I$S/include/SDL -Ideps/libretro-common/include -Iasp -c asp/asp_psx.c -o asp/asp_psx.o
++arm-linux-gnueabi-g++ -static -o asp/psx_emu.dge asp/asp_psx.o libpcsx_asp.a -L$S/lib -lSDL -lz -lpthread -lm -ldl
++arm-linux-gnueabi-strip asp/psx_emu.dge
++echo "divide instructions: $(arm-linux-gnueabi-objdump -d asp/psx_emu.dge | grep -cP '\t(s|u)div\t')"
++ls -l asp/psx_emu.dge

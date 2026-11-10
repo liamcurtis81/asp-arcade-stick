@@ -3734,3 +3734,28 @@ game_focus_8 from `gba_page.py`, logo supplied by Liam. PNGs must not go
 through device_commit_files (C2PA chunk breaks the stick's libpng); write
 them as NEW files from the Mac shell. Overwriting an existing file there
 without delete permission removes it.
+
+## PCSX ReARMed -> psx_emu.dge (PlayStation)
+
+Source: `libretro/pcsx_rearmed` at 7b0e8f8. Apply `pcsx-rearmed-asp.patch` (adds
+`asp/`: asp_psx.c, a standalone SDL frontend built from asp_gba.c, plus the
+shared screen helpers) and run `asp/build.sh` with the sysroot from the top of
+this file. The core is built armv7-a with NEON (the gs702c has it), softfp,
+the ari64 translator and the NEON GPU drawing on its own thread.
+HAVE_PHYSICAL_CDROM=0: the physical-drive code pulls in libretro-common
+pieces a static frontend does not have, and there is no drive.
+
+No divide instructions in the binary, and none generated at run time either:
+ari64's ARM back end divides in software (clz and a shift-subtract loop,
+assem_arm.c multdiv_assemble_arm), so the translator is safe on this chip.
+
+BIOS: the core's "auto". A real BIOS beside the binary is used if present,
+otherwise its built-in HLE BIOS, which boots Symphony of the Night (SLUS-00067)
+to its title screen in the qemu harness. Games go on the card as .chd
+(chdman createcd): one file per game for the launcher, about two thirds the
+size of the bin/cue. Memory card 1 is <save>/psx/<game>.mcd.
+
+Pad by position: bottom Cross, right Circle, left Square, top Triangle,
+SFC30 L/R or M30 Z/C as L1/R1, M30 heart/star as L2/R2; Select + Start held
+for a second leaves. On the stick: yellow Cross, blue Circle, red Square,
+green Triangle, greys L1/R1, Options leaves. Registered as `psxx`.
