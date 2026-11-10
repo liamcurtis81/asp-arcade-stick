@@ -997,10 +997,10 @@ index 0000000..9a69ada
 +#endif /* ASP_GEOM_H */
 diff --git a/asp/asp_psx.c b/asp/asp_psx.c
 new file mode 100644
-index 0000000..4a8e67c
+index 0000000..424bdd4
 --- /dev/null
 +++ b/asp/asp_psx.c
-@@ -0,0 +1,643 @@
+@@ -0,0 +1,733 @@
 +/* asp_psx.c - standalone frontend that runs the PCSX ReARMed libretro core
 + * on the Neo Geo Arcade Stick Pro. Built from asp_gba.c (the gpSP frontend):
 + * same launch contract, screen code, sound ring and exit combinations.
@@ -1167,8 +1167,17 @@ index 0000000..4a8e67c
 +/* Linear resample from in_rate to OUT_RATE. */
 +static size_t audio_batch(const int16_t *data, size_t frames)
 +{
-+	const double step = in_rate / OUT_RATE;
++	/* Rate control: when the queue is below its target the sound is
++	 * stretched slightly (up to 1.5%, about a quarter of a semitone at the
++	 * extreme) instead of running dry, which is what crackles; above it, it
++	 * is squeezed by the same amount. */
++	double fill = (double)(ring_w - ring_r);
++	double adj = (fill - TARGET_FR) / TARGET_FR;
++	double step;
 +	size_t i;
++	if (adj > 1) adj = 1;
++	if (adj < -1) adj = -1;
++	step = in_rate / OUT_RATE * (1.0 + 0.015 * adj);
 +
 +	if (!audio_ok)
 +		return frames;
@@ -1230,30 +1239,97 @@ index 0000000..4a8e67c
 +	frame_pitch = pitch;
 +}
 +
-+static void present(void)
++/* The picture is scaled to the panel on its own thread. The emulation
++ * thread only copies the finished frame (at most 640x512, usually 256x240)
++ * into a spare buffer and signals; scaling to 1280x675 costs several
++ * milliseconds a frame and was on the emulation thread, which on the first
++ * play ran 2-4% short of full speed and starved the sound. Newest frame
++ * wins: if the presenter is still busy, the older frame is dropped. */
++#include <pthread.h>
++#define PBUF_MAX (1024 * 512)
++static uint16_t pbuf[2][PBUF_MAX];
++static unsigned pb_w[2], pb_h[2], pb_pitch[2];
++static int pb_ready = -1;            /* index of the newest unshown frame */
++static int pb_busy = -1;             /* index the presenter is reading */
++static pthread_mutex_t pb_mx = PTHREAD_MUTEX_INITIALIZER;
++static pthread_cond_t pb_cv = PTHREAD_COND_INITIALIZER;
++static int pb_quit, pb_threaded;
++static unsigned long frames_dropped;
++static double t_present_ms;
++
++static double now_ms(void)
++{
++	struct timespec ts;
++	clock_gettime(CLOCK_MONOTONIC, &ts);
++	return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
++}
++
++static void hash_frame(const uint16_t *d, unsigned w, unsigned h, unsigned pitch_px)
++{
++	static unsigned long n;
++	n++;
++	if (n % 100 == 0) {
++		uint32_t hsh = 2166136261u;
++		unsigned y, x;
++		for (y = 0; y < h; y++)
++			for (x = 0; x < w; x++) { hsh ^= d[y * pitch_px + x]; hsh *= 16777619u; }
++		fprintf(stderr, "asp: frame %lu hash %08x\n", n, hsh);
++	}
++}
++
++static void draw_buffer(int i)
 +{
 +	int ox, oy, dw, dh;
-+	if (frame_data == NULL || !asp_fb_first_frame_setup())
++	double t0;
++	if (!asp_fb_first_frame_setup())
 +		return;
++	t0 = now_ms();
 +	asp_target_rect_fb(&ox, &oy, &dw, &dh);
-+	asp_fb_present((const unsigned short *)frame_data, frame_w, frame_h,
-+		(int)(frame_pitch / 2), ox, oy, dw, dh);
++	asp_fb_present(pbuf[i], pb_w[i], pb_h[i], pb_pitch[i], ox, oy, dw, dh);
++	t_present_ms += now_ms() - t0;
 +	frames_shown++;
-+	if (getenv("ASP_HASH_FRAMES")) {
-+		/* Off-device proof: hash the game-resolution frame, as the arcade
-+		 * harness does, at fixed checkpoints. */
-+		static unsigned long n;
-+		n++;
-+		if (n % 100 == 0) {
-+			uint32_t hsh = 2166136261u;
-+			unsigned y, x;
-+			for (y = 0; y < frame_h; y++) {
-+				const uint16_t *row = (const uint16_t *)((const char *)frame_data + y * frame_pitch);
-+				for (x = 0; x < frame_w; x++) { hsh ^= row[x]; hsh *= 16777619u; }
-+			}
-+			fprintf(stderr, "asp: frame %lu hash %08x\n", n, hsh);
-+		}
++}
++
++static void *presenter(void *arg)
++{
++	(void)arg;
++	pthread_mutex_lock(&pb_mx);
++	for (;;) {
++		while (pb_ready < 0 && !pb_quit)
++			pthread_cond_wait(&pb_cv, &pb_mx);
++		if (pb_quit) break;
++		pb_busy = pb_ready;
++		pb_ready = -1;
++		pthread_mutex_unlock(&pb_mx);
++		draw_buffer(pb_busy);
++		pthread_mutex_lock(&pb_mx);
++		pb_busy = -1;
 +	}
++	pthread_mutex_unlock(&pb_mx);
++	return NULL;
++}
++
++static void present(void)
++{
++	int i;
++	unsigned y, w = frame_w, h = frame_h, pitch_px = (unsigned)(frame_pitch / 2);
++	if (frame_data == NULL || w == 0 || h == 0 || w * h > PBUF_MAX)
++		return;
++	pthread_mutex_lock(&pb_mx);
++	i = (pb_busy == 0) ? 1 : (pb_busy == 1 ? 0 : (pb_ready == 0 ? 1 : 0));
++	if (pb_ready >= 0) frames_dropped++;
++	pb_ready = -1;                    /* the slot we overwrite is no longer ready */
++	pthread_mutex_unlock(&pb_mx);
++	for (y = 0; y < h; y++)
++		memcpy(&pbuf[i][y * w], (const uint16_t *)frame_data + y * pitch_px, w * 2);
++	pb_w[i] = w; pb_h[i] = h; pb_pitch[i] = w;
++	if (getenv("ASP_HASH_FRAMES"))
++		hash_frame(pbuf[i], w, h, w);
++	if (!pb_threaded) { draw_buffer(i); return; }
++	pthread_mutex_lock(&pb_mx);
++	pb_ready = i;
++	pthread_cond_signal(&pb_cv);
++	pthread_mutex_unlock(&pb_mx);
 +}
 +
 +/* ---- controls ---------------------------------------------------------- */
@@ -1363,6 +1439,7 @@ index 0000000..4a8e67c
 +/* ---- audio buffer status, for the core's automatic frameskip ----------- */
 +static retro_audio_buffer_status_callback_t buf_status_cb;
 +static unsigned long frames_skipped_hint;
++static double t_run_ms;
 +static void report_audio_buffer(void)
 +{
 +	unsigned fill, occ;
@@ -1603,10 +1680,20 @@ index 0000000..4a8e67c
 +	if (getenv("SDL_AUDIODRIVER") == NULL || strcmp(getenv("SDL_AUDIODRIVER"), "dummy") != 0)
 +		open_audio();
 +
++	{
++		pthread_t pt;
++		pb_threaded = getenv("ASP_PSX_INLINE_PRESENT") == NULL &&
++			pthread_create(&pt, NULL, presenter, NULL) == 0;
++		fprintf(stderr, "asp: picture scaled on %s\n", pb_threaded ? "its own thread" : "the emulation thread");
++	}
 +	t_start = SDL_GetTicks();
 +	while (!quit_now) {
 +		report_audio_buffer();
-+		retro_run();
++		{
++			double t0 = now_ms();
++			retro_run();
++			t_run_ms += now_ms() - t0;
++		}
 +		present();
 +		frame++;
 +
@@ -1630,6 +1717,9 @@ index 0000000..4a8e67c
 +			Uint32 el = SDL_GetTicks() - t_start;
 +			fprintf(stderr, "asp: %lu frames in %.1f s (%.2f fps), sound underruns %u (%lu silent samples), overruns %u, low-sound frames %lu\n",
 +				frame, el / 1000.0, frame * 1000.0 / (el ? el : 1), underruns, out_short, overruns, frames_skipped_hint);
++			fprintf(stderr, "asp: per frame this minute: emulation %.2f ms, scaling %.2f ms (own thread: %s), pictures dropped %lu\n",
++				t_run_ms / 3600, t_present_ms / 3600, pb_threaded ? "yes" : "no", frames_dropped);
++			t_run_ms = t_present_ms = 0;
 +		}
 +	}
 +	{
@@ -1667,5 +1757,5 @@ index 0000000..1d66498
 +ls -l asp/psx_emu.dge
 diff --git a/asp/psx_emu.dge b/asp/psx_emu.dge
 new file mode 100755
-index 0000000..3dcac7b
+index 0000000..2d88011
 Binary files /dev/null and b/asp/psx_emu.dge differ
