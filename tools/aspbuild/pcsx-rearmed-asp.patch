@@ -1755,7 +1755,3 @@ index 0000000..1d66498
 +arm-linux-gnueabi-strip asp/psx_emu.dge
 +echo "divide instructions: $(arm-linux-gnueabi-objdump -d asp/psx_emu.dge | grep -cP '\t(s|u)div\t')"
 +ls -l asp/psx_emu.dge
-diff --git a/asp/psx_emu.dge b/asp/psx_emu.dge
-new file mode 100755
-index 0000000..2d88011
-Binary files /dev/null and b/asp/psx_emu.dge differ
