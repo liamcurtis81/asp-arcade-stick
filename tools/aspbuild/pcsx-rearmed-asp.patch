@@ -997,10 +997,10 @@ index 0000000..9a69ada
 +#endif /* ASP_GEOM_H */
 diff --git a/asp/asp_psx.c b/asp/asp_psx.c
 new file mode 100644
-index 0000000..4a99e3e
+index 0000000..4a8e67c
 --- /dev/null
 +++ b/asp/asp_psx.c
-@@ -0,0 +1,617 @@
+@@ -0,0 +1,643 @@
 +/* asp_psx.c - standalone frontend that runs the PCSX ReARMed libretro core
 + * on the Neo Geo Arcade Stick Pro. Built from asp_gba.c (the gpSP frontend):
 + * same launch contract, screen code, sound ring and exit combinations.
@@ -1127,7 +1127,7 @@ index 0000000..4a99e3e
 +/* ---- sound ------------------------------------------------------------- */
 +#define OUT_RATE   44100
 +#define RING_FR    16384               /* stereo frames, power of two */
-+#define TARGET_FR  3072                /* ~46 ms queued before we wait */
++#define TARGET_FR  3072                /* ~70 ms queued before we wait */
 +static int16_t ring[RING_FR * 2];
 +static volatile unsigned ring_w, ring_r;   /* in frames, free-running */
 +static int audio_ok;
@@ -1135,16 +1135,19 @@ index 0000000..4a99e3e
 +static double rs_pos;                  /* position between in_prev and in_cur */
 +static int16_t in_prev[2];
 +static unsigned underruns, overruns;
++static volatile unsigned long out_short;   /* silent samples played: the crackle */
 +
 +static void audio_cb(void *ud, Uint8 *stream, int len)
 +{
 +	int16_t *out = (int16_t *)stream;
 +	int frames = len / 4, i;
 +	(void)ud;
++	unsigned long short_before = out_short;
 +	for (i = 0; i < frames; i++) {
 +		if (ring_r == ring_w) {
 +			out[2 * i] = out[2 * i + 1] = 0;
-+			if (i == 0) underruns++;
++			if (out_short == short_before) underruns++;   /* one per callback that ran dry */
++			out_short++;
 +			continue;
 +		}
 +		out[2 * i]     = ring[(ring_r & (RING_FR - 1)) * 2];
@@ -1357,6 +1360,19 @@ index 0000000..4a99e3e
 +	return (pad_bits >> id) & 1;
 +}
 +
++/* ---- audio buffer status, for the core's automatic frameskip ----------- */
++static retro_audio_buffer_status_callback_t buf_status_cb;
++static unsigned long frames_skipped_hint;
++static void report_audio_buffer(void)
++{
++	unsigned fill, occ;
++	if (buf_status_cb == NULL || !audio_ok) return;
++	fill = ring_w - ring_r;
++	occ = fill >= TARGET_FR ? 100 : fill * 100 / TARGET_FR;
++	buf_status_cb(true, occ, occ < 25);
++	if (occ < 25) frames_skipped_hint++;
++}
++
 +/* ---- environment ------------------------------------------------------- */
 +static char save_dir[512] = "/mnt/data/save/psx";
 +
@@ -1384,7 +1400,11 @@ index 0000000..4a99e3e
 +			{ "pcsx_rearmed_region", "auto" },
 +			{ "pcsx_rearmed_memcard1", "libretro" },
 +			{ "pcsx_rearmed_memcard2", "none" },
-+			{ "pcsx_rearmed_frameskip_type", "disabled" },
++			/* Drop a picture, never a sound: when the sound queue runs low the
++			 * core skips drawing a frame to catch up. */
++			{ "pcsx_rearmed_frameskip_type", "auto_threshold" },
++			{ "pcsx_rearmed_frameskip_threshold", "33" },
++			{ "pcsx_rearmed_spu_thread", "enabled" },   /* four cores; sound on its own */
 +			{ "pcsx_rearmed_gpu_thread_rendering", "enabled" },  /* second core draws */
 +			{ "pcsx_rearmed_show_bios_bootlogo", "disabled" },
 +			{ "pcsx_rearmed_rgb32_output", "disabled" },
@@ -1414,6 +1434,11 @@ index 0000000..4a99e3e
 +	case RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO: {
 +		const struct retro_system_av_info *av = data;
 +		if (av->timing.sample_rate > 0) in_rate = av->timing.sample_rate;
++		return true;
++	}
++	case RETRO_ENVIRONMENT_SET_AUDIO_BUFFER_STATUS_CALLBACK: {
++		const struct retro_audio_buffer_status_callback *c = data;
++		buf_status_cb = c ? c->callback : NULL;
 +		return true;
 +	}
 +	case RETRO_ENVIRONMENT_SET_GEOMETRY:
@@ -1580,6 +1605,7 @@ index 0000000..4a99e3e
 +
 +	t_start = SDL_GetTicks();
 +	while (!quit_now) {
++		report_audio_buffer();
 +		retro_run();
 +		present();
 +		frame++;
@@ -1602,8 +1628,8 @@ index 0000000..4a99e3e
 +			break;
 +		if (frame % 3600 == 0) {
 +			Uint32 el = SDL_GetTicks() - t_start;
-+			fprintf(stderr, "asp: %lu frames in %.1f s (%.2f fps), sound underruns %u, overruns %u\n",
-+				frame, el / 1000.0, frame * 1000.0 / (el ? el : 1), underruns, overruns);
++			fprintf(stderr, "asp: %lu frames in %.1f s (%.2f fps), sound underruns %u (%lu silent samples), overruns %u, low-sound frames %lu\n",
++				frame, el / 1000.0, frame * 1000.0 / (el ? el : 1), underruns, out_short, overruns, frames_skipped_hint);
 +		}
 +	}
 +	{
@@ -1639,3 +1665,7 @@ index 0000000..1d66498
 +arm-linux-gnueabi-strip asp/psx_emu.dge
 +echo "divide instructions: $(arm-linux-gnueabi-objdump -d asp/psx_emu.dge | grep -cP '\t(s|u)div\t')"
 +ls -l asp/psx_emu.dge
+diff --git a/asp/psx_emu.dge b/asp/psx_emu.dge
+new file mode 100755
+index 0000000..3dcac7b
+Binary files /dev/null and b/asp/psx_emu.dge differ
