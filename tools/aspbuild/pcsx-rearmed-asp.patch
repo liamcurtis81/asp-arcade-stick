@@ -997,10 +997,10 @@ index 0000000..9a69ada
 +#endif /* ASP_GEOM_H */
 diff --git a/asp/asp_psx.c b/asp/asp_psx.c
 new file mode 100644
-index 0000000..bbd4eef
+index 0000000..f25b769
 --- /dev/null
 +++ b/asp/asp_psx.c
-@@ -0,0 +1,738 @@
+@@ -0,0 +1,787 @@
 +/* asp_psx.c - standalone frontend that runs the PCSX ReARMed libretro core
 + * on the Neo Geo Arcade Stick Pro. Built from asp_gba.c (the gpSP frontend):
 + * same launch contract, screen code, sound ring and exit combinations.
@@ -1333,6 +1333,39 @@ index 0000000..bbd4eef
 +	pthread_mutex_unlock(&pb_mx);
 +}
 +
++/* ---- discs -------------------------------------------------------------- */
++/* A game of several discs is a .m3u list of them; the core reads the list
++ * and hands us its disc-control calls. */
++static struct retro_disk_control_callback disk_cb;
++static int have_disk_cb;
++/* Asked for from the input poll, which runs inside retro_run; done between
++ * frames, where the core can take a disc change (doing it mid-frame crashed). */
++static volatile int swap_wanted;
++static void swap_disc(void)
++{
++	unsigned n, cur, next;
++	if (!have_disk_cb || !disk_cb.get_num_images) return;
++	n = disk_cb.get_num_images();
++	if (n < 2) { fprintf(stderr, "asp: one disc only, nothing to swap\n"); return; }
++	cur = disk_cb.get_image_index();
++	next = (cur + 1) % n;
++	fprintf(stderr, "asp: opening the lid\n"); fflush(stderr);
++	disk_cb.set_eject_state(true);
++	fprintf(stderr, "asp: changing disc\n"); fflush(stderr);
++	disk_cb.set_image_index(next);
++	fprintf(stderr, "asp: closing the lid\n"); fflush(stderr);
++	disk_cb.set_eject_state(false);
++	fprintf(stderr, "asp: disc %u of %u -> disc %u\n", cur + 1, n, next + 1);
++}
++/* Off-device test hook: ASP_SWAP_AT=<frame> holds the combination there. */
++static unsigned long cur_frame;
++static int getenv_swap_now(void)
++{
++	static long at = -2;
++	if (at == -2) at = getenv("ASP_SWAP_AT") ? atol(getenv("ASP_SWAP_AT")) : -1;
++	return at >= 0 && cur_frame >= (unsigned long)at && cur_frame < (unsigned long)at + 900;
++}
++
 +/* ---- controls ---------------------------------------------------------- */
 +static SDL_Joystick *joy;
 +static int pad_mode;
@@ -1424,6 +1457,18 @@ index 0000000..bbd4eef
 +	}
 +	if (ks[SDLK_ESCAPE])
 +		quit_now = 1;
++	{
++		/* Next disc: hold Select + R1 (SFC30 R, M30 C, the stick's lower
++		 * grey) for a second. Wraps after the last disc. */
++		static Uint32 since;
++		int sel_r1 = pad_mode ? ((jb(PAD_SELECT) || jb(PAD_MINUS)) && jb(PAD_RSHOULDER))
++		                      : (jb(STK_SELECT) && jb(STK_GB));
++		if (sel_r1 || getenv_swap_now()) {
++			if (since == 0) since = SDL_GetTicks();
++			else if (since != 1 && SDL_GetTicks() - since > 1000) { swap_wanted = 1; since = 1; }
++		} else
++			since = 0;
++	}
 +	pad_bits = b;
 +}
 +
@@ -1519,10 +1564,12 @@ index 0000000..bbd4eef
 +		buf_status_cb = c ? c->callback : NULL;
 +		return true;
 +	}
++	case RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE:
++		if (data) { disk_cb = *(const struct retro_disk_control_callback *)data; have_disk_cb = 1; }
++		return true;
 +	case RETRO_ENVIRONMENT_SET_GEOMETRY:
 +	case RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS:
 +	case RETRO_ENVIRONMENT_SET_CONTROLLER_INFO:
-+	case RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE:
 +	case RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL:
 +	case RETRO_ENVIRONMENT_SET_MEMORY_MAPS:
 +	case RETRO_ENVIRONMENT_SET_MINIMUM_AUDIO_LATENCY:
@@ -1701,6 +1748,8 @@ index 0000000..bbd4eef
 +		}
 +		present();
 +		frame++;
++		cur_frame = frame;
++		if (swap_wanted) { swap_wanted = 0; swap_disc(); }
 +
 +		if (audio_ok) {
 +			/* Sound is the clock: wait while more than the target is queued. */
