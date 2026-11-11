@@ -1,9 +1,9 @@
 diff --git a/asp/asp_psx.c b/asp/asp_psx.c
 new file mode 100644
-index 0000000..eca3e77
+index 0000000..6f33f27
 --- /dev/null
 +++ b/asp/asp_psx.c
-@@ -0,0 +1,849 @@
+@@ -0,0 +1,860 @@
 +/* asp_psx.c - standalone frontend that runs the PCSX ReARMed libretro core
 + * on the Neo Geo Arcade Stick Pro. Built from asp_gba.c (the gpSP frontend):
 + * same launch contract, screen code, sound ring and exit combinations.
@@ -131,7 +131,12 @@ index 0000000..eca3e77
 +/* ---- sound ------------------------------------------------------------- */
 +#define OUT_RATE   44100
 +#define RING_FR    16384               /* stereo frames, power of two */
-+#define TARGET_FR  1536                /* ~35 ms queued before we wait (was 70; rate control covers dips) */
++/* Sound queued ahead before the emulator waits. The stick's sound driver
++ * takes data in bursts of several tens of milliseconds, so a 35 ms queue
++ * (p6-p8) ran dry every burst: silence, crackle, and the game slowed by the
++ * silence it had to wait out. 70 ms is the setting that played cleanly.
++ * psx_options.txt can change it: asp_sound_queue_ms <n>. */
++static unsigned TARGET_FR = 3072;
 +static int16_t ring[RING_FR * 2];
 +static volatile unsigned ring_w, ring_r;   /* in frames, free-running */
 +static int audio_ok;
@@ -536,6 +541,12 @@ index 0000000..eca3e77
 +	while (n_ovr < 32 && fgets(line, sizeof(line), f)) {
 +		if (line[0] == '#' || sscanf(line, "%63s %47s", ovr_k[n_ovr], ovr_v[n_ovr]) != 2)
 +			continue;
++		if (strcmp(ovr_k[n_ovr], "asp_sound_queue_ms") == 0) {
++			int ms = atoi(ovr_v[n_ovr]);
++			if (ms >= 10 && ms <= 200) TARGET_FR = (unsigned)(ms * 441 / 10);
++			fprintf(stderr, "asp: sound queue %u samples\n", TARGET_FR);
++			continue;
++		}
 +		fprintf(stderr, "asp: option override %s = %s\n", ovr_k[n_ovr], ovr_v[n_ovr]);
 +		n_ovr++;
 +	}
