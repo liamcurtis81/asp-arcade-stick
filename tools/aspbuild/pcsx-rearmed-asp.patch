@@ -997,10 +997,10 @@ index 0000000..9a69ada
 +#endif /* ASP_GEOM_H */
 diff --git a/asp/asp_psx.c b/asp/asp_psx.c
 new file mode 100644
-index 0000000..f25b769
+index 0000000..5889032
 --- /dev/null
 +++ b/asp/asp_psx.c
-@@ -0,0 +1,787 @@
+@@ -0,0 +1,805 @@
 +/* asp_psx.c - standalone frontend that runs the PCSX ReARMed libretro core
 + * on the Neo Geo Arcade Stick Pro. Built from asp_gba.c (the gpSP frontend):
 + * same launch contract, screen code, sound ring and exit combinations.
@@ -1401,6 +1401,23 @@ index 0000000..f25b769
 +	return joy && i < SDL_JoystickNumButtons(joy) && SDL_JoystickGetButton(joy, i);
 +}
 +
++/* Log each button as it goes down (first 300 a session), so a new pad's
++ * numbering can be read off the log: the SFC30's L2/R2, the 8BitDo NEOGEO. */
++static void log_buttons(void)
++{
++	static Uint8 prev[32];
++	static int logged;
++	int i, n;
++	if (!joy || logged >= 300) return;
++	n = SDL_JoystickNumButtons(joy);
++	if (n > 32) n = 32;
++	for (i = 0; i < n; i++) {
++		Uint8 b = SDL_JoystickGetButton(joy, i);
++		if (b && !prev[i]) { fprintf(stderr, "asp: button %d down\n", i); logged++; }
++		prev[i] = b;
++	}
++}
++
 +static void input_poll(void)
 +{
 +	Uint8 *ks;
@@ -1411,6 +1428,7 @@ index 0000000..f25b769
 +		if (ev.type == SDL_QUIT)
 +			quit_now = 1;
 +	SDL_JoystickUpdate();
++	log_buttons();
 +	ks = SDL_GetKeyState(NULL);
 +
 +	/* The stick's lever arrives as arrow keys in both modes. */
