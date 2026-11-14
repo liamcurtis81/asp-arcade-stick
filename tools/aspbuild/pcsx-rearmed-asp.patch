@@ -864,3 +864,18 @@ index 0000000..6f33f27
 +	SDL_Quit();
 +	return 0;
 +}
+diff --git a/libpcsxcore/cdriso.c b/libpcsxcore/cdriso.c
+index 149dce7..bedf817 100644
+--- a/libpcsxcore/cdriso.c
++++ b/libpcsxcore/cdriso.c
+@@ -957,6 +957,10 @@ static int handlepbp(const char *isofile) {
+ 			break;
+ 
+ 		compr_img->index_table[i] = cdimg_base + index_entry_offset;
++		// A block that would not shrink is stored as-is, 16 raw sectors.
++		// Without this flag it was fed to inflate and the read failed.
++		if (index_entry_size == 16 * 2352)
++			compr_img->index_table[i] |= OFF_T_MSB;
+ 	}
+ 	compr_img->index_table[i] = cdimg_base + index_entry_offset + index_entry_size;
+ 
