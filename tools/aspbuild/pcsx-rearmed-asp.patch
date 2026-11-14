@@ -997,10 +997,10 @@ index 0000000..9a69ada
 +#endif /* ASP_GEOM_H */
 diff --git a/asp/asp_manual.h b/asp/asp_manual.h
 new file mode 100644
-index 0000000..6d34b3d
+index 0000000..3477740
 --- /dev/null
 +++ b/asp/asp_manual.h
-@@ -0,0 +1,303 @@
+@@ -0,0 +1,312 @@
 +/* asp_manual.h - the game's instruction manual, read in-game on the TV.
 + *
 + * Hold Select + L1 for a second: the game pauses (sound too) and the manual
@@ -1016,11 +1016,20 @@ index 0000000..6d34b3d
 + *
 + * Drawn straight into the framebuffer at its own resolution, with an area
 + * filter so small print stays legible, and corrected for the display's pixel
-+ * shape the same way the game picture is. Only included by asp_psx.c. */
++ * shape the same way the game picture is.
++ *
++ * Shared by the ASP frontends. The includer defines ASP_MAN_SYS (the folder
++ * name under roms/ and manuals/), ASP_MAN_PRESENTER if a presenter thread
++ * owns the screen between frames, and provides
++ *   man_buttons(int *l1, int *r1, int *zin, int *zout, int *start, int *sel)
++ * plus jb/joy/pad_mode/quit_now/audio_ok/bin_dir as the frontends all do. */
 +#ifndef ASP_MANUAL_H
 +#define ASP_MANUAL_H
 +
 +#include <dirent.h>
++#ifndef ASP_MAN_SYS
++#define ASP_MAN_SYS "psx"
++#endif
 +
 +#define STBI_ONLY_JPEG
 +#define STBI_ONLY_PNG
@@ -1048,19 +1057,18 @@ index 0000000..6d34b3d
 +static void manual_find(const char *content)
 +{
 +	char game[300], *p;
-+	const char *rp = strstr(content, "/roms/psx/");
++	const char *rp = strcasestr(content, "/roms/" ASP_MAN_SYS "/");
 +	DIR *d;
 +	struct dirent *e;
 +
-+	if (rp == NULL) rp = strstr(content, "/ROMS/PSX/");
 +	if (rp == NULL) return;
-+	rp += strlen("/roms/psx/");
++	rp += strlen("/roms/" ASP_MAN_SYS "/");
 +	snprintf(game, sizeof(game), "%s", rp);
 +	p = strchr(game, '/');
 +	if (p) *p = 0;                                  /* the game's folder */
 +	else if ((p = strrchr(game, '.')) != NULL) *p = 0;  /* or its file name */
 +
-+	snprintf(man_dir, sizeof(man_dir), "%s../../manuals/psx/%s", bin_dir, game);
++	snprintf(man_dir, sizeof(man_dir), "%s../../manuals/" ASP_MAN_SYS "/%s", bin_dir, game);
 +	d = opendir(man_dir);
 +	if (d == NULL) {
 +		fprintf(stderr, "asp: no manual (%s)\n", man_dir);
@@ -1130,7 +1138,7 @@ index 0000000..6d34b3d
 +	double s, kx, sx_step, sy_step, x0, y0;
 +
 +	if (aw <= 0 || ah <= 0) { ox = oy = 0; aw = asp_fb_w; ah = asp_fb_h; }
-+	if (man_view == NULL) man_view = malloc((size_t)aw * ah * 2);
++	if (man_view == NULL) man_view = (uint16_t *)malloc((size_t)aw * ah * 2);
 +	if (man_view == NULL) return;
 +	memset(man_view, 0, (size_t)aw * ah * 2);
 +
@@ -1199,6 +1207,7 @@ index 0000000..6d34b3d
 +	if (man_pages == 0) return;
 +	if (!asp_fb_first_frame_setup()) return;
 +
++#ifdef ASP_MAN_PRESENTER
 +	/* Let the presenter finish the frame it is on before we take the screen. */
 +	for (;;) {
 +		int idle;
@@ -1208,6 +1217,7 @@ index 0000000..6d34b3d
 +		if (idle) break;
 +		SDL_Delay(2);
 +	}
++#endif
 +	if (audio_ok) SDL_PauseAudio(1);
 +	fprintf(stderr, "asp: manual open at page %d of %d\n", last_page_read + 1, man_pages);
 +	man_cur = last_page_read;
@@ -1233,12 +1243,11 @@ index 0000000..6d34b3d
 +		right = ks[SDLK_RIGHT] || (hat & SDL_HAT_RIGHT);
 +		up    = ks[SDLK_UP]    || (hat & SDL_HAT_UP);
 +		down  = ks[SDLK_DOWN]  || (hat & SDL_HAT_DOWN);
-+		l1    = pad_mode ? jb(PAD_LSHOULDER) : jb(STK_GT);
-+		r1    = pad_mode ? jb(PAD_RSHOULDER) : jb(STK_GB);
-+		zin   = pad_mode ? jb(PAD_RIGHT)  : jb(STK_D);
-+		zout  = pad_mode ? jb(PAD_BOTTOM) : jb(STK_B);
-+		start = pad_mode ? jb(PAD_START)  : (jb(STK_START) || jb(STK_OPTIONS));
-+		close = (pad_mode ? (jb(PAD_SELECT) || jb(PAD_MINUS)) : jb(STK_SELECT)) && l1;
++		{
++			int sel;
++			man_buttons(&l1, &r1, &zin, &zout, &start, &sel);
++			close = sel && l1;
++		}
 +		if (man_script) {
 +			char c = man_script[step / 4];
 +			int on = (step % 4) < 2;     /* press for two passes, release for two */
@@ -1306,10 +1315,10 @@ index 0000000..6d34b3d
 +#endif
 diff --git a/asp/asp_psx.c b/asp/asp_psx.c
 new file mode 100644
-index 0000000..905e780
+index 0000000..656e84e
 --- /dev/null
 +++ b/asp/asp_psx.c
-@@ -0,0 +1,884 @@
+@@ -0,0 +1,896 @@
 +/* asp_psx.c - standalone frontend that runs the PCSX ReARMed libretro core
 + * on the Neo Geo Arcade Stick Pro. Built from asp_gba.c (the gpSP frontend):
 + * same launch contract, screen code, sound ring and exit combinations.
@@ -1340,6 +1349,7 @@ index 0000000..905e780
 + * Memory card 1 is the core's save memory, kept as <savedir>/psx/<game>.mcd,
 + * written every few seconds when it changes and on exit.
 + */
++#define _GNU_SOURCE
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <string.h>
@@ -1824,6 +1834,17 @@ index 0000000..905e780
 +	pad_bits = b;
 +}
 +
++static void man_buttons(int *l1, int *r1, int *zin, int *zout, int *start, int *sel)
++{
++	*l1    = pad_mode ? jb(PAD_LSHOULDER) : jb(STK_GT);
++	*r1    = pad_mode ? jb(PAD_RSHOULDER) : jb(STK_GB);
++	*zin   = pad_mode ? jb(PAD_RIGHT)  : jb(STK_D);
++	*zout  = pad_mode ? jb(PAD_BOTTOM) : jb(STK_B);
++	*start = pad_mode ? jb(PAD_START)  : (jb(STK_START) || jb(STK_OPTIONS));
++	*sel   = pad_mode ? (jb(PAD_SELECT) || jb(PAD_MINUS)) : jb(STK_SELECT);
++}
++#define ASP_MAN_SYS "psx"
++#define ASP_MAN_PRESENTER
 +#include "asp_manual.h"
 +
 +static int16_t input_state(unsigned port, unsigned device, unsigned index, unsigned id)
