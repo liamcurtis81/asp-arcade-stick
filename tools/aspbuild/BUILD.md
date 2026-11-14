@@ -35,7 +35,7 @@ ASP's OSS node. Without it nothing built here has sound.
 
 ## PicoDrive -> md_emu.dge
 
-Source: `notaz/picodrive` (+ `platform/libpicofe` submodule).
+Source: `notaz/picodrive` (+ `platform/libpicofe` submodule); the manual-viewer build (md_emu_p4) was made from picodrive 26ecb2b6. Needs libpng in the sysroot.
 Apply `picodrive-asp.patch` and `libpicofe-asp.patch`.
 
 ```sh
@@ -3759,3 +3759,14 @@ Pad by position: bottom Cross, right Circle, left Square, top Triangle,
 SFC30 L/R or M30 Z/C as L1/R1, M30 heart/star as L2/R2; Select + Start held
 for a second leaves. On the stick: yellow Cross, blue Circle, red Square,
 green Triangle, greys L1/R1, Options leaves. Registered as `psxx`.
+
+## In-game manuals (all console emulators)
+
+`asp_manual.h` (shared, with `stb_image.h`) is in every console frontend: hold
+Select + L for a second (the stick: Select + upper grey) and the game pauses
+on the manual in `hack/manuals/<system>/<rom name without extension>/`, pages
+`001.jpg`... in name order. `<system>` is the folder under `hack/roms/`
+(psx, gba, sfc, nes, megadrive); a PlayStation game in its own folder uses
+the folder name. Pages: `tools/manuals/mkpages.py` (pdftoppm, longest side
+1400 px, quality 80). picodrive's input layer tracks buttons by events, so
+the viewer pushes release events for everything not held when it closes.
