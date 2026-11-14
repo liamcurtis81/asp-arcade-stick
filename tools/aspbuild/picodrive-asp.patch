@@ -224,10 +224,10 @@ index 00000000..f6f07915
 +#endif /* ASP_CALIB_H */
 diff --git a/platform/common/asp_fbout.h b/platform/common/asp_fbout.h
 new file mode 100644
-index 00000000..f5e6d6cb
+index 00000000..a9d12a15
 --- /dev/null
 +++ b/platform/common/asp_fbout.h
-@@ -0,0 +1,574 @@
+@@ -0,0 +1,605 @@
 +/* asp_fbout.h - write frames straight to /dev/fb0 at the stride the display
 + * driver actually reports, bypassing SDL's video surface.
 + *
@@ -292,6 +292,29 @@ index 00000000..f5e6d6cb
 +
 +/* Set from asp_screen.cfg before asp_fb_open(). */
 +static int asp_fb_mode_cfg;
++/* CRT look: crt=1 (soft) or crt=2 (strong) in asp_screen.cfg darkens the last
++ * screen row of every source line, so each game line reads as a lit scanline
++ * with a dark gap under it, like a TV. Only when a line spans 2+ rows. */
++static int asp_fb_crt;
++static unsigned char asp_fb_crtbuf[2560 * 4] __attribute__((aligned(8)));
++static void asp_fb_crt_row(const unsigned char *in, int n_px)
++{
++	const unsigned int *s = (const unsigned int *)in;
++	unsigned int *d = (unsigned int *)asp_fb_crtbuf;
++	int i, words = (n_px * asp_fb_px) / 4;
++	if (asp_fb_px == 2) {
++		/* two RGB565 pixels per word: halve (strong) or 3/4 (soft) */
++		for (i = 0; i < words; i++) {
++			unsigned int v = s[i], h = (v >> 1) & 0x7BEF7BEFu;
++			d[i] = asp_fb_crt >= 2 ? h : h + ((v >> 2) & 0x39E739E7u);
++		}
++	} else {
++		for (i = 0; i < words; i++) {
++			unsigned int v = s[i], h = (v >> 1) & 0x007F7F7Fu;
++			d[i] = asp_fb_crt >= 2 ? h : h + ((v >> 2) & 0x003F3F3Fu);
++		}
++	}
++}
 +
 +static int asp_fb_open(void)
 +{
@@ -734,7 +757,15 @@ index 00000000..f5e6d6cb
 +			prev_sy = sy;
 +		}
 +
-+		memcpy(p, rowbuf, (size_t)dw * asp_fb_px);
++		{
++			const unsigned char *out = rowbuf;
++			if (asp_fb_crt && dh >= 2 * sh &&
++			    (int)(((unsigned)(i + 1) * sh) / dh) != sy) {
++				asp_fb_crt_row(rowbuf, dw);
++				out = asp_fb_crtbuf;
++			}
++			memcpy(p, out, (size_t)dw * asp_fb_px);
++		}
 +	}
 +	(void)prev;
 +}
@@ -1292,6 +1323,117 @@ index 00000000..7e006f49
 +}
 +
 +#endif
+diff --git a/platform/common/asp_stats.h b/platform/common/asp_stats.h
+new file mode 100644
+index 00000000..639e4672
+--- /dev/null
++++ b/platform/common/asp_stats.h
+@@ -0,0 +1,105 @@
++/* asp_stats.h - how long each game has been played, and in what order.
++ *
++ * Every console frontend calls asp_stats_begin(system, rom path) once the game
++ * is loaded. At exit the session's seconds are added to
++ *   <card>/ASPh/hack/stats/playtime.txt
++ * one line per game: system<TAB>game<TAB>total seconds<TAB>sessions<TAB>order
++ * where order is a counter that goes up by one every time any game is played
++ * (the stick's clock resets to 2011 on each boot, so dates are no use for
++ * "recently played"; the counter is). The file is rewritten whole through a
++ * temporary file, so an interrupted write leaves the old one intact.
++ *
++ * Header-only, plain C, used from C and C++ frontends. */
++#ifndef ASP_STATS_H
++#define ASP_STATS_H
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <time.h>
++#include <unistd.h>
++#include <sys/stat.h>
++
++static char asp_st_sys[16], asp_st_game[256], asp_st_dir[600];
++static struct timespec asp_st_t0;
++static int asp_st_on;
++
++static void asp_stats_end(void)
++{
++	char path[700], tmp[720], line[512];
++	struct timespec t1;
++	long secs, best_order = 0;
++	FILE *in, *out;
++	int found = 0;
++
++	if (!asp_st_on) return;
++	asp_st_on = 0;
++	clock_gettime(CLOCK_MONOTONIC, &t1);
++	secs = (long)(t1.tv_sec - asp_st_t0.tv_sec);
++	if (secs < 5) return;                     /* launched by mistake */
++
++	snprintf(path, sizeof(path), "%s/playtime.txt", asp_st_dir);
++	snprintf(tmp, sizeof(tmp), "%s/playtime.new", asp_st_dir);
++	in = fopen(path, "r");
++	if (in) {                                 /* highest order so far */
++		while (fgets(line, sizeof(line), in)) {
++			char *f[5]; int n = 0; char *p = line;
++			while (n < 5 && (f[n] = strsep(&p, "\t\n")) != NULL) n++;
++			if (n >= 5 && atol(f[4]) > best_order) best_order = atol(f[4]);
++		}
++		rewind(in);
++	}
++	out = fopen(tmp, "w");
++	if (out == NULL) { if (in) fclose(in); return; }
++	if (in) {
++		while (fgets(line, sizeof(line), in)) {
++			char copy[512], *f[5]; int n = 0; char *p = copy;
++			snprintf(copy, sizeof(copy), "%s", line);
++			while (n < 5 && (f[n] = strsep(&p, "\t\n")) != NULL) n++;
++			if (n >= 5 && !strcmp(f[0], asp_st_sys) && !strcmp(f[1], asp_st_game)) {
++				fprintf(out, "%s\t%s\t%ld\t%ld\t%ld\n", asp_st_sys, asp_st_game,
++					atol(f[2]) + secs, atol(f[3]) + 1, best_order + 1);
++				found = 1;
++			} else if (n >= 5)
++				fputs(line, out);
++		}
++		fclose(in);
++	}
++	if (!found)
++		fprintf(out, "%s\t%s\t%ld\t1\t%ld\n", asp_st_sys, asp_st_game, secs, best_order + 1);
++	fflush(out);
++	fsync(fileno(out));
++	fclose(out);
++	rename(tmp, path);
++	fprintf(stderr, "asp: played %ld s this session (%s/%s)\n", secs, asp_st_sys, asp_st_game);
++}
++
++/* exe_dir is the emulator's own folder (…/hack/bin/<sys>/), rom the path the
++ * launcher gave. The game is named by its file, or for a PlayStation game in
++ * its own folder, by the folder - the same names the manuals use. */
++static void asp_stats_begin(const char *exe_dir, const char *sys, const char *rom)
++{
++	const char *b, *r;
++	char *dot;
++	char key[300];
++	snprintf(asp_st_sys, sizeof(asp_st_sys), "%s", sys);
++	snprintf(asp_st_dir, sizeof(asp_st_dir), "%s../../stats", exe_dir);
++	mkdir(asp_st_dir, 0755);
++	r = strstr(rom, "/roms/");
++	if (r && (r = strchr(r + 6, '/')) != NULL) {
++		r++;
++		snprintf(key, sizeof(key), "%s", r);
++		if (strchr(key, '/')) *strchr(key, '/') = 0;     /* game in a folder */
++		else if ((dot = strrchr(key, '.')) != NULL) *dot = 0;
++	} else {
++		b = strrchr(rom, '/');
++		snprintf(key, sizeof(key), "%s", b ? b + 1 : rom);
++		if ((dot = strrchr(key, '.')) != NULL) *dot = 0;
++	}
++	snprintf(asp_st_game, sizeof(asp_st_game), "%s", key);
++	clock_gettime(CLOCK_MONOTONIC, &asp_st_t0);
++	asp_st_on = 1;
++	atexit(asp_stats_end);
++}
++
++#endif
 diff --git a/platform/common/emu.c b/platform/common/emu.c
 index 8e6ad540..a507af24 100644
 --- a/platform/common/emu.c
@@ -1843,7 +1985,7 @@ index 8e6987e4..ee1e3d50 100644
 +	return 0;
 +}
 diff --git a/platform/common/plat_sdl.c b/platform/common/plat_sdl.c
-index 4f8249f6..a2c472fe 100644
+index 4f8249f6..dd3caf40 100644
 --- a/platform/common/plat_sdl.c
 +++ b/platform/common/plat_sdl.c
 @@ -1,3 +1,4 @@
@@ -1851,7 +1993,7 @@ index 4f8249f6..a2c472fe 100644
  /*
   * PicoDrive
   * (C) notaz, 2013
-@@ -176,6 +177,304 @@ void rgb565_to_uyvy(void *d, const void *s, int w, int h, int pitch, int dpitch,
+@@ -176,6 +177,308 @@ void rgb565_to_uyvy(void *d, const void *s, int w, int h, int pitch, int dpitch,
  	}
  }
  
@@ -1913,6 +2055,7 @@ index 4f8249f6..a2c472fe 100644
 +}
 +#define ASP_MAN_SYS "megadrive"
 +#include "asp_manual.h"
++#include "asp_stats.h"
 +
 +void asp_manual_setup(const char *rom)
 +{
@@ -1926,6 +2069,7 @@ index 4f8249f6..a2c472fe 100644
 +	} else
 +		strcpy(bin_dir, "./");
 +	manual_find(rom);
++	asp_stats_begin(bin_dir, "megadrive", rom);
 +}
 +
 +/* The input layer tracks buttons by their events, and the manual's own loop
@@ -2027,6 +2171,8 @@ index 4f8249f6..a2c472fe 100644
 +		else if (sscanf(line, "aspect = %63s", word) == 1 ||
 +		         sscanf(line, "aspect=%63s", word) == 1)
 +			asp_keep_aspect = (strncmp(word, "fill", 4) != 0);
++		else if (sscanf(line, "crt = %d", &v) == 1 || sscanf(line, "crt=%d", &v) == 1)
++			asp_fb_crt = v;
 +		else if (sscanf(line, "calibrate = %d", &v) == 1 ||
 +		         sscanf(line, "calibrate=%d", &v) == 1)
 +			asp_calibrate = v;
@@ -2156,7 +2302,7 @@ index 4f8249f6..a2c472fe 100644
  void copy_intscale(void *dst, int w, int h, int pp, void *src, int sw, int sh, int spp)
  {
  	int xf = w / sw, yf = h / sh, f = xf < yf ? xf : yf;
-@@ -226,6 +525,19 @@ void plat_video_set_size(int w, int h)
+@@ -226,6 +529,19 @@ void plat_video_set_size(int w, int h)
  	if (area.w != w || area.h != h) {
  		area = (struct area) { w, h };
  
@@ -2176,7 +2322,7 @@ index 4f8249f6..a2c472fe 100644
  		if (plat_sdl_overlay || plat_sdl_gl_active || !plat_sdl_is_windowed()) {
  			// create surface for overlays, or try using a hw scaler
  			if (plat_sdl_change_video_mode(w, h, 0) < 0) {
-@@ -288,12 +600,70 @@ void plat_video_flip(void)
+@@ -288,12 +604,70 @@ void plat_video_flip(void)
  	else {
  		int copy = g_screen_ptr != plat_sdl_screen->pixels;
  		if (copy)
@@ -2247,7 +2393,7 @@ index 4f8249f6..a2c472fe 100644
  		SDL_Flip(plat_sdl_screen);
  
  		// take over resized settings for the physical SDL surface
-@@ -355,6 +725,13 @@ void plat_video_clear_buffers(void)
+@@ -355,6 +729,13 @@ void plat_video_clear_buffers(void)
  	if (plat_sdl_overlay)
  		plat_sdl_overlay_clear();
  	memset(plat_sdl_screen->pixels, 0, plat_sdl_screen->pitch*plat_sdl_screen->h);
@@ -2261,7 +2407,7 @@ index 4f8249f6..a2c472fe 100644
  	clear_buf_cnt = 3; // do it thrice in case of triple buffering
  }
  
-@@ -375,8 +752,17 @@ void plat_video_menu_update(void)
+@@ -375,8 +756,17 @@ void plat_video_menu_update(void)
  	// update pitch as it is needed by the menu bg scaler
  	if (plat_sdl_overlay || plat_sdl_gl_active)
  		g_menuscreen_pp = g_menuscreen_w;
@@ -2279,7 +2425,7 @@ index 4f8249f6..a2c472fe 100644
  
  	resize_buffers();
  }
-@@ -391,6 +777,18 @@ void plat_video_menu_begin(void)
+@@ -391,6 +781,18 @@ void plat_video_menu_begin(void)
  {
  	plat_video_menu_update(); // just in case
  
@@ -2298,7 +2444,7 @@ index 4f8249f6..a2c472fe 100644
  	if (plat_sdl_overlay || plat_sdl_gl_active)
  		g_menuscreen_ptr = shadow_fb;
  	else {
-@@ -419,6 +817,20 @@ void plat_video_menu_end(void)
+@@ -419,6 +821,20 @@ void plat_video_menu_end(void)
  	else if (plat_sdl_gl_active) {
  		gl_flip(g_menuscreen_ptr, g_menuscreen_pp, g_menuscreen_h);
  	}
@@ -2319,7 +2465,7 @@ index 4f8249f6..a2c472fe 100644
  	else {
  		if (SDL_MUSTLOCK(plat_sdl_screen))
  			SDL_UnlockSurface(plat_sdl_screen);
-@@ -437,8 +849,18 @@ void plat_video_loop_prepare(void)
+@@ -437,8 +853,18 @@ void plat_video_loop_prepare(void)
  
  	// take over any new vout settings
  	area = (struct area) { 0, 0 };
@@ -2338,7 +2484,7 @@ index 4f8249f6..a2c472fe 100644
  
  	// switch over to scaled output if available, but keep the aspect ratio
  	if (plat_sdl_overlay || plat_sdl_gl_active)
-@@ -560,7 +982,27 @@ void plat_init(void)
+@@ -560,7 +986,27 @@ void plat_init(void)
  	in_sdl_platform_data.jmap_size = in_sdl_joy_map_sz,
  	in_sdl_platform_data.joy_map = in_sdl_joy_map,
  	in_sdl_platform_data.key_names = in_sdl_key_names,
