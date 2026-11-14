@@ -1675,10 +1675,10 @@ index 0000000..9a69ada
 +#endif /* ASP_GEOM_H */
 diff --git a/asp/asp_manual.h b/asp/asp_manual.h
 new file mode 100644
-index 0000000..3477740
+index 0000000..7e006f4
 --- /dev/null
 +++ b/asp/asp_manual.h
-@@ -0,0 +1,312 @@
+@@ -0,0 +1,343 @@
 +/* asp_manual.h - the game's instruction manual, read in-game on the TV.
 + *
 + * Hold Select + L1 for a second: the game pauses (sound too) and the manual
@@ -1725,6 +1725,30 @@ index 0000000..3477740
 +static int man_zoom;                    /* 0 = whole page, then x1.5, x2, x3 */
 +static double man_cx, man_cy;           /* view centre, in page pixels */
 +static uint16_t *man_view;              /* composed screen, fb_w x fb_h */
++static uint16_t *man_bg;                /* the paused game, dimmed */
++
++/* Take what is on screen now - the paused game - and dim it to about a third,
++ * so the page sits over it like a booklet held up in front of the TV. Read
++ * once when the manual opens; the framebuffer is slow to read but this is a
++ * single pass. */
++static void man_grab_background(int ox, int oy, int aw, int ah)
++{
++	int x, y;
++	if (man_bg == NULL) man_bg = (uint16_t *)malloc((size_t)aw * ah * 2);
++	if (man_bg == NULL) return;
++	for (y = 0; y < ah; y++) {
++		const unsigned char *row = asp_fb_row(oy + y);
++		uint16_t *o = man_bg + (size_t)y * aw;
++		if (row == NULL || asp_fb_px != 2) { memset(o, 0, (size_t)aw * 2); continue; }
++		{
++			const uint16_t *r = (const uint16_t *)row + ox;
++			for (x = 0; x < aw; x++) {
++				uint16_t p = r[x];
++				o[x] = (uint16_t)(((p >> 2) & 0x39E7) + ((p >> 3) & 0x18E3));
++			}
++		}
++	}
++}
 +
 +static int man_cmp(const void *a, const void *b)
 +{
@@ -1818,7 +1842,8 @@ index 0000000..3477740
 +	if (aw <= 0 || ah <= 0) { ox = oy = 0; aw = asp_fb_w; ah = asp_fb_h; }
 +	if (man_view == NULL) man_view = (uint16_t *)malloc((size_t)aw * ah * 2);
 +	if (man_view == NULL) return;
-+	memset(man_view, 0, (size_t)aw * ah * 2);
++	if (man_bg) memcpy(man_view, man_bg, (size_t)aw * ah * 2);
++	else memset(man_view, 0, (size_t)aw * ah * 2);
 +
 +	if (man_load(man_cur)) {
 +		man_clamp(aw, ah);
@@ -1901,7 +1926,12 @@ index 0000000..3477740
 +	man_cur = last_page_read;
 +	man_zoom = 0;
 +	man_cx = man_cy = 0;
-+	asp_fb_clear();
++	{
++		int aw = asp_fb_w - 2 * asp_inset_x, ah = asp_fb_h - 2 * asp_inset_y;
++		int ox = asp_inset_x, oy = asp_inset_y;
++		if (aw <= 0 || ah <= 0) { ox = oy = 0; aw = asp_fb_w; ah = asp_fb_h; }
++		man_grab_background(ox, oy, aw, ah);
++	}
 +	if (man_script == NULL) man_script = getenv("ASP_MANUAL_SCRIPT");
 +
 +	if (man_load(man_cur)) { man_cx = man_iw / 2.0; man_cy = 0; }
@@ -1983,6 +2013,7 @@ index 0000000..3477740
 +	last_page_read = man_cur;
 +	fprintf(stderr, "asp: manual closed at page %d\n", man_cur + 1);
 +	if (man_img) { stbi_image_free(man_img); man_img = NULL; man_loaded = -1; }
++	free(man_bg); man_bg = NULL;          /* the next opening takes a fresh picture */
 +	/* Hand the screen back: clear it so the margins lose the page, and make
 +	 * the next game frame re-solve its rectangle. */
 +	asp_fb_clear();
