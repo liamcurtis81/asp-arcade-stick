@@ -2858,7 +2858,7 @@ index 0000000..639e467
 +
 +#endif
 diff --git a/dingux-sdl/sdlmain.cpp b/dingux-sdl/sdlmain.cpp
-index 70280c8..02e1b34 100644
+index 70280c8..a546d35 100644
 --- a/dingux-sdl/sdlmain.cpp
 +++ b/dingux-sdl/sdlmain.cpp
 @@ -65,6 +65,7 @@
@@ -2988,7 +2988,19 @@ index 70280c8..02e1b34 100644
  	Settings.Stereo = TRUE;
  	Settings.SoundSync = TRUE;
  	Settings.SoundBufferSize = 256;
-@@ -349,6 +442,9 @@ int main (int argc, char **argv)
+@@ -284,7 +377,10 @@ int main (int argc, char **argv)
+ 	Settings.MultiPlayer5 = FALSE;
+ 	Settings.ControllerOption = SNES_MULTIPLAYER5;
+ 	Settings.ControllerOption = 0;
+-	Settings.Transparency = FALSE; //TRUE;
++	/* ASP: on. Off was a speed choice for 2009 handhelds, and without it
++	 * colour-maths layers (Super Metroid's rain, water, fog, shadows) are
++	 * drawn solid over the picture. The ASP has the headroom. */
++	Settings.Transparency = TRUE;
+ 	Settings.SixteenBit = TRUE;
+ 	Settings.SupportHiRes = FALSE; //autodetected for known highres roms
+ 	Settings.NetPlay = FALSE;
+@@ -349,6 +445,9 @@ int main (int argc, char **argv)
  
  	if (rom_filename)
  	{
@@ -2998,7 +3010,7 @@ index 70280c8..02e1b34 100644
  		if (!Memory.LoadROM (rom_filename))
  		{
  			char dir [_MAX_DIR + 1];
-@@ -600,8 +696,154 @@ void S9xExit()
+@@ -600,8 +699,154 @@ void S9xExit()
  }
  
  Uint16 sfc_key[256];
@@ -3153,7 +3165,7 @@ index 70280c8..02e1b34 100644
  #ifdef CAANOO
  	keyssnes = SDL_JoystickOpen(0);
  #else
-@@ -641,6 +883,7 @@ void S9xInitInputDevices ()
+@@ -641,6 +886,7 @@ void S9xInitInputDevices ()
  	sfc_key[UP_1] = DINGOO_BUTTON_UP;
  	sfc_key[DOWN_1] = DINGOO_BUTTON_DOWN;
  #endif
@@ -3161,7 +3173,7 @@ index 70280c8..02e1b34 100644
  
  	int i = 0;
  	char *envp, *j;
-@@ -691,6 +934,10 @@ const char *S9xGetSnapshotDirectory ()
+@@ -691,6 +937,10 @@ const char *S9xGetSnapshotDirectory ()
  	static char filename [PATH_MAX];
  	const char *snapshot;
  
@@ -3172,7 +3184,7 @@ index 70280c8..02e1b34 100644
  	if (!(snapshot = getenv ("SNES9X_SNAPSHOT_DIR")) &&
  	!(snapshot = getenv ("SNES96_SNAPSHOT_DIR")))
  	{
-@@ -821,8 +1068,264 @@ bool8_32 S9xInitUpdate ()
+@@ -821,8 +1071,264 @@ bool8_32 S9xInitUpdate ()
  	return (TRUE);
  }
  
@@ -3437,7 +3449,7 @@ index 70280c8..02e1b34 100644
  	uint32 spd = (Settings.SupportHiRes ? 256/2 : 0);
  	uint32 dpd = (screen->w - 256) / 2;
  	uint32 dpo = (screen->w - 256)/4 + (screen->h - 224)/2*screen->w/2;
-@@ -880,6 +1383,7 @@ bool8_32 S9xDeinitUpdate (int Width, int Height)
+@@ -880,6 +1386,7 @@ bool8_32 S9xDeinitUpdate (int Width, int Height)
  	SDL_UnlockSurface(screen);
  	SDL_Flip(screen);
  	return(TRUE);
@@ -3445,7 +3457,7 @@ index 70280c8..02e1b34 100644
  }
  
  #ifndef _ZAURUS
-@@ -1089,6 +1593,37 @@ void S9xProcessEvents (bool8_32 block)
+@@ -1089,6 +1596,37 @@ void S9xProcessEvents (bool8_32 block)
  	{
  		switch(event.type)
  		{
@@ -3483,7 +3495,7 @@ index 70280c8..02e1b34 100644
  #ifdef CAANOO
  			// CAANOO -------------------------------------------------------------
  			case SDL_JOYBUTTONDOWN:
-@@ -1116,6 +1651,13 @@ void S9xProcessEvents (bool8_32 block)
+@@ -1116,6 +1654,13 @@ void S9xProcessEvents (bool8_32 block)
  #else
  			//DINGOO ------------------------------------------------------
  			case SDL_KEYDOWN:
@@ -3497,7 +3509,7 @@ index 70280c8..02e1b34 100644
  				keyssnes = SDL_GetKeyState(NULL);
  
  				//QUIT Emulator
-@@ -1188,7 +1730,56 @@ uint32 S9xReadJoypad (int which1)
+@@ -1188,7 +1733,56 @@ uint32 S9xReadJoypad (int which1)
  	if (which1 > 4)
  		return 0;
  

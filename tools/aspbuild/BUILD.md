@@ -3831,3 +3831,10 @@ qemu. `.align 4` added; it would have bitten on the stick sooner or later.
 Testing off the stick: `ASP_CHEATS_AT=<frame>` opens the list once,
 `ASP_CHEATS_SCRIPT` drives it (d/u move, a toggle, n page, q close, x leave
 the picture in the framebuffer and exit).
+
+## 15 Nov - SNES transparency on (sfc p8)
+
+snes9x4d shipped with `Settings.Transparency = FALSE`, a speed choice for
+2009 handhelds. Without it colour-maths layers are drawn solid: Super
+Metroid's Crateria rain covered the whole picture. Switched on; Liam
+confirmed the rain is right on the stick.
