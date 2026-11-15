@@ -222,6 +222,76 @@ index 0000000..f6f0791
 +}
 +
 +#endif /* ASP_CALIB_H */
+diff --git a/dingux-sdl/asp_crt.h b/dingux-sdl/asp_crt.h
+new file mode 100644
+index 0000000..b89c900
+--- /dev/null
++++ b/dingux-sdl/asp_crt.h
+@@ -0,0 +1,64 @@
++/* Scan lines on the fly: hold Select + Up for a second to step through
++ * off -> soft -> strong -> off. The choice is kept per console in
++ * asp_crt.cfg beside the emulator binary and overrides crt= in
++ * asp_screen.cfg from then on.
++ *
++ * Select + Up rather than Select + R because R is already the disc swap in
++ * the PlayStation build, L is the manual and Start is the exit; Up is the
++ * one direction every frontend reads the same way (arrow key from the
++ * stick, hat 0 from a pad on the adaptor).
++ *
++ * Include after asp_fbout.h (for asp_fb_crt) and SDL. */
++#ifndef ASP_CRT_H
++#define ASP_CRT_H
++#include <stdio.h>
++#include <string.h>
++#include <unistd.h>
++
++static char asp_crt_path[600];
++
++static void asp_crt_init(void)
++{
++	FILE *f;
++	int v, n = readlink("/proc/self/exe", asp_crt_path, sizeof(asp_crt_path) - 16);
++	if (n <= 0) { asp_crt_path[0] = 0; return; }
++	asp_crt_path[n] = 0;
++	while (n > 0 && asp_crt_path[n - 1] != '/') n--;
++	strcpy(asp_crt_path + n, "asp_crt.cfg");
++	f = fopen(asp_crt_path, "r");
++	if (f == NULL) return;
++	if (fscanf(f, "%d", &v) == 1 && v >= 0 && v <= 2) {
++		asp_fb_crt = v;
++		fprintf(stderr, "asp: scan lines %d from asp_crt.cfg\n", v);
++	}
++	fclose(f);
++}
++
++static int asp_crt_up(SDL_Joystick *j)
++{
++	Uint8 *ks = SDL_GetKeyState(NULL);
++	if (ks && ks[SDLK_UP]) return 1;
++	return j && SDL_JoystickNumHats(j) > 0 && (SDL_JoystickGetHat(j, 0) & SDL_HAT_UP);
++}
++
++/* Once a frame. sel: the frontend's own reading of Select. */
++static void asp_crt_poll(int sel, SDL_Joystick *j)
++{
++	static Uint32 since;
++	if (sel && asp_crt_up(j)) {
++		if (since == 0) since = SDL_GetTicks() | 2;
++		else if (since != 1 && SDL_GetTicks() - since > 1000) {
++			FILE *f;
++			since = 1;
++			asp_fb_crt = (asp_fb_crt + 1) % 3;
++			fprintf(stderr, "asp: scan lines now %d\n", asp_fb_crt);
++			if (asp_crt_path[0] && (f = fopen(asp_crt_path, "w")) != NULL) {
++				fprintf(f, "%d\n", asp_fb_crt);
++				fclose(f);
++				sync();
++			}
++		}
++	} else
++		since = 0;
++}
++#endif
 diff --git a/dingux-sdl/asp_fbout.h b/dingux-sdl/asp_fbout.h
 new file mode 100644
 index 0000000..a9d12a1
@@ -1435,7 +1505,7 @@ index 0000000..639e467
 +
 +#endif
 diff --git a/dingux-sdl/sdlmain.cpp b/dingux-sdl/sdlmain.cpp
-index 70280c8..9ac3a14 100644
+index 70280c8..80c4e40 100644
 --- a/dingux-sdl/sdlmain.cpp
 +++ b/dingux-sdl/sdlmain.cpp
 @@ -85,6 +85,17 @@ static void sync() { }
@@ -1741,7 +1811,7 @@ index 70280c8..9ac3a14 100644
  	if (!(snapshot = getenv ("SNES9X_SNAPSHOT_DIR")) &&
  	!(snapshot = getenv ("SNES96_SNAPSHOT_DIR")))
  	{
-@@ -821,8 +1067,228 @@ bool8_32 S9xInitUpdate ()
+@@ -821,8 +1067,232 @@ bool8_32 S9xInitUpdate ()
  	return (TRUE);
  }
  
@@ -1785,10 +1855,13 @@ index 70280c8..9ac3a14 100644
 + * halving that SDL upconverts cheaply. */
 +int asp_sound_rate_idx = 6;
 +#include "asp_fbout.h"
++#include "asp_crt.h"
++static void asp_read_screen_cfg_file(void);
++static void asp_read_screen_cfg(void) { asp_read_screen_cfg_file(); asp_crt_init(); }
 +#include "asp_calib.h"
 +#include "asp_geom.h"
 +
-+static void asp_read_screen_cfg(void)
++static void asp_read_screen_cfg_file(void)
 +{
 +	static int done;
 +	char path[512], line[256];
@@ -1913,6 +1986,7 @@ index 70280c8..9ac3a14 100644
 +	static Uint32 since;
 +	static long at = -2;
 +	int held = asp_pad_mode ? ((jb(10) || jb(9)) && jb(6)) : (jb(8) && jb(3));
++	asp_crt_poll(asp_pad_mode ? (jb(10) || jb(9)) : jb(8), asp_pad_mode ? asp_joy : NULL);
 +	asp_frames_read++;
 +	if (at == -2) at = getenv("ASP_MANUAL_AT") ? atol(getenv("ASP_MANUAL_AT")) : -1;
 +	if (at >= 0 && asp_frames_read >= (unsigned long)at && asp_frames_read < (unsigned long)at + 2000) held = 1;
@@ -1970,7 +2044,7 @@ index 70280c8..9ac3a14 100644
  	uint32 spd = (Settings.SupportHiRes ? 256/2 : 0);
  	uint32 dpd = (screen->w - 256) / 2;
  	uint32 dpo = (screen->w - 256)/4 + (screen->h - 224)/2*screen->w/2;
-@@ -880,6 +1346,7 @@ bool8_32 S9xDeinitUpdate (int Width, int Height)
+@@ -880,6 +1350,7 @@ bool8_32 S9xDeinitUpdate (int Width, int Height)
  	SDL_UnlockSurface(screen);
  	SDL_Flip(screen);
  	return(TRUE);
@@ -1978,7 +2052,7 @@ index 70280c8..9ac3a14 100644
  }
  
  #ifndef _ZAURUS
-@@ -1089,6 +1556,37 @@ void S9xProcessEvents (bool8_32 block)
+@@ -1089,6 +1560,37 @@ void S9xProcessEvents (bool8_32 block)
  	{
  		switch(event.type)
  		{
@@ -2016,7 +2090,7 @@ index 70280c8..9ac3a14 100644
  #ifdef CAANOO
  			// CAANOO -------------------------------------------------------------
  			case SDL_JOYBUTTONDOWN:
-@@ -1116,6 +1614,13 @@ void S9xProcessEvents (bool8_32 block)
+@@ -1116,6 +1618,13 @@ void S9xProcessEvents (bool8_32 block)
  #else
  			//DINGOO ------------------------------------------------------
  			case SDL_KEYDOWN:
@@ -2030,7 +2104,7 @@ index 70280c8..9ac3a14 100644
  				keyssnes = SDL_GetKeyState(NULL);
  
  				//QUIT Emulator
-@@ -1188,7 +1693,56 @@ uint32 S9xReadJoypad (int which1)
+@@ -1188,7 +1697,56 @@ uint32 S9xReadJoypad (int which1)
  	if (which1 > 4)
  		return 0;
  

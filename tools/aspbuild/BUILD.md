@@ -3770,3 +3770,27 @@ on the manual in `hack/manuals/<system>/<rom name without extension>/`, pages
 the folder name. Pages: `tools/manuals/mkpages.py` (pdftoppm, longest side
 1400 px, quality 80). picodrive's input layer tracks buttons by events, so
 the viewer pushes release events for everything not held when it closes.
+
+## 15 Nov - scan lines everywhere, arcade move lists (fba_v50)
+
+**Scan lines on the fly.** `asp_crt.h` is shared by all six frontends: hold
+Select + Up for a second to step off -> soft -> strong. The choice is written
+to `asp_crt.cfg` beside the binary and wins over `crt=` in `asp_screen.cfg`.
+Select + Up rather than Select + R because R is the PlayStation disc swap.
+In the arcade build the stick's directions arrive through evdev, not SDL's
+key state, so `inp_pi.cpp` exports `AspUpHeld()` / `AspPollDirs()` for it.
+
+**Move lists.** `tools/movelists/render_moves.py` turns command.dat
+(Procyon's, revised) into 1200x900 JPEG pages using MAME's cmddata.h glyph
+meanings. 36 of the card's fbax games have entries (the Neo Geo page stays on
+the stock emulator, so its games are left out). Pages go in
+`hack/manuals/arcade/<romset>/` and open with Select + upper grey (pad:
+Select or minus + L), in the same viewer the consoles use. The present
+thread is stopped while the viewer owns the screen and restarted after.
+
+**Rebuilding FBNeo from this repo** needs `make -f makefile.aspdisp`, never
+`makefile.asp` directly: the dispatcher supplies `LSB_FIRST=1` and `PERL=1`.
+A build without `LSB_FIRST` failed in `epx.cpp` here; had it linked, every
+driver would have been byte-swapped. Patch 0028 also brings `asp_calib.h`
+and `asp_geom.h` into the tree, so `ASPHDRS` can point at
+`src/intf/video/asp`.

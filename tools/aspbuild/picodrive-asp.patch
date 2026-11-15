@@ -222,6 +222,76 @@ index 00000000..f6f07915
 +}
 +
 +#endif /* ASP_CALIB_H */
+diff --git a/platform/common/asp_crt.h b/platform/common/asp_crt.h
+new file mode 100644
+index 00000000..b89c9000
+--- /dev/null
++++ b/platform/common/asp_crt.h
+@@ -0,0 +1,64 @@
++/* Scan lines on the fly: hold Select + Up for a second to step through
++ * off -> soft -> strong -> off. The choice is kept per console in
++ * asp_crt.cfg beside the emulator binary and overrides crt= in
++ * asp_screen.cfg from then on.
++ *
++ * Select + Up rather than Select + R because R is already the disc swap in
++ * the PlayStation build, L is the manual and Start is the exit; Up is the
++ * one direction every frontend reads the same way (arrow key from the
++ * stick, hat 0 from a pad on the adaptor).
++ *
++ * Include after asp_fbout.h (for asp_fb_crt) and SDL. */
++#ifndef ASP_CRT_H
++#define ASP_CRT_H
++#include <stdio.h>
++#include <string.h>
++#include <unistd.h>
++
++static char asp_crt_path[600];
++
++static void asp_crt_init(void)
++{
++	FILE *f;
++	int v, n = readlink("/proc/self/exe", asp_crt_path, sizeof(asp_crt_path) - 16);
++	if (n <= 0) { asp_crt_path[0] = 0; return; }
++	asp_crt_path[n] = 0;
++	while (n > 0 && asp_crt_path[n - 1] != '/') n--;
++	strcpy(asp_crt_path + n, "asp_crt.cfg");
++	f = fopen(asp_crt_path, "r");
++	if (f == NULL) return;
++	if (fscanf(f, "%d", &v) == 1 && v >= 0 && v <= 2) {
++		asp_fb_crt = v;
++		fprintf(stderr, "asp: scan lines %d from asp_crt.cfg\n", v);
++	}
++	fclose(f);
++}
++
++static int asp_crt_up(SDL_Joystick *j)
++{
++	Uint8 *ks = SDL_GetKeyState(NULL);
++	if (ks && ks[SDLK_UP]) return 1;
++	return j && SDL_JoystickNumHats(j) > 0 && (SDL_JoystickGetHat(j, 0) & SDL_HAT_UP);
++}
++
++/* Once a frame. sel: the frontend's own reading of Select. */
++static void asp_crt_poll(int sel, SDL_Joystick *j)
++{
++	static Uint32 since;
++	if (sel && asp_crt_up(j)) {
++		if (since == 0) since = SDL_GetTicks() | 2;
++		else if (since != 1 && SDL_GetTicks() - since > 1000) {
++			FILE *f;
++			since = 1;
++			asp_fb_crt = (asp_fb_crt + 1) % 3;
++			fprintf(stderr, "asp: scan lines now %d\n", asp_fb_crt);
++			if (asp_crt_path[0] && (f = fopen(asp_crt_path, "w")) != NULL) {
++				fprintf(f, "%d\n", asp_fb_crt);
++				fclose(f);
++				sync();
++			}
++		}
++	} else
++		since = 0;
++}
++#endif
 diff --git a/platform/common/asp_fbout.h b/platform/common/asp_fbout.h
 new file mode 100644
 index 00000000..a9d12a15
@@ -1985,7 +2055,7 @@ index 8e6987e4..ee1e3d50 100644
 +	return 0;
 +}
 diff --git a/platform/common/plat_sdl.c b/platform/common/plat_sdl.c
-index 4f8249f6..dd3caf40 100644
+index 4f8249f6..251dee2a 100644
 --- a/platform/common/plat_sdl.c
 +++ b/platform/common/plat_sdl.c
 @@ -1,3 +1,4 @@
@@ -1993,7 +2063,7 @@ index 4f8249f6..dd3caf40 100644
  /*
   * PicoDrive
   * (C) notaz, 2013
-@@ -176,6 +177,308 @@ void rgb565_to_uyvy(void *d, const void *s, int w, int h, int pitch, int dpitch,
+@@ -176,6 +177,312 @@ void rgb565_to_uyvy(void *d, const void *s, int w, int h, int pitch, int dpitch,
  	}
  }
  
@@ -2029,6 +2099,9 @@ index 4f8249f6..dd3caf40 100644
 +static int asp_panel_w = 16, asp_panel_h = 9;
 +static void asp_read_screen_cfg(void);
 +#include "asp_fbout.h"
++#include "asp_crt.h"
++static void asp_read_screen_cfg_file(void);
++static void asp_read_screen_cfg(void) { asp_read_screen_cfg_file(); asp_crt_init(); }
 +#include "asp_calib.h"
 +#include "asp_geom.h"
 +
@@ -2117,11 +2190,12 @@ index 4f8249f6..dd3caf40 100644
 +	static long at = -2;
 +	static unsigned long frames;
 +	int held;
-+	if (man_pages == 0) return;
 +	if (joy == NULL && SDL_NumJoysticks() > 0) {
 +		joy = SDL_JoystickOpen(0);
 +		pad_mode = joy && SDL_JoystickNumButtons(joy) == 16;
 +	}
++	asp_crt_poll(pad_mode ? (jb(10) || jb(9)) : jb(8), pad_mode ? joy : NULL);
++	if (man_pages == 0) return;
 +	held = pad_mode ? ((jb(10) || jb(9)) && jb(6)) : (jb(8) && jb(3));
 +	frames++;
 +	if (at == -2) at = getenv("ASP_MANUAL_AT") ? atol(getenv("ASP_MANUAL_AT")) : -1;
@@ -2138,7 +2212,7 @@ index 4f8249f6..dd3caf40 100644
 +		since = 0;
 +}
 +
-+static void asp_read_screen_cfg(void)
++static void asp_read_screen_cfg_file(void)
 +{
 +	char path[512], line[256];
 +	FILE *f;
@@ -2302,7 +2376,7 @@ index 4f8249f6..dd3caf40 100644
  void copy_intscale(void *dst, int w, int h, int pp, void *src, int sw, int sh, int spp)
  {
  	int xf = w / sw, yf = h / sh, f = xf < yf ? xf : yf;
-@@ -226,6 +529,19 @@ void plat_video_set_size(int w, int h)
+@@ -226,6 +533,19 @@ void plat_video_set_size(int w, int h)
  	if (area.w != w || area.h != h) {
  		area = (struct area) { w, h };
  
@@ -2322,7 +2396,7 @@ index 4f8249f6..dd3caf40 100644
  		if (plat_sdl_overlay || plat_sdl_gl_active || !plat_sdl_is_windowed()) {
  			// create surface for overlays, or try using a hw scaler
  			if (plat_sdl_change_video_mode(w, h, 0) < 0) {
-@@ -288,12 +604,70 @@ void plat_video_flip(void)
+@@ -288,12 +608,70 @@ void plat_video_flip(void)
  	else {
  		int copy = g_screen_ptr != plat_sdl_screen->pixels;
  		if (copy)
@@ -2393,7 +2467,7 @@ index 4f8249f6..dd3caf40 100644
  		SDL_Flip(plat_sdl_screen);
  
  		// take over resized settings for the physical SDL surface
-@@ -355,6 +729,13 @@ void plat_video_clear_buffers(void)
+@@ -355,6 +733,13 @@ void plat_video_clear_buffers(void)
  	if (plat_sdl_overlay)
  		plat_sdl_overlay_clear();
  	memset(plat_sdl_screen->pixels, 0, plat_sdl_screen->pitch*plat_sdl_screen->h);
@@ -2407,7 +2481,7 @@ index 4f8249f6..dd3caf40 100644
  	clear_buf_cnt = 3; // do it thrice in case of triple buffering
  }
  
-@@ -375,8 +756,17 @@ void plat_video_menu_update(void)
+@@ -375,8 +760,17 @@ void plat_video_menu_update(void)
  	// update pitch as it is needed by the menu bg scaler
  	if (plat_sdl_overlay || plat_sdl_gl_active)
  		g_menuscreen_pp = g_menuscreen_w;
@@ -2425,7 +2499,7 @@ index 4f8249f6..dd3caf40 100644
  
  	resize_buffers();
  }
-@@ -391,6 +781,18 @@ void plat_video_menu_begin(void)
+@@ -391,6 +785,18 @@ void plat_video_menu_begin(void)
  {
  	plat_video_menu_update(); // just in case
  
@@ -2444,7 +2518,7 @@ index 4f8249f6..dd3caf40 100644
  	if (plat_sdl_overlay || plat_sdl_gl_active)
  		g_menuscreen_ptr = shadow_fb;
  	else {
-@@ -419,6 +821,20 @@ void plat_video_menu_end(void)
+@@ -419,6 +825,20 @@ void plat_video_menu_end(void)
  	else if (plat_sdl_gl_active) {
  		gl_flip(g_menuscreen_ptr, g_menuscreen_pp, g_menuscreen_h);
  	}
@@ -2465,7 +2539,7 @@ index 4f8249f6..dd3caf40 100644
  	else {
  		if (SDL_MUSTLOCK(plat_sdl_screen))
  			SDL_UnlockSurface(plat_sdl_screen);
-@@ -437,8 +853,18 @@ void plat_video_loop_prepare(void)
+@@ -437,8 +857,18 @@ void plat_video_loop_prepare(void)
  
  	// take over any new vout settings
  	area = (struct area) { 0, 0 };
@@ -2484,7 +2558,7 @@ index 4f8249f6..dd3caf40 100644
  
  	// switch over to scaled output if available, but keep the aspect ratio
  	if (plat_sdl_overlay || plat_sdl_gl_active)
-@@ -560,7 +986,27 @@ void plat_init(void)
+@@ -560,7 +990,27 @@ void plat_init(void)
  	in_sdl_platform_data.jmap_size = in_sdl_joy_map_sz,
  	in_sdl_platform_data.joy_map = in_sdl_joy_map,
  	in_sdl_platform_data.key_names = in_sdl_key_names,
