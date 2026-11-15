@@ -1,0 +1,61 @@
+From 48cb49bd43e315aec0a19757ea325d2ff1316ed0 Mon Sep 17 00:00:00 2001
+From: Liam Curtis <liamcurtis81@users.noreply.github.com>
+Date: Sun, 15 Nov 2026 18:20:18 +0000
+Subject: ASP: read the pad's hat live in the list viewers (fba_v53)
+
+AspPollDirs used asp_hat_down, which only scanJoysticks refreshes, and that
+does not run while the cheat or move list is open. Opening the cheat list
+with Select + Down on a pad froze Down as held, so the cursor ran to the
+bottom and would not come back.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/intf/input/pi/inp_pi.cpp | 27 +++++++++++++++++++--------
+ 1 file changed, 19 insertions(+), 8 deletions(-)
+
+diff --git a/src/intf/input/pi/inp_pi.cpp b/src/intf/input/pi/inp_pi.cpp
+index ee8fe7543..99ad1e30e 100644
+--- a/src/intf/input/pi/inp_pi.cpp
++++ b/src/intf/input/pi/inp_pi.cpp
+@@ -113,14 +113,6 @@ int AspUpHeld() { return asp_dir_down[0] || asp_hat_down[0]; }
+ // For the move-list viewer, which runs its own loop between frames: pump the
+ // stick's evdev nodes and report all four directions.
+ static void asp_evdev_poll(void);
+-void AspPollDirs(int *l, int *r, int *u, int *d)
+-{
+-	asp_evdev_poll();
+-	*u = asp_dir_down[0] || asp_hat_down[0];
+-	*d = asp_dir_down[1] || asp_hat_down[1];
+-	*l = asp_dir_down[2] || asp_hat_down[2];
+-	*r = asp_dir_down[3] || asp_hat_down[3];
+-}
+ extern int asp_manual_wanted;
+ extern int asp_cheats_wanted;
+ 
+@@ -1105,3 +1097,22 @@ static INT32 piInputJoyAxis(INT32, INT32) { return 0; }
+ static INT32 piInputMouseAxis(INT32, INT32) { return 0; }
+ 
+ struct InputInOut InputInOutSDL = { piInputInit, piInputExit, NULL, piInputStart, piInputState, piInputJoyAxis, piInputMouseAxis, NULL, NULL, NULL, _T("Raspberry Pi input") };
++
++#ifdef BUILD_ASP
++// For the move-list and cheat lists, which run their own loop between frames:
++// pump the stick's evdev nodes and read the pad's hat live. asp_hat_down is
++// only refreshed by scanJoysticks, which does not run while a list is open,
++// so using it here froze whatever the hat held when the list opened - Select
++// + Down on a pad left Down held, and the cheat list ran to the bottom.
++void AspPollDirs(int *l, int *r, int *u, int *d)
++{
++	Uint8 hat = 0;
++	asp_evdev_poll();
++	if (asp_pad_mode && nJoystickCount > 0 && JoyList[0] && SDL_JoystickNumHats(JoyList[0]) > 0)
++		hat = SDL_JoystickGetHat(JoyList[0], 0);
++	*u = asp_dir_down[0] || (hat & SDL_HAT_UP);
++	*d = asp_dir_down[1] || (hat & SDL_HAT_DOWN);
++	*l = asp_dir_down[2] || (hat & SDL_HAT_LEFT);
++	*r = asp_dir_down[3] || (hat & SDL_HAT_RIGHT);
++}
++#endif
+-- 
+2.43.0
+
