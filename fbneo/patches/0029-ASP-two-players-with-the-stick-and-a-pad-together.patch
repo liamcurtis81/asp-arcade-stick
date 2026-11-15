@@ -1,0 +1,176 @@
+From 5d30b75e2699a24f8f24a2151e32e0c16c0e3174 Mon Sep 17 00:00:00 2001
+From: Liam Curtis <liamcurtis81@users.noreply.github.com>
+Date: Sun, 15 Nov 2026 17:43:31 +0000
+Subject: ASP: two players with the stick and a pad together (fba_v51)
+
+With a pad on the adaptor SDL only sees the pad, but the stick's buttons
+still arrive on its evdev node alongside the lever (BTN 304-311, 314, 315,
+278, 279). Both are read; the pad's port decides who is who: the 1P port
+(usb-aotg_hub.0-1.1) makes the pad player 1 and the stick player 2, any
+other port the reverse. Each player takes the joyconfig map for its own
+device (pad_*.jc or the stick's). The stick's Options still exits.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/intf/input/pi/inp_pi.cpp | 104 +++++++++++++++++++++++++++++------
+ 1 file changed, 87 insertions(+), 17 deletions(-)
+
+diff --git a/src/intf/input/pi/inp_pi.cpp b/src/intf/input/pi/inp_pi.cpp
+index c05e76b39..2c838c9d4 100644
+--- a/src/intf/input/pi/inp_pi.cpp
++++ b/src/intf/input/pi/inp_pi.cpp
+@@ -82,6 +82,12 @@ static int handleFreeplayHack(int player, int code);
+ static int asp_kbd_fd[ASP_MAX_KBD];
+ static int asp_kbd_count = -1;			// -1 = not yet opened
+ static unsigned char asp_dir_down[4];	// up, down, left, right
++// Two players: the stick's buttons from the same evdev node as its lever
++// (BTN 304-311 = buttons 0-7, 314 Select 8, 315 Start 9, 278 Options 10,
++// 279 Turbo 11, the numbers SDL gives the stick on its own).
++static unsigned asp_stk_btn;
++static int asp_two = 0;					// stick and pad both playing
++static int asp_pad_p1 = 0;				// the pad is in the 1P port
+ 
+ // ASP: a pad on the Mayflash Magic-S Pro 2 adaptor (8BitDo SFC30 or M30).
+ // The adaptor appears as SDL joystick 0, "JJ", with 16 buttons and a hat,
+@@ -342,6 +348,16 @@ static void asp_evdev_poll(void)
+ 		while ((n = read(asp_kbd_fd[i], &ev, sizeof(ev))) == (ssize_t)sizeof(ev)) {
+ 			if (ev.type != EV_KEY) continue;
+ 			asp_trace_event(&ev, asp_kbd_num[i]);
++			int bit = -1;
++			if (ev.code >= 304 && ev.code <= 311) bit = ev.code - 304;
++			else if (ev.code == 314) bit = 8;
++			else if (ev.code == 315) bit = 9;
++			else if (ev.code == 278) bit = 10;
++			else if (ev.code == 279) bit = 11;
++			if (bit >= 0 && ev.value != 2) {
++				if (ev.value) asp_stk_btn |= 1u << bit; else asp_stk_btn &= ~(1u << bit);
++				continue;
++			}
+ 			int d = asp_dir_index(ev.code);
+ 			if (d < 0) continue;
+ 			// value 1 = pressed, 2 = autorepeat, 0 = released
+@@ -486,6 +502,27 @@ static int piInputStart()
+ #ifdef BUILD_ASP
+ 	asp_evdev_poll();					// the stick's four directions
+ 	asp_probe_poll();					// controller probe, log only
++	if (asp_two) {
++		// Player slots: joystick state 0 is player 1, 1 is player 2. The pad's
++		// state was read into slot 0 by scanJoysticks; its d-pad is the hat.
++		unsigned ps = joyButtonStates[0] & ~0xfu, ss;
++		if (asp_hat_down[2]) ps |= 1u << 0;		// left
++		if (asp_hat_down[3]) ps |= 1u << 1;		// right
++		if (asp_hat_down[0]) ps |= 1u << 2;		// up
++		if (asp_hat_down[1]) ps |= 1u << 3;		// down
++		ss = (asp_stk_btn & 0xfff) << 4;
++		if (asp_dir_down[2]) ss |= 1u << 0;
++		if (asp_dir_down[3]) ss |= 1u << 1;
++		if (asp_dir_down[0]) ss |= 1u << 2;
++		if (asp_dir_down[1]) ss |= 1u << 3;
++		joyButtonStates[0] = asp_pad_p1 ? ps : ss;
++		joyButtonStates[1] = asp_pad_p1 ? ss : ps;
++		if (asp_stk_btn & (1u << 10)) {			// the stick's Options
++			fprintf(stderr, "asp: stick Options, exiting\n");
++			nExitEmulator = 1;
++		}
++		if (ss || ps) inputEventOccurred = 1;
++	}
+ #endif
+ 
+ 	struct timeval now;
+@@ -546,7 +583,7 @@ static int piInputState(int nCode)
+ 	// The stick's directions come from evdev, not from SDL. Checked before
+ 	// the keyboard table because keyLookupTable holds -1 for anything SDL
+ 	// never mapped, and KEY_IS_DOWN(-1) reads off the front of the array.
+-	switch (nCode) {
++	if (!asp_two) switch (nCode) {
+ 	case FBK_UPARROW:    if (asp_dir_down[0] || asp_hat_down[0]) return 1; break;
+ 	case FBK_DOWNARROW:  if (asp_dir_down[1] || asp_hat_down[1]) return 1; break;
+ 	case FBK_LEFTARROW:  if (asp_dir_down[2] || asp_hat_down[2]) return 1; break;
+@@ -961,34 +998,67 @@ static void resetJoystickMap()
+ 	int sixButton = usesStreetFighterLayout();
+ 
+ 	int loadConfig = 0;
++	char padPath[512] = "", stkPath[512] = "";
++	int havePad = 0, haveStk = 0;
+ #ifdef BUILD_ASP
+ 	asp_pad_mode = (nJoystickCount > 0 && JoyList[0] && SDL_JoystickNumButtons(JoyList[0]) == 16);
+ 	memset(asp_hat_down, 0, sizeof(asp_hat_down));
++	asp_two = 0;
+ 	if (asp_pad_mode) {
+ 		char pn[96], pp[96];
+ 		snprintf(pn, sizeof pn, "pad_%s", BurnDrvGetText(DRV_NAME));
+ 		snprintf(pp, sizeof pp, "pad_%s", BurnDrvGetText(DRV_PARENT) ? BurnDrvGetText(DRV_PARENT) : "");
+-		loadConfig = configExists(path, sizeof(path), pn)
+-			|| (BurnDrvGetText(DRV_PARENT) && configExists(path, sizeof(path), pp))
+-			|| (sixButton && configExists(path, sizeof(path), "pad_capcom6"))
+-			|| configExists(path, sizeof(path), "pad_default");
+-		fprintf(stderr, "asp: pad on the adaptor is player 1 (\"%s\", 16 buttons): %s\n",
+-			SDL_JoystickName(0), loadConfig ? path : "no pad_*.jc found, using the stick's maps");
+-	}
+-	if (!loadConfig)
++		havePad = configExists(padPath, sizeof(padPath), pn)
++			|| (BurnDrvGetText(DRV_PARENT) && configExists(padPath, sizeof(padPath), pp))
++			|| (sixButton && configExists(padPath, sizeof(padPath), "pad_capcom6"))
++			|| configExists(padPath, sizeof(padPath), "pad_default");
++
++		// The stick is still readable as its own evdev node (the one with
++		// arrows): that makes two players. Which is which follows the pad's
++		// port: the 1P port shows as usb-aotg_hub.0-1.1.
++		if (asp_kbd_count > 0) {
++			asp_two = 1;
++			asp_pad_p1 = 0;
++			DIR *dd = opendir("/dev/input");
++			struct dirent *de;
++			while (dd && (de = readdir(dd)) != NULL) {
++				if (strncmp(de->d_name, "event", 5)) continue;
++				char dp[280], nm[128] = "", ph[128] = "";
++				snprintf(dp, sizeof dp, "/dev/input/%s", de->d_name);
++				int fd = open(dp, O_RDONLY | O_NONBLOCK);
++				if (fd < 0) continue;
++				ioctl(fd, EVIOCGNAME(sizeof(nm) - 1), nm);
++				ioctl(fd, EVIOCGPHYS(sizeof(ph) - 1), ph);
++				close(fd);
++				if (!strcmp(nm, SDL_JoystickName(0))) {
++					asp_pad_p1 = strstr(ph, "-1.1/") != NULL;
++					fprintf(stderr, "asp: pad \"%s\" on %s: %s port\n", nm, ph, asp_pad_p1 ? "1P" : "2P");
++				}
++			}
++			if (dd) closedir(dd);
++		}
++		fprintf(stderr, "asp: pad on the adaptor (\"%s\", 16 buttons): %s; %s\n",
++			SDL_JoystickName(0), havePad ? padPath : "no pad_*.jc found, using the stick's maps",
++			asp_two ? (asp_pad_p1 ? "pad player 1, stick player 2" : "stick player 1, pad player 2")
++			        : "pad player 1");
++	}
+ #endif
+-	loadConfig = configExists(path, sizeof(path), BurnDrvGetText(DRV_NAME))
+-		|| configExists(path, sizeof(path), BurnDrvGetText(DRV_PARENT))
+-		|| (sixButton && configExists(path, sizeof(path), "capcom6"))
+-		|| configExists(path, sizeof(path), "default");
++	haveStk = configExists(stkPath, sizeof(stkPath), BurnDrvGetText(DRV_NAME))
++		|| configExists(stkPath, sizeof(stkPath), BurnDrvGetText(DRV_PARENT))
++		|| (sixButton && configExists(stkPath, sizeof(stkPath), "capcom6"))
++		|| configExists(stkPath, sizeof(stkPath), "default");
+ 
+-	if (loadConfig)
+-		printf("Found joyconfig file in path '%s'\n", path);
++	if (havePad || haveStk)
++		printf("Found joyconfig files: pad '%s' stick '%s'\n", padPath, stkPath);
++	loadConfig = havePad || haveStk;
+ 
+ 	for (int i = 0; i < 4; i++) {
++		// which device plays as player i, and so which map it takes
++		int padHere = asp_pad_mode && (asp_two ? (i == (asp_pad_p1 ? 0 : 1)) : 1);
++		const char *cfg = (padHere && havePad) ? padPath : (haveStk ? stkPath : NULL);
+ 		setupDefaults(i);
+-		if (loadConfig)
+-			readConfigFile(i, path, sixButton);
++		if (cfg)
++			readConfigFile(i, cfg, sixButton);
+ 	}
+ 
+ #ifdef BUILD_ASP
+-- 
+2.43.0
+

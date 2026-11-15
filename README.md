@@ -285,6 +285,16 @@ adaptor to go back to the stick.
 
 ---
 
+### Two players
+
+Plug a pad into either port with the stick connected and both play. The
+pad's port decides: in the **1P port** the pad is player 1 and the stick
+player 2; in the **2P port** the stick is player 1 and the pad player 2.
+Works on the arcade pages, PlayStation, SNES, NES and Mega Drive (GBA is
+one player; the Neo Geo page uses the launcher's own emulator).
+
+---
+
 ## Logs and troubleshooting
 
 Each emulator writes a log next to its binary: `psx_log.txt`, `sfc_log.txt`,
@@ -404,8 +414,6 @@ colour.
 - **Dreamcast, N64, PS2 and later** are out of reach: the stick has no
   graphics chip these builds can use, and its processor is far too slow to
   emulate them in software.
-- **Player 2 on the consoles** with a pad and the stick together is not
-  finished.
 - The launcher has **ten pages**, so adding a new page means merging two.
 
 ---
