@@ -3794,3 +3794,40 @@ A build without `LSB_FIRST` failed in `epx.cpp` here; had it linked, every
 driver would have been byte-swapped. Patch 0028 also brings `asp_calib.h`
 and `asp_geom.h` into the tree, so `ASPHDRS` can point at
 `src/intf/video/asp`.
+
+## 15 Nov - cheats on the consoles (psx p16, gba p6, sfc p7, fc p7, md p8)
+
+`asp_cheats.h`, shared like the manual viewer: hold Select + Down for a
+second for a scrolling list of the game's cheats over the dimmed picture;
+A (stick: blue) switches one, B / Start goes back, L / R page. Lists are
+RetroArch `.cht` files from libretro-database, matched to the card's games by
+`tools/manuals/match_cht.py` (634 of 675 games) and copied to
+`hack/cheats/<sys>/<game>.cht`; switched-on state is written back to the
+same file and re-applied on the next start. Codes containing `?` (player
+fills in a value) are shown greyed out.
+
+How each core takes them:
+
+- PlayStation, GBA: `retro_cheat_reset` + `retro_cheat_set`, renumbered from 0
+  so the core only holds switched-on cheats (gpSP: 20 at most, Code Breaker
+  format, so the matcher prefers Code Breaker lists; PSX prefers GameShark).
+- SNES: Game Genie / PAR decoded with snes9x's own converters, `S9xAddCheat`
+  saving the replaced byte, all re-added on every change.
+- NES: FCEUX `FCEUI_DecodeGG` or raw `AAAA:VV` / `AAAA?CC:VV`, added as
+  substitute cheats; FCEUX also keeps its own copy, which the first apply
+  clears.
+- Mega Drive: PicoDrive's patch list, built from a temp `.pat` holding only
+  switched-on parts, because `PicoPatchApply` writes the old value back for
+  every inactive RAM patch each frame. ROM patches are undone by hand, odd
+  addresses dropped (16-bit write), and `PicoPatchApply` runs every frame so
+  RAM codes hold.
+
+**PicoDrive latent bug fixed on the way:** `filter:` in `pico/sound/mix_arm.S`
+sits in `.data` with no `.align` and is read with `ldmia`. Any change to the
+size of the program's other data can leave it unaligned, and the sound mixer
+then dies with SIGBUS. Adding the cheat code's font did exactly that under
+qemu. `.align 4` added; it would have bitten on the stick sooner or later.
+
+Testing off the stick: `ASP_CHEATS_AT=<frame>` opens the list once,
+`ASP_CHEATS_SCRIPT` drives it (d/u move, a toggle, n page, q close, x leave
+the picture in the framebuffer and exit).
