@@ -17,7 +17,7 @@ What you get on the stick:
 - **Scan lines** you can switch on and off while playing.
 - **External pads** (8BitDo SFC30 / M30 on a Mayflash Magic-S Pro 2 adaptor)
   taking over player 1 from the stick.
-- **Cheats** for about 630 console games, switched on and off from an in-game list.
+- **Cheats** for about 650 console games and 250 arcade games, switched on and off from an in-game list.
 - A **play-time log** per game.
 
 No ROMs, BIOS files, game manuals or box art are included, and none will be.
@@ -188,7 +188,7 @@ side        Select   Start    Options        Turbo
 | Quit to the launcher | **Options** | hold **Select + Start** for a second (Mega Drive: **−** opens PicoDrive's menu, choose Exit) |
 | Open the manual or move list | hold **Select + upper grey** for a second | hold **Select + L** (M30: **−** + Z) |
 | Scan lines off / soft / strong | hold **Select + Up** for a second | hold **Select + Up** (M30: **−** + Up) |
-| Cheats (consoles) | hold **Select + Down** for a second | hold **Select + Down** (M30: **−** + Down) |
+| Cheats | hold **Select + Down** for a second | hold **Select + Down** (M30: **−** + Down) |
 | Next PlayStation disc | hold **Select + lower grey** for a second | hold **Select + R** (M30: **−** + C) |
 
 Inside the manual viewer:

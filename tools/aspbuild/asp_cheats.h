@@ -23,7 +23,9 @@
 #include "asp_font.h"
 
 #define CHT_MAX 1200
-struct asp_cheat { char *desc, *code; int on; };
+/* nopt > 2: a cheat with several settings (FinalBurn Neo's lists), stepped
+ * through with A; opt 0 is off. */
+struct asp_cheat { char *desc, *code; int on; int nopt, opt; char **optname; };
 static struct asp_cheat cht[CHT_MAX];
 static int cht_n;
 static char cht_path[760];
@@ -71,6 +73,7 @@ static void cheats_find(const char *content)
 		if (!strcmp(key, "desc"))        { free(cht[i].desc); cht[i].desc = strdup(p); }
 		else if (!strcmp(key, "code"))   { free(cht[i].code); cht[i].code = strdup(p); }
 		else if (!strcmp(key, "enable")) cht[i].on = !strncmp(p, "true", 4);
+		else if (!strcmp(key, "option")) cht[i].opt = atoi(p);
 	}
 	fclose(f);
 	fprintf(stderr, "asp: %d cheats (%s)\n", cht_n, cht_path);
@@ -82,10 +85,13 @@ static void cheats_save(void)
 	int i;
 	if (!cht_path[0] || (f = fopen(cht_path, "w")) == NULL) return;
 	fprintf(f, "cheats = %d\n\n", cht_n);
-	for (i = 0; i < cht_n; i++)
-		fprintf(f, "cheat%d_desc = \"%s\"\ncheat%d_code = \"%s\"\ncheat%d_enable = %s\n\n",
+	for (i = 0; i < cht_n; i++) {
+		fprintf(f, "cheat%d_desc = \"%s\"\ncheat%d_code = \"%s\"\ncheat%d_enable = %s\n",
 			i, cht[i].desc ? cht[i].desc : "", i, cht[i].code ? cht[i].code : "",
 			i, cht[i].on ? "true" : "false");
+		if (cht[i].nopt > 2) fprintf(f, "cheat%d_option = %d\n", i, cht[i].opt);
+		fputc('\n', f);
+	}
 	fclose(f);
 	sync();
 }
@@ -184,8 +190,15 @@ static void cheats_draw(int sel, int top, int rows, int nused)
 		cht_fill(man_view, aw, ah, bx, by, (int)(bs * kx), bs, usable ? 0x9CF3 : 0x4A69);
 		cht_fill(man_view, aw, ah, bx + 2, by + 2, (int)(bs * kx) - 4, bs - 4,
 			cht[i].on ? 0xFD20 : 0x18E3);
-		cht_text(man_view, aw, ah, bx + (int)(bs * kx) + 16, y, d, col, kx,
-			aw - 2 * margin - (int)(bs * kx) - 30);
+		{
+			char lbl[300];
+			if (cht[i].nopt > 2 && cht[i].optname && cht[i].optname[cht[i].opt])
+				snprintf(lbl, sizeof(lbl), "%s:  %s", d, cht[i].opt ? cht[i].optname[cht[i].opt] : "Off");
+			else
+				snprintf(lbl, sizeof(lbl), "%s", d);
+			cht_text(man_view, aw, ah, bx + (int)(bs * kx) + 16, y, lbl, col, kx,
+				aw - 2 * margin - (int)(bs * kx) - 30);
+		}
 		y += CHT_ROW;
 	}
 	if (cht_n > rows) {                  /* where you are in the list */
@@ -260,6 +273,9 @@ static void cheats_show(void)
 		if (pad_mode && joy && SDL_JoystickNumHats(joy) > 0) hat = SDL_JoystickGetHat(joy, 0);
 		up   = ks[SDLK_UP]   || (hat & SDL_HAT_UP);
 		down = ks[SDLK_DOWN] || (hat & SDL_HAT_DOWN);
+#ifdef ASP_MAN_DIRS
+		{ int l_ = 0, r_ = 0; ASP_MAN_DIRS(&l_, &r_, &up, &down); }
+#endif
 		man_buttons(&l1, &r1, &zin, &zout, &start, &sel_b);
 		{	/* ASP_CHEATS_SCRIPT: d down, u up, a toggle, n page, q close, x leave as is */
 			static const char *sc; static int st;
@@ -296,7 +312,11 @@ static void cheats_show(void)
 		if (man_pressed(l1, &p_l)) { sel -= rows; if (sel < 0) sel = 0; moved = 1; }
 		if (man_pressed(r1, &p_r)) { sel += rows; if (sel > cht_n - 1) sel = cht_n - 1; moved = 1; }
 		if (man_pressed(zin, &p_in) && cht_usable(sel)) {
-			cht[sel].on = !cht[sel].on;
+			if (cht[sel].nopt > 2) {
+				cht[sel].opt = (cht[sel].opt + 1) % cht[sel].nopt;
+				cht[sel].on = cht[sel].opt > 0;
+			} else
+				cht[sel].on = !cht[sel].on;
 			nused = cheats_apply();
 			changed = 1; redraw = 1;
 		}

@@ -3862,3 +3862,14 @@ stick's evdev node already read for the lever also carries its buttons;
 joystick state slot 0 is player 1 and slot 1 player 2 (P2 inputs are bound
 to 0x40xx codes by gami.cpp), filled from pad and stick by port. Each
 player gets its own device's joyconfig map.
+
+## 15 Nov - arcade cheats (fba_v52, patch 0030)
+
+FinalBurn Neo's cheat engine was already built in and applied every frame;
+it only needed a path (szAppCheatsPath -> hack/cheats/arcade/, set from
+/proc/self/exe before ConfigCheatLoad) and the menu. The list reuses
+asp_cheats.h, extended for cheats with several settings (nopt/opt, A steps
+through them). Data: finalburnneo/FBNeo-cheats .ini files for 195 of the
+258 fbax games plus 7 parents, and the 54 others' entries cut out of
+cheat.dat into a 93 KB cheat.dat so start-up stays fast. Saved state:
+<romset>.on.
