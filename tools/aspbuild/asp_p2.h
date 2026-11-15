@@ -13,8 +13,11 @@
  *   278                      10 Options
  *   279                      11 Turbo
  *
- * The stick is player 1 and the pad player 2. The pad's USB path is logged
- * so the two physical ports can be told apart later.
+ * Which player the pad is follows the port it is in. The arcade build's
+ * input log, taken with the adaptor in the 1P port, shows its USB path as
+ * "usb-aotg_hub.0-1.1": that port makes the pad player 1 and the stick
+ * player 2. Any other port (the 2P port) makes the stick player 1 and the
+ * pad player 2.
  *
  * Include after SDL and stdio. */
 #ifndef ASP_P2_H
@@ -29,6 +32,7 @@
 static int asp_stk_fd = -1;
 static unsigned asp_stk_btn;            /* bit n: stick button n held */
 static unsigned asp_stk_dir;            /* 1 up, 2 down, 4 left, 8 right */
+static int asp_pad_p1;                  /* 1: the pad is in the 1P port */
 
 #define ASP_STK_UP    1
 #define ASP_STK_DOWN  2
@@ -54,17 +58,22 @@ static int asp_p2_init(SDL_Joystick *pad)
 		if (fd < 0) continue;
 		ioctl(fd, EVIOCGNAME(sizeof(name) - 1), name);
 		ioctl(fd, EVIOCGPHYS(sizeof(phys) - 1), phys);
-		if (padname && !strcmp(name, padname))
-			fprintf(stderr, "asp: p2: pad \"%s\" on %s (%s)\n", name, phys, path);
+		if (padname && !strcmp(name, padname)) {
+			asp_pad_p1 = strstr(phys, "-1.1/") != NULL;
+			fprintf(stderr, "asp: p2: pad \"%s\" on %s (%s): %s port\n", name, phys, path,
+				asp_pad_p1 ? "1P" : "2P");
+		}
 		if (asp_stk_fd < 0 && strstr(name, "adckeypad")) {
 			asp_stk_fd = fd;
-			fprintf(stderr, "asp: p2: stick is %s (%s): player 1, the pad player 2\n", path, name);
+			fprintf(stderr, "asp: p2: stick is %s (%s)\n", path, name);
 			continue;
 		}
 		close(fd);
 	}
 	closedir(d);
 	if (asp_stk_fd < 0) fprintf(stderr, "asp: p2: stick keypad not found, one player only\n");
+	else fprintf(stderr, "asp: p2: player 1 is the %s, player 2 the %s\n",
+		asp_pad_p1 ? "pad" : "stick", asp_pad_p1 ? "stick" : "pad");
 	return asp_stk_fd >= 0;
 }
 

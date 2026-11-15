@@ -3851,3 +3851,8 @@ alone: player 1, as before. The pad's USB path is logged so the two
 physical ports can be told apart later. SNES port 2 switched from the
 five-player adaptor to a plain pad, and S9xReadJoypad no longer hands
 player 1's input to every port. GBA is one player.
+
+Pad follows its port (psx p18, sfc p10, fc p9, md p10): the adaptor in the
+1P port shows as `usb-aotg_hub.0-1.1` (the arcade input log, taken with it
+there); that makes the pad player 1 and the stick player 2. Any other path
+is the 2P port: stick player 1, pad player 2.
