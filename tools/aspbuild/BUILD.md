@@ -3838,3 +3838,16 @@ snes9x4d shipped with `Settings.Transparency = FALSE`, a speed choice for
 2009 handhelds. Without it colour-maths layers are drawn solid: Super
 Metroid's Crateria rain covered the whole picture. Switched on; Liam
 confirmed the rain is right on the stick.
+
+## 15 Nov - two players (psx p17, sfc p9, fc p8, md p9)
+
+With a pad on the adaptor SDL only sees the pad, but the stick is still the
+keypad device `atc260x-adckeypad`: arrows, BTN 304-311 as buttons 0-7, 314
+Select, 315 Start, 278 Options, 279 Turbo (the same numbers SDL gives the
+stick alone). `asp_p2.h` reads it straight from evdev. Stick and pad
+together: stick is player 1, pad player 2 (the stick's lever no longer
+leaks into the pad, whose directions come from its hat). Pad or stick
+alone: player 1, as before. The pad's USB path is logged so the two
+physical ports can be told apart later. SNES port 2 switched from the
+five-player adaptor to a plain pad, and S9xReadJoypad no longer hands
+player 1's input to every port. GBA is one player.

@@ -2746,6 +2746,109 @@ index 0000000..7e006f4
 +}
 +
 +#endif
+diff --git a/dingux-sdl/asp_p2.h b/dingux-sdl/asp_p2.h
+new file mode 100644
+index 0000000..5262af0
+--- /dev/null
++++ b/dingux-sdl/asp_p2.h
+@@ -0,0 +1,97 @@
++/* asp_p2.h - two players: the stick and a pad on the adaptor at once.
++ *
++ * With a pad plugged in, SDL only reports the pad (the adaptor, "JJ", 16
++ * buttons). The stick has not gone anywhere: it is the ASP's own keypad,
++ * a Linux input device called "atc260x-adckeypad", and is read here
++ * directly. Its codes, from the arcade build's input log, map onto the same
++ * button numbers SDL gives the stick when it is on its own:
++ *
++ *   KEY_UP/DOWN/LEFT/RIGHT   the lever
++ *   BTN 304..311             buttons 0..7   (A, B, C, greys, D, ...)
++ *   BTN_SELECT 314           8  Select
++ *   BTN_START  315           9  Start
++ *   278                      10 Options
++ *   279                      11 Turbo
++ *
++ * The stick is player 1 and the pad player 2. The pad's USB path is logged
++ * so the two physical ports can be told apart later.
++ *
++ * Include after SDL and stdio. */
++#ifndef ASP_P2_H
++#define ASP_P2_H
++#include <fcntl.h>
++#include <unistd.h>
++#include <dirent.h>
++#include <string.h>
++#include <sys/ioctl.h>
++#include <linux/input.h>
++
++static int asp_stk_fd = -1;
++static unsigned asp_stk_btn;            /* bit n: stick button n held */
++static unsigned asp_stk_dir;            /* 1 up, 2 down, 4 left, 8 right */
++
++#define ASP_STK_UP    1
++#define ASP_STK_DOWN  2
++#define ASP_STK_LEFT  4
++#define ASP_STK_RIGHT 8
++
++/* Called once, with the pad SDL found. Returns 1 if the stick can be read
++ * as a second player. */
++static int asp_p2_init(SDL_Joystick *pad)
++{
++	DIR *d;
++	struct dirent *e;
++	const char *padname = pad ? SDL_JoystickName(0) : NULL;
++	if (asp_stk_fd >= 0) return 1;
++	d = opendir("/dev/input");
++	if (d == NULL) { fprintf(stderr, "asp: p2: no /dev/input\n"); return 0; }
++	while ((e = readdir(d)) != NULL) {
++		char path[300], name[128] = "", phys[128] = "";
++		int fd;
++		if (strncmp(e->d_name, "event", 5)) continue;
++		snprintf(path, sizeof(path), "/dev/input/%s", e->d_name);
++		fd = open(path, O_RDONLY | O_NONBLOCK);
++		if (fd < 0) continue;
++		ioctl(fd, EVIOCGNAME(sizeof(name) - 1), name);
++		ioctl(fd, EVIOCGPHYS(sizeof(phys) - 1), phys);
++		if (padname && !strcmp(name, padname))
++			fprintf(stderr, "asp: p2: pad \"%s\" on %s (%s)\n", name, phys, path);
++		if (asp_stk_fd < 0 && strstr(name, "adckeypad")) {
++			asp_stk_fd = fd;
++			fprintf(stderr, "asp: p2: stick is %s (%s): player 1, the pad player 2\n", path, name);
++			continue;
++		}
++		close(fd);
++	}
++	closedir(d);
++	if (asp_stk_fd < 0) fprintf(stderr, "asp: p2: stick keypad not found, one player only\n");
++	return asp_stk_fd >= 0;
++}
++
++/* Once a frame: take in everything the stick sent since the last call. */
++static void asp_p2_poll(void)
++{
++	struct input_event ev;
++	if (asp_stk_fd < 0) return;
++	while (read(asp_stk_fd, &ev, sizeof(ev)) == (ssize_t)sizeof(ev)) {
++		int bit = -1, dir = 0;
++		if (ev.type != EV_KEY || ev.value == 2) continue;
++		switch (ev.code) {
++		case KEY_UP:    dir = ASP_STK_UP;    break;
++		case KEY_DOWN:  dir = ASP_STK_DOWN;  break;
++		case KEY_LEFT:  dir = ASP_STK_LEFT;  break;
++		case KEY_RIGHT: dir = ASP_STK_RIGHT; break;
++		case 314: bit = 8;  break;
++		case 315: bit = 9;  break;
++		case 278: bit = 10; break;
++		case 279: bit = 11; break;
++		default:
++			if (ev.code >= 304 && ev.code <= 311) bit = ev.code - 304;
++		}
++		if (dir) { if (ev.value) asp_stk_dir |= dir; else asp_stk_dir &= ~dir; }
++		if (bit >= 0) { if (ev.value) asp_stk_btn |= 1u << bit; else asp_stk_btn &= ~(1u << bit); }
++	}
++}
++
++static int asp_stk_jb(int n) { return (asp_stk_btn >> n) & 1; }
++#endif
 diff --git a/dingux-sdl/asp_stats.h b/dingux-sdl/asp_stats.h
 new file mode 100644
 index 0000000..639e467
@@ -2858,18 +2961,20 @@ index 0000000..639e467
 +
 +#endif
 diff --git a/dingux-sdl/sdlmain.cpp b/dingux-sdl/sdlmain.cpp
-index 70280c8..a546d35 100644
+index 70280c8..fad542e 100644
 --- a/dingux-sdl/sdlmain.cpp
 +++ b/dingux-sdl/sdlmain.cpp
-@@ -65,6 +65,7 @@
+@@ -65,6 +65,9 @@
  #endif
  
  #include "snes9x.h"
 +#include "cheats.h"
++#include <SDL/SDL.h>
++#include "asp_p2.h"
  #include "memmap.h"
  #include "debug.h"
  #include "cpuexec.h"
-@@ -85,6 +86,17 @@ static void sync() { }
+@@ -85,6 +88,17 @@ static void sync() { }
  #else
  	uint8 *keyssnes;
  #endif
@@ -2887,7 +2992,7 @@ index 70280c8..a546d35 100644
  
  #ifdef NETPLAY_SUPPORT
  	static uint32	joypads[8];
-@@ -246,11 +258,81 @@ void S9xReadConfig()
+@@ -246,11 +260,81 @@ void S9xReadConfig()
  	fclose(fp);
  }
  
@@ -2969,7 +3074,7 @@ index 70280c8..a546d35 100644
  	if (argc < 2) {
  		S9xUsage ();
  	}
-@@ -258,7 +340,18 @@ int main (int argc, char **argv)
+@@ -258,7 +342,18 @@ int main (int argc, char **argv)
  	ZeroMemory (&Settings, sizeof (Settings));
  
  	Settings.JoystickEnabled = FALSE;
@@ -2988,11 +3093,15 @@ index 70280c8..a546d35 100644
  	Settings.Stereo = TRUE;
  	Settings.SoundSync = TRUE;
  	Settings.SoundBufferSize = 256;
-@@ -284,7 +377,10 @@ int main (int argc, char **argv)
+@@ -282,9 +377,12 @@ int main (int argc, char **argv)
+ 	Settings.Mouse = FALSE;	//TRUE
+ 	Settings.SuperScope = FALSE;
  	Settings.MultiPlayer5 = FALSE;
- 	Settings.ControllerOption = SNES_MULTIPLAYER5;
- 	Settings.ControllerOption = 0;
+-	Settings.ControllerOption = SNES_MULTIPLAYER5;
+-	Settings.ControllerOption = 0;
 -	Settings.Transparency = FALSE; //TRUE;
++	/* ASP: a plain second pad in port 2 (was 0, the five-player adaptor). */
++	Settings.ControllerOption = SNES_JOYPAD;
 +	/* ASP: on. Off was a speed choice for 2009 handhelds, and without it
 +	 * colour-maths layers (Super Metroid's rain, water, fog, shadows) are
 +	 * drawn solid over the picture. The ASP has the headroom. */
@@ -3000,7 +3109,7 @@ index 70280c8..a546d35 100644
  	Settings.SixteenBit = TRUE;
  	Settings.SupportHiRes = FALSE; //autodetected for known highres roms
  	Settings.NetPlay = FALSE;
-@@ -349,6 +445,9 @@ int main (int argc, char **argv)
+@@ -349,6 +447,9 @@ int main (int argc, char **argv)
  
  	if (rom_filename)
  	{
@@ -3010,7 +3119,7 @@ index 70280c8..a546d35 100644
  		if (!Memory.LoadROM (rom_filename))
  		{
  			char dir [_MAX_DIR + 1];
-@@ -600,8 +699,154 @@ void S9xExit()
+@@ -600,8 +701,155 @@ void S9xExit()
  }
  
  Uint16 sfc_key[256];
@@ -3145,6 +3254,7 @@ index 70280c8..a546d35 100644
 +		sfc_key[SELECT_1] = 10;
 +		sfc_key[START_1] = 11;
 +		fprintf(stderr, "asp: pad on the adaptor (16 buttons): SNES layout, hold Select + Start to exit\n");
++		asp_p2_init(asp_joy);
 +	}
 +
 +	/* No button index carries a direction. 0xFFFF never matches a real
@@ -3165,7 +3275,7 @@ index 70280c8..a546d35 100644
  #ifdef CAANOO
  	keyssnes = SDL_JoystickOpen(0);
  #else
-@@ -641,6 +886,7 @@ void S9xInitInputDevices ()
+@@ -641,6 +889,7 @@ void S9xInitInputDevices ()
  	sfc_key[UP_1] = DINGOO_BUTTON_UP;
  	sfc_key[DOWN_1] = DINGOO_BUTTON_DOWN;
  #endif
@@ -3173,7 +3283,7 @@ index 70280c8..a546d35 100644
  
  	int i = 0;
  	char *envp, *j;
-@@ -691,6 +937,10 @@ const char *S9xGetSnapshotDirectory ()
+@@ -691,6 +940,10 @@ const char *S9xGetSnapshotDirectory ()
  	static char filename [PATH_MAX];
  	const char *snapshot;
  
@@ -3184,7 +3294,7 @@ index 70280c8..a546d35 100644
  	if (!(snapshot = getenv ("SNES9X_SNAPSHOT_DIR")) &&
  	!(snapshot = getenv ("SNES96_SNAPSHOT_DIR")))
  	{
-@@ -821,8 +1071,264 @@ bool8_32 S9xInitUpdate ()
+@@ -821,8 +1074,264 @@ bool8_32 S9xInitUpdate ()
  	return (TRUE);
  }
  
@@ -3449,7 +3559,7 @@ index 70280c8..a546d35 100644
  	uint32 spd = (Settings.SupportHiRes ? 256/2 : 0);
  	uint32 dpd = (screen->w - 256) / 2;
  	uint32 dpo = (screen->w - 256)/4 + (screen->h - 224)/2*screen->w/2;
-@@ -880,6 +1386,7 @@ bool8_32 S9xDeinitUpdate (int Width, int Height)
+@@ -880,6 +1389,7 @@ bool8_32 S9xDeinitUpdate (int Width, int Height)
  	SDL_UnlockSurface(screen);
  	SDL_Flip(screen);
  	return(TRUE);
@@ -3457,7 +3567,7 @@ index 70280c8..a546d35 100644
  }
  
  #ifndef _ZAURUS
-@@ -1089,6 +1596,37 @@ void S9xProcessEvents (bool8_32 block)
+@@ -1089,6 +1599,37 @@ void S9xProcessEvents (bool8_32 block)
  	{
  		switch(event.type)
  		{
@@ -3495,7 +3605,7 @@ index 70280c8..a546d35 100644
  #ifdef CAANOO
  			// CAANOO -------------------------------------------------------------
  			case SDL_JOYBUTTONDOWN:
-@@ -1116,6 +1654,13 @@ void S9xProcessEvents (bool8_32 block)
+@@ -1116,6 +1657,13 @@ void S9xProcessEvents (bool8_32 block)
  #else
  			//DINGOO ------------------------------------------------------
  			case SDL_KEYDOWN:
@@ -3509,59 +3619,71 @@ index 70280c8..a546d35 100644
  				keyssnes = SDL_GetKeyState(NULL);
  
  				//QUIT Emulator
-@@ -1188,7 +1733,56 @@ uint32 S9xReadJoypad (int which1)
+@@ -1188,7 +1736,68 @@ uint32 S9xReadJoypad (int which1)
  	if (which1 > 4)
  		return 0;
  
 -#ifdef CAANOO
 +#if defined(ASP_BUILD)
-+	/* every control on the ASP, directions included, is a joystick button */
++	/* Port 0 is player 1, port 1 player 2; nothing else is plugged in.
++	 * With a pad on the adaptor the stick is player 1, read from its own
++	 * keypad device (asp_p2.h), and the pad player 2. On its own, either
++	 * one is player 1. */
 +	if (which1 == 0) asp_manual_check();
-+	if (asp_joy == NULL) return val;
-+	SDL_JoystickUpdate();
-+	asp_check_exit();
-+	if (SDL_JoystickGetButton(asp_joy, sfc_key[L_1]))		val |= SNES_TL_MASK;
-+	if (SDL_JoystickGetButton(asp_joy, sfc_key[R_1]))		val |= SNES_TR_MASK;
-+	if (SDL_JoystickGetButton(asp_joy, sfc_key[X_1]))		val |= SNES_X_MASK;
-+	if (SDL_JoystickGetButton(asp_joy, sfc_key[Y_1]))		val |= SNES_Y_MASK;
-+	if (SDL_JoystickGetButton(asp_joy, sfc_key[B_1]))		val |= SNES_B_MASK;
-+	if (SDL_JoystickGetButton(asp_joy, sfc_key[A_1]))		val |= SNES_A_MASK;
-+	if (SDL_JoystickGetButton(asp_joy, sfc_key[START_1]))		val |= SNES_START_MASK;
-+	if (SDL_JoystickGetButton(asp_joy, sfc_key[SELECT_1]))		val |= SNES_SELECT_MASK;
-+	if (SDL_JoystickGetButton(asp_joy, sfc_key[UP_1]))		val |= SNES_UP_MASK;
-+	if (SDL_JoystickGetButton(asp_joy, sfc_key[DOWN_1]))		val |= SNES_DOWN_MASK;
-+	if (SDL_JoystickGetButton(asp_joy, sfc_key[LEFT_1]))		val |= SNES_LEFT_MASK;
-+	if (SDL_JoystickGetButton(asp_joy, sfc_key[RIGHT_1]))		val |= SNES_RIGHT_MASK;
-+
-+	/* The stick reports its directions three different ways depending on how
-+	 * the firmware has it that run, and this port only ever read one of them:
-+	 *
-+	 *   - joystick buttons 8-11, handled above
-+	 *   - keyboard arrow keysyms, handled here. The device's own event log
-+	 *     shows the directions arriving as KEY 273-276 while every face
-+	 *     button arrives as a joystick button, so reading only the joystick
-+	 *     left the stick completely dead while the face buttons worked - the
-+	 *     "only one button works" report.
-+	 *   - a hat, if a pad is plugged into the other port, handled below
-+	 *
-+	 * All three are read. A given device only produces one of them, so the
-+	 * other two contribute nothing and cost a few reads per frame. */
-+	{
-+		Uint8 *ks = SDL_GetKeyState(NULL);
-+		if (ks != NULL) {
-+			if (ks[SDLK_UP])    val |= SNES_UP_MASK;
-+			if (ks[SDLK_DOWN])  val |= SNES_DOWN_MASK;
-+			if (ks[SDLK_LEFT])  val |= SNES_LEFT_MASK;
-+			if (ks[SDLK_RIGHT]) val |= SNES_RIGHT_MASK;
-+		}
++	if (asp_joy == NULL) return which1 == 0 ? val : 0;
++	if (which1 == 0) {
++		SDL_JoystickUpdate();
++		asp_check_exit();
++		if (asp_pad_mode) asp_p2_poll();
 +	}
++	{
++		int two = asp_pad_mode && asp_stk_fd >= 0;
++		uint32 stk = 0, pad = 0;
++		Uint8 *ks = SDL_GetKeyState(NULL);
++		if (which1 > 1 || (which1 == 1 && !two)) return 0;
 +
-+	if (SDL_JoystickNumHats(asp_joy) > 0) {
-+		Uint8 hat = SDL_JoystickGetHat(asp_joy, 0);
-+		if (hat & SDL_HAT_UP)    val |= SNES_UP_MASK;
-+		if (hat & SDL_HAT_DOWN)  val |= SNES_DOWN_MASK;
-+		if (hat & SDL_HAT_LEFT)  val |= SNES_LEFT_MASK;
-+		if (hat & SDL_HAT_RIGHT) val |= SNES_RIGHT_MASK;
++		/* the pad (or, with nothing on the adaptor, the stick through SDL) */
++		if (SDL_JoystickGetButton(asp_joy, sfc_key[L_1]))      pad |= SNES_TL_MASK;
++		if (SDL_JoystickGetButton(asp_joy, sfc_key[R_1]))      pad |= SNES_TR_MASK;
++		if (SDL_JoystickGetButton(asp_joy, sfc_key[X_1]))      pad |= SNES_X_MASK;
++		if (SDL_JoystickGetButton(asp_joy, sfc_key[Y_1]))      pad |= SNES_Y_MASK;
++		if (SDL_JoystickGetButton(asp_joy, sfc_key[B_1]))      pad |= SNES_B_MASK;
++		if (SDL_JoystickGetButton(asp_joy, sfc_key[A_1]))      pad |= SNES_A_MASK;
++		if (SDL_JoystickGetButton(asp_joy, sfc_key[START_1]))  pad |= SNES_START_MASK;
++		if (SDL_JoystickGetButton(asp_joy, sfc_key[SELECT_1])) pad |= SNES_SELECT_MASK;
++		if (SDL_JoystickNumHats(asp_joy) > 0) {
++			Uint8 hat = SDL_JoystickGetHat(asp_joy, 0);
++			if (hat & SDL_HAT_UP)    pad |= SNES_UP_MASK;
++			if (hat & SDL_HAT_DOWN)  pad |= SNES_DOWN_MASK;
++			if (hat & SDL_HAT_LEFT)  pad |= SNES_LEFT_MASK;
++			if (hat & SDL_HAT_RIGHT) pad |= SNES_RIGHT_MASK;
++		}
++
++		/* the stick's lever: arrow keys through SDL, or from its own device */
++		if (two) {
++			if (asp_stk_dir & ASP_STK_UP)    stk |= SNES_UP_MASK;
++			if (asp_stk_dir & ASP_STK_DOWN)  stk |= SNES_DOWN_MASK;
++			if (asp_stk_dir & ASP_STK_LEFT)  stk |= SNES_LEFT_MASK;
++			if (asp_stk_dir & ASP_STK_RIGHT) stk |= SNES_RIGHT_MASK;
++			/* stick buttons, the same layout as the stick on its own */
++			if (asp_stk_jb(0)) stk |= SNES_Y_MASK;
++			if (asp_stk_jb(2)) stk |= SNES_X_MASK;
++			if (asp_stk_jb(3)) stk |= SNES_TL_MASK;
++			if (asp_stk_jb(1)) stk |= SNES_B_MASK;
++			if (asp_stk_jb(5)) stk |= SNES_A_MASK;
++			if (asp_stk_jb(4)) stk |= SNES_TR_MASK;
++			if (asp_stk_jb(8)) stk |= SNES_SELECT_MASK;
++			if (asp_stk_jb(9)) stk |= SNES_START_MASK;
++			if (asp_stk_jb(10)) S9xExit();
++		} else if (ks != NULL) {
++			if (ks[SDLK_UP])    stk |= SNES_UP_MASK;
++			if (ks[SDLK_DOWN])  stk |= SNES_DOWN_MASK;
++			if (ks[SDLK_LEFT])  stk |= SNES_LEFT_MASK;
++			if (ks[SDLK_RIGHT]) stk |= SNES_RIGHT_MASK;
++		}
++
++		if (two) return val | (which1 == 0 ? stk : pad);
++		return val | stk | pad;
 +	}
 +#elif defined(CAANOO)
  	//player1
