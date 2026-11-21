@@ -1,8 +1,7 @@
-From d1db6821fd51bc23ae6c5d63a012e9fa4a259396 Mon Sep 17 00:00:00 2001
+From f6819b214fdd1354b432e44c4161483dc1ee3a1c Mon Sep 17 00:00:00 2001
 From: Liam Curtis <liamcurtis81@users.noreply.github.com>
 Date: Sun, 8 Nov 2026 16:43:41 +0000
-Subject: [PATCH 26/27] ASP: Midway speed-ups (idle skip, sound ROM mapping,
- timer division)
+Subject: ASP: Midway speed-ups (idle skip, sound ROM mapping, timer division)
 
 - TMS34010 idle skipping for Mortal Kombat and MK II: the wait-for-vblank
   loop (list walk + flag poll) was over half the CPU's time. When the flag
@@ -29,7 +28,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  8 files changed, 281 insertions(+)
 
 diff --git a/src/burn/drv/midway/d_yunit.cpp b/src/burn/drv/midway/d_yunit.cpp
-index 72b225c..68c1d86 100644
+index 1cca47269..8cad68f05 100644
 --- a/src/burn/drv/midway/d_yunit.cpp
 +++ b/src/burn/drv/midway/d_yunit.cpp
 @@ -1678,6 +1678,54 @@ static UINT8 term2_nvram_chunk[] = {
@@ -165,7 +164,7 @@ index 72b225c..68c1d86 100644
      return 0;
  }
 diff --git a/src/burn/drv/midway/midtunit.cpp b/src/burn/drv/midway/midtunit.cpp
-index 9069c24..6fc4f7a 100644
+index 9069c2425..6fc4f7af8 100644
 --- a/src/burn/drv/midway/midtunit.cpp
 +++ b/src/burn/drv/midway/midtunit.cpp
 @@ -151,8 +151,31 @@ static INT32 sound_inreset;
@@ -356,7 +355,7 @@ index 9069c24..6fc4f7a 100644
  
  	if (nSoundType == SOUND_ADPCM) M6809Close();
 diff --git a/src/burn/drv/midway/williams_adpcm.cpp b/src/burn/drv/midway/williams_adpcm.cpp
-index f08d15b..3ea234a 100644
+index f08d15b72..3ea234a5c 100644
 --- a/src/burn/drv/midway/williams_adpcm.cpp
 +++ b/src/burn/drv/midway/williams_adpcm.cpp
 @@ -53,6 +53,9 @@ static void adpcm_write(UINT16 address, UINT8 data)
@@ -380,7 +379,7 @@ index f08d15b..3ea234a 100644
  
  		case 0x2c00:
 diff --git a/src/burn/timer.h b/src/burn/timer.h
-index 0b5d70a..a3c7a33 100644
+index 0b5d70a33..a3c7a33da 100644
 --- a/src/burn/timer.h
 +++ b/src/burn/timer.h
 @@ -4,8 +4,28 @@
@@ -413,7 +412,7 @@ index 0b5d70a..a3c7a33 100644
  extern "C" double BurnTimerGetTime();
  
 diff --git a/src/cpu/tms34/tms34010.cpp b/src/cpu/tms34/tms34010.cpp
-index 1ca49a3..b4c32df 100644
+index 1ca49a30a..b4c32df71 100644
 --- a/src/cpu/tms34/tms34010.cpp
 +++ b/src/cpu/tms34/tms34010.cpp
 @@ -857,6 +857,9 @@ int tms34010_run(int cycles)
@@ -479,7 +478,7 @@ index 1ca49a3..b4c32df 100644
 +}
 +#endif
 diff --git a/src/cpu/tms34/tms34010.h b/src/cpu/tms34/tms34010.h
-index e273a38..826e641 100644
+index e273a389b..826e6415a 100644
 --- a/src/cpu/tms34/tms34010.h
 +++ b/src/cpu/tms34/tms34010.h
 @@ -108,6 +108,9 @@ void tms34010_scan(INT32 nAction);
@@ -493,7 +492,7 @@ index e273a38..826e641 100644
  INT64 tms34010_total_cycles();
  void tms34010_new_frame();
 diff --git a/src/cpu/tms34_intf.cpp b/src/cpu/tms34_intf.cpp
-index 4a55362..e32ecd6 100644
+index 4a55362da..e32ecd6b4 100644
 --- a/src/cpu/tms34_intf.cpp
 +++ b/src/cpu/tms34_intf.cpp
 @@ -248,6 +248,13 @@ void TMS34010RunEnd()
@@ -511,7 +510,7 @@ index 4a55362..e32ecd6 100644
  {
  	for (INT32 i = 0; i < total_cpus; i++) {
 diff --git a/src/cpu/tms34_intf.h b/src/cpu/tms34_intf.h
-index e386ce1..acc1ebc 100644
+index e386ce1ab..acc1ebcaa 100644
 --- a/src/cpu/tms34_intf.h
 +++ b/src/cpu/tms34_intf.h
 @@ -26,6 +26,9 @@ INT32 TMS34010TotalCycles();

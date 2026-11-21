@@ -1,0 +1,43 @@
+From 95bc2e6e312680ac21243e2da39b7b80ac0d92d4 Mon Sep 17 00:00:00 2001
+From: Liam Curtis <liamcurtis81@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 10:29:44 +0000
+Subject: ASP: follow upstream's scaler move to C in makefile.asp (fba_v54)
+
+Upstream replaced the x86 asm scalers (hq2x/3x/4x, 2xSaI, Eagle,
+SuperScale) with C files and vid_softfx.cpp now calls them on every
+platform, so makefile.asp has to build hqx, hq2x, hq3x, hq4x, 2xsai16,
+eagle, superscale, hq3xs and hq_shared32 or the link fails. The old
+BUILD_X86_ASM block is gone.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017bFDpwj71bNUcXJZGTv8su
+---
+ makefile.asp | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/makefile.asp b/makefile.asp
+index 3e66e9cbc..b1a171d30 100644
+--- a/makefile.asp
++++ b/makefile.asp
+@@ -92,7 +92,7 @@ depobj += cdlist.o \
+ 		interface.o lowpass2.o  vid_interface.o vid_softfx.o \
+ 		vid_support.o \
+ 		\
+-		2xpm.o 2xsai.o ddt3x.o epx.o hq2xs.o hq2xs_16.o xbr.o xbr32.o \
++		2xpm.o 2xsai.o 2xsai16.o ddt3x.o epx.o hq2xs.o hq2xs_16.o hqx.o hq2x.o hq3x.o hq4x.o eagle.o superscale.o hq3xs.o hq_shared32.o xbr.o xbr32.o \
+ 		\
+ 		inp_pi.o aud_sdl.o support_paths.o \
+ 		ips_manager.o scrn.o config.o \
+@@ -110,9 +110,6 @@ endif
+ 
+ autobj += $(depobj)
+ 
+-ifdef BUILD_X86_ASM
+-autobj += eagle_fm.o 2xsaimmx.o hq2x32.o hq3x32.o hq4x32.o superscale.o
+-endif
+ # End platform-specific
+ 
+ 
+-- 
+2.43.0
+

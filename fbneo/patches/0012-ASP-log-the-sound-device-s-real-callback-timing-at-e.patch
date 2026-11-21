@@ -1,8 +1,7 @@
-From fb7963c81628453e2b01bc876d14bfaeaedfdb10 Mon Sep 17 00:00:00 2001
+From f6b00a0ffbf99a5b7078d800cb99f82d35107845 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sun, 1 Nov 2026 16:05:14 +0000
-Subject: [PATCH 12/27] ASP: log the sound device's real callback timing at
- exit
+Subject: ASP: log the sound device's real callback timing at exit
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
@@ -12,7 +11,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  2 files changed, 34 insertions(+)
 
 diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
-index c3c41c0..720fce7 100644
+index c3c41c043..720fce76b 100644
 --- a/src/burner/pi/run_pi.cpp
 +++ b/src/burner/pi/run_pi.cpp
 @@ -678,6 +678,14 @@ static void asp_log_framerate(unsigned int ticks, int emulated, int rendered)
@@ -31,7 +30,7 @@ index c3c41c0..720fce7 100644
  		// Generic per-driver draw split (asp_ds_* filled by a driver's draw).
  		extern unsigned long long asp_ds_t[8];
 diff --git a/src/intf/audio/sdl/aud_sdl.cpp b/src/intf/audio/sdl/aud_sdl.cpp
-index c300fdd..c74f03a 100644
+index c300fddd3..c74f03af3 100644
 --- a/src/intf/audio/sdl/aud_sdl.cpp
 +++ b/src/intf/audio/sdl/aud_sdl.cpp
 @@ -34,8 +34,34 @@ static int nSDLPlayPos;

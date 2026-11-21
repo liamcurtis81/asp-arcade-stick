@@ -1,8 +1,8 @@
-From f8b277f132b7d4e2a91a358689aae8b5fc9697eb Mon Sep 17 00:00:00 2001
+From 2ade3fb1daf7af9e6c1270c56dfb9b2af26674cc Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Thu, 29 Oct 2026 23:26:38 +0000
-Subject: [PATCH 02/27] ASP: per-game tuning sections, frame-time spread
- histograms, frame-count exit
+Subject: ASP: per-game tuning sections, frame-time spread histograms,
+ frame-count exit
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
@@ -12,7 +12,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  2 files changed, 197 insertions(+), 32 deletions(-)
 
 diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
-index f7dd0ad..cf28bc8 100755
+index f7dd0ad8d..cf28bc8d1 100755
 --- a/src/burner/pi/main_pi.cpp
 +++ b/src/burner/pi/main_pi.cpp
 @@ -2,6 +2,7 @@
@@ -159,7 +159,7 @@ index f7dd0ad..cf28bc8 100755
  }
  
 diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
-index 00ca55a..e8ad44c 100644
+index 00ca55ac8..e8ad44cca 100644
 --- a/src/burner/pi/run_pi.cpp
 +++ b/src/burner/pi/run_pi.cpp
 @@ -44,6 +44,35 @@ void ToggleLayer(unsigned char thisLayer)

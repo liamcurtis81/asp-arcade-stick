@@ -1,8 +1,8 @@
-From cc5ff96838c741cfb73a2a3b12577180af38d214 Mon Sep 17 00:00:00 2001
+From 0d1e9a31687c17a8a9e1e936349cfbcf6184f4b4 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 20:01:52 +0000
-Subject: [PATCH 21/27] ASP: controller probe - list every input device and SDL
- joystick, trace presses from all of them
+Subject: ASP: controller probe - list every input device and SDL joystick,
+ trace presses from all of them
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
@@ -11,7 +11,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  1 file changed, 102 insertions(+), 7 deletions(-)
 
 diff --git a/src/intf/input/pi/inp_pi.cpp b/src/intf/input/pi/inp_pi.cpp
-index 70efd79..4f9518f 100644
+index 70efd797e..4f9518f31 100644
 --- a/src/intf/input/pi/inp_pi.cpp
 +++ b/src/intf/input/pi/inp_pi.cpp
 @@ -69,6 +69,8 @@ static int handleFreeplayHack(int player, int code);
