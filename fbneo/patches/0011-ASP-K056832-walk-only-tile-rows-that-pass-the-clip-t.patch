@@ -1,8 +1,8 @@
-From 52f71a8698b296b6cd1e644647fe2ea851fb1799 Mon Sep 17 00:00:00 2001
+From 999e32cdc0418b6af548df3d53a0982fad64418c Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sun, 1 Nov 2026 10:28:46 +0000
-Subject: [PATCH 11/27] ASP: K056832 - walk only tile rows that pass the clip
- test (line/row-scroll layers)
+Subject: ASP: K056832 - walk only tile rows that pass the clip test
+ (line/row-scroll layers)
 
 Harness: frames and sound identical with fast_tiles 0/1 on xexex, mystwarr, metamrph, viostorm, moomesa, bucky, asterix.
 
@@ -13,7 +13,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  1 file changed, 28 insertions(+)
 
 diff --git a/src/burn/drv/konami/k056832.cpp b/src/burn/drv/konami/k056832.cpp
-index 81b87d7..648b484 100644
+index 81b87d751..648b4840c 100644
 --- a/src/burn/drv/konami/k056832.cpp
 +++ b/src/burn/drv/konami/k056832.cpp
 @@ -542,8 +542,36 @@ static void draw_layer_internal(INT32 layer, INT32 pageIndex, INT32 *clip, INT32

@@ -1,8 +1,8 @@
-From fd8e68ea2098676ed0de056ed58824632742361f Mon Sep 17 00:00:00 2001
+From 351b53d32f9c3072bf4e849a3e6812a82d0ca07e Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 15:29:46 +0000
-Subject: [PATCH 24/27] ASP: pad mode for 8BitDo pads on the Mayflash adaptor -
- pad_*.jc maps, hat directions, Select as credit, credit+Start held to exit
+Subject: ASP: pad mode for 8BitDo pads on the Mayflash adaptor - pad_*.jc
+ maps, hat directions, Select as credit, credit+Start held to exit
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
@@ -11,7 +11,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  1 file changed, 64 insertions(+), 6 deletions(-)
 
 diff --git a/src/intf/input/pi/inp_pi.cpp b/src/intf/input/pi/inp_pi.cpp
-index f400422..dcbcf81 100644
+index f4004227d..dcbcf8136 100644
 --- a/src/intf/input/pi/inp_pi.cpp
 +++ b/src/intf/input/pi/inp_pi.cpp
 @@ -83,6 +83,23 @@ static int asp_kbd_fd[ASP_MAX_KBD];

@@ -1,8 +1,8 @@
-From 864e99fcba010eaf997670f9f5c947769ddb5ee2 Mon Sep 17 00:00:00 2001
+From 369eeda4988b04b19d237a19004ad474d050f8f2 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 31 Oct 2026 16:59:06 +0000
-Subject: [PATCH 10/27] ASP: Data East layer/alpha-mix fast paths, Moo
- Mesa/Bucky sound waits (ZetSetIdleLoopN), Xexex draw split
+Subject: ASP: Data East layer/alpha-mix fast paths, Moo Mesa/Bucky sound waits
+ (ZetSetIdleLoopN), Xexex draw split
 
 Harness: Night Slashers and Captain America frames and sound identical before/after; Moo Mesa, Bucky
 and the other Z80-hook games identical with skips off/on.
@@ -22,7 +22,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
 
 diff --git a/src/burn/asp_dsplit.h b/src/burn/asp_dsplit.h
 new file mode 100644
-index 0000000..1733fa5
+index 000000000..1733fa566
 --- /dev/null
 +++ b/src/burn/asp_dsplit.h
 @@ -0,0 +1,22 @@
@@ -49,10 +49,10 @@ index 0000000..1733fa5
 +#endif
 +#endif
 diff --git a/src/burn/drv/dataeast/d_deco32.cpp b/src/burn/drv/dataeast/d_deco32.cpp
-index 79935bf..caeeeda 100644
+index 166e4e01f..b23e565dd 100644
 --- a/src/burn/drv/dataeast/d_deco32.cpp
 +++ b/src/burn/drv/dataeast/d_deco32.cpp
-@@ -2989,6 +2989,13 @@ static void mixDualAlphaSprites(INT32 mixAlphaTilemap, INT32 drawAlphaTilemap)
+@@ -2992,6 +2992,13 @@ static void mixDualAlphaSprites(INT32 mixAlphaTilemap, INT32 drawAlphaTilemap)
  
  			UINT16 priColAlphaPal0=sprite0[x];
  			UINT16 priColAlphaPal1=sprite1[x];
@@ -67,7 +67,7 @@ index 79935bf..caeeeda 100644
  			UINT16 pri1=(priColAlphaPal1&0x6000)>>13;
  			UINT16 col0=((priColAlphaPal0&0x1f00)>>8);
 diff --git a/src/burn/drv/dataeast/deco16ic.cpp b/src/burn/drv/dataeast/deco16ic.cpp
-index 32acf72..c8add34 100644
+index 32acf7279..c8add345f 100644
 --- a/src/burn/drv/dataeast/deco16ic.cpp
 +++ b/src/burn/drv/dataeast/deco16ic.cpp
 @@ -412,6 +412,21 @@ void deco16_draw_layer_by_line(INT32 draw_start, INT32 draw_end, INT32 tmap, UIN
@@ -93,7 +93,7 @@ index 32acf72..c8add34 100644
  					if ((xxx + sx) < 0 || (xxx + sx) >= nScreenWidth) continue;
  
 diff --git a/src/burn/drv/konami/d_moo.cpp b/src/burn/drv/konami/d_moo.cpp
-index 066481d..37fb3c3 100644
+index 066481d9a..37fb3c3fc 100644
 --- a/src/burn/drv/konami/d_moo.cpp
 +++ b/src/burn/drv/konami/d_moo.cpp
 @@ -29,6 +29,24 @@ static AspIdle68k asp_idle_bucky = { 3, { 0x14c2, 0x14c8, 0x14ca }, { 20, 8, 10
@@ -138,7 +138,7 @@ index 066481d..37fb3c3 100644
  
  	EEPROMInit(&moo_eeprom_interface);
 diff --git a/src/burn/drv/konami/d_xexex.cpp b/src/burn/drv/konami/d_xexex.cpp
-index 5d36553..01f1f17 100644
+index 5d36553e3..01f1f1751 100644
 --- a/src/burn/drv/konami/d_xexex.cpp
 +++ b/src/burn/drv/konami/d_xexex.cpp
 @@ -9,6 +9,7 @@
@@ -196,7 +196,7 @@ index 5d36553..01f1f17 100644
  	return 0;
  }
 diff --git a/src/cpu/z80_intf.cpp b/src/cpu/z80_intf.cpp
-index 89118d8..8345383 100644
+index 7052adcad..1f106f953 100644
 --- a/src/cpu/z80_intf.cpp
 +++ b/src/cpu/z80_intf.cpp
 @@ -395,31 +395,47 @@ static INT32 ZetRunReal(INT32 nCycles);
@@ -260,10 +260,10 @@ index 89118d8..8345383 100644
  			nZetCyclesTotal += k * iter;    // as ZetIdle
  			asp_idle_skippedz80 += k * iter;
 diff --git a/src/cpu/z80_intf.h b/src/cpu/z80_intf.h
-index e0dc753..8161189 100644
+index 8969b8e90..1212bcf27 100644
 --- a/src/cpu/z80_intf.h
 +++ b/src/cpu/z80_intf.h
-@@ -55,6 +55,7 @@ INT32 ZetScan(INT32 nAction);
+@@ -56,6 +56,7 @@ INT32 ZetScan(INT32 nAction);
  INT32 ZetRun(INT32 nCycles);
  #ifdef BUILD_ASP
  void ZetSetIdleLoop(INT32 nCPU, UINT16 pc0, INT32 cyc0, UINT16 pc1, INT32 cyc1, INT32 (*again)(void));

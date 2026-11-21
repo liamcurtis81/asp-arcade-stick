@@ -1,8 +1,8 @@
-From c16391877720d99d6a07a9bede556e1a684eab34 Mon Sep 17 00:00:00 2001
+From 2ceeded49f13eaf8068fb8e7058d2bcfd5f91b49 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 30 Oct 2026 18:02:30 +0000
-Subject: [PATCH 05/27] ASP: K056832 interior-row fast path (fast_tiles), long
- hash checkpoints
+Subject: ASP: K056832 interior-row fast path (fast_tiles), long hash
+ checkpoints
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
@@ -13,7 +13,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  3 files changed, 1159 insertions(+), 1093 deletions(-)
 
 diff --git a/src/burn/drv/konami/k056832.cpp b/src/burn/drv/konami/k056832.cpp
-index 7a11647..81b87d7 100644
+index 7a11647f1..81b87d751 100644
 --- a/src/burn/drv/konami/k056832.cpp
 +++ b/src/burn/drv/konami/k056832.cpp
 @@ -1,1093 +1,1138 @@
@@ -2249,7 +2249,7 @@ index 7a11647..81b87d7 100644
 +	}
 +}
 diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
-index 940b254..a7bcc32 100755
+index 940b254b2..a7bcc326f 100755
 --- a/src/burner/pi/main_pi.cpp
 +++ b/src/burner/pi/main_pi.cpp
 @@ -303,6 +303,7 @@ extern int asp_aud_device_samples;
@@ -2270,7 +2270,7 @@ index 940b254..a7bcc32 100755
  		return 0;
  	}
 diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
-index 730563e..8199584 100644
+index 730563ecb..8199584a2 100644
 --- a/src/burner/pi/run_pi.cpp
 +++ b/src/burner/pi/run_pi.cpp
 @@ -141,6 +141,13 @@ int asp_reset_pending = 0;

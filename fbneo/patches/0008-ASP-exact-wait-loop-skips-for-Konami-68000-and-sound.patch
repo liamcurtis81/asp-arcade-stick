@@ -1,15 +1,15 @@
-From 033f3deec9f6ca6bf224bc7bd653cd6177d3cdba Mon Sep 17 00:00:00 2001
+From c315dac9d8a1e3c5772f78e09fa3b7430ec23c7f Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 31 Oct 2026 15:46:25 +0000
-Subject: [PATCH 08/27] ASP: exact wait-loop skips for Konami 68000 and sound
- Z80 (idle_skips), NS draw split, harness sound hash
+Subject: ASP: exact wait-loop skips for Konami 68000 and sound Z80
+ (idle_skips), NS draw split, harness sound hash
 
 Work in progress: proof runs (frames and sound identical with skips off/on) in progress.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
 ---
- src/burn/drv/dataeast/d_deco32.cpp | 10588 ++++++++++++++-------------
+ src/burn/drv/dataeast/d_deco32.cpp | 10602 ++++++++++++++-------------
  src/burn/drv/konami/asp_idle.h     |    85 +
  src/burn/drv/konami/d_asterix.cpp  |  1791 ++---
  src/burn/drv/konami/d_moo.cpp      |    25 +-
@@ -19,16 +19,16 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  src/burn/drv/konami/d_xmen.cpp     |  2673 +++----
  src/burner/pi/main_pi.cpp          |     3 +
  src/burner/pi/run_pi.cpp           |    30 +
- src/cpu/z80_intf.cpp               |  2372 +++---
- src/cpu/z80_intf.h                 |   243 +-
- 12 files changed, 10131 insertions(+), 9789 deletions(-)
+ src/cpu/z80_intf.cpp               |  2382 +++---
+ src/cpu/z80_intf.h                 |   245 +-
+ 12 files changed, 10144 insertions(+), 9802 deletions(-)
  create mode 100644 src/burn/drv/konami/asp_idle.h
 
 diff --git a/src/burn/drv/dataeast/d_deco32.cpp b/src/burn/drv/dataeast/d_deco32.cpp
-index 6292782..79935bf 100644
+index 1791c2883..166e4e01f 100644
 --- a/src/burn/drv/dataeast/d_deco32.cpp
 +++ b/src/burn/drv/dataeast/d_deco32.cpp
-@@ -1,5281 +1,5307 @@
+@@ -1,5288 +1,5314 @@
 -// FB Alpha Deco32 driver module
 -// Based on MAME driver by Bryan McPhail
 -
@@ -244,7 +244,7 @@ index 6292782..79935bf 100644
 -	{0x02, 0x01, 0x80, 0x80, "Off"			},
 -	{0x02, 0x01, 0x80, 0x00, "On"			},
 -
--	{0   , 0xfe, 0   ,    2, "Speed Hacks"		},
+-	{0   , 0xfd, 0   ,    2, "Speed Hacks"		},
 -	{0x03, 0x01, 0x01, 0x00, "Off"			},
 -	{0x03, 0x01, 0x01, 0x01, "On"			},
 -};
@@ -288,16 +288,17 @@ index 6292782..79935bf 100644
 -
 -static struct BurnDIPInfo FghthistDIPList[]=
 -{
--	{0x1a, 0xff, 0xff, 0xef, NULL				},
--	{0x1b, 0xff, 0xff, 0x00, NULL				},
+-	DIP_OFFSET(0x1a)
+-	{0x00, 0xff, 0xff, 0xef, NULL				},
+-	{0x01, 0xff, 0xff, 0x00, NULL				},
 -
 -	{0   , 0xfe, 0   ,    2, "Service Mode"			},
--	{0x1a, 0x01, 0x08, 0x08, "Off"				},
--	{0x1a, 0x01, 0x08, 0x00, "On"				},
+-	{0x00, 0x01, 0x08, 0x08, "Off"				},
+-	{0x00, 0x01, 0x08, 0x00, "On"				},
 -
--	{0   , 0xfe, 0   ,    2, "Speed Hacks"			},
--	{0x1b, 0x01, 0x01, 0x00, "Off"				},
--	{0x1b, 0x01, 0x01, 0x01, "On"				},
+-	{0   , 0xfd, 0   ,    2, "Speed Hacks"			},
+-	{0x01, 0x01, 0x01, 0x00, "Off"				},
+-	{0x01, 0x01, 0x01, 0x01, "On"				},
 -};
 -
 -STDDIPINFO(Fghthist)
@@ -347,11 +348,11 @@ index 6292782..79935bf 100644
 -	{0x00, 0xff, 0xff, 0x08, NULL			},
 -	{0x01, 0xff, 0xff, 0x00, NULL			},
 -
--	{0   , 0xfe, 0   ,    2, "Service Mode "	},
+-	{0   , 0xfe, 0   ,    2, "Service Mode"	},
 -	{0x00, 0x01, 0x08, 0x08, "Off"			},
 -	{0x00, 0x01, 0x08, 0x00, "On"			},
 -
--	{0   , 0xfe, 0   ,    2, "Speed Hacks"			},
+-	{0   , 0xfd, 0   ,    2, "Speed Hacks"			},
 -	{0x01, 0x01, 0x01, 0x00, "Off"				},
 -	{0x01, 0x01, 0x01, 0x01, "On"				},
 -};
@@ -396,12 +397,13 @@ index 6292782..79935bf 100644
 -
 -static struct BurnDIPInfo TattassDIPList[]=
 -{
--	{0x1b, 0xff, 0xff, 0x00, NULL			},
--	{0x1c, 0xff, 0xff, 0x00, NULL			},
+-	DIP_OFFSET(0x1b)
+-	{0x00, 0xff, 0xff, 0x00, NULL			},
+-	{0x01, 0xff, 0xff, 0x00, NULL			},
 -
--	{0   , 0xfe, 0   ,    2, "Speed Hacks"			},
--	{0x1c, 0x01, 0x01, 0x00, "Off"				},
--	{0x1c, 0x01, 0x01, 0x01, "On"				},
+-	{0   , 0xfd, 0   ,    2, "Speed Hacks"			},
+-	{0x01, 0x01, 0x01, 0x00, "Off"				},
+-	{0x01, 0x01, 0x01, 0x01, "On"				},
 -};
 -
 -STDDIPINFO(Tattass)
@@ -434,29 +436,30 @@ index 6292782..79935bf 100644
 -
 -static struct BurnDIPInfo DragngunDIPList[]=
 -{
--	{0x0e, 0xff, 0xff, 0xfe, NULL			},
--	{0x0f, 0xff, 0xff, 0x00, NULL			},
--	{0x10, 0xff, 0xff, 0x04, NULL			},
+-	DIP_OFFSET(0x0e)
+-	{0x00, 0xff, 0xff, 0xfe, NULL			},
+-	{0x01, 0xff, 0xff, 0x00, NULL			},
+-	{0x02, 0xff, 0xff, 0x04, NULL			},
 -
 -	{0   , 0xfe, 0   ,    2, "Reset"		},
--	{0x0e, 0x01, 0x01, 0x00, "Off"			},
--	{0x0e, 0x01, 0x01, 0x01, "On"			},
+-	{0x00, 0x01, 0x01, 0x00, "Off"			},
+-	{0x00, 0x01, 0x01, 0x01, "On"			},
 -
 -	{0   , 0xfe, 0   ,    2, "Stage Select"		},
--	{0x0e, 0x01, 0x40, 0x40, "Off"			},
--	{0x0e, 0x01, 0x40, 0x00, "On"			},
+-	{0x00, 0x01, 0x40, 0x40, "Off"			},
+-	{0x00, 0x01, 0x40, 0x00, "On"			},
 -
 -	{0   , 0xfe, 0   ,    2, "Debug Mode"		},
--	{0x0e, 0x01, 0x80, 0x80, "Off"			},
--	{0x0e, 0x01, 0x80, 0x00, "On"			},
+-	{0x00, 0x01, 0x80, 0x80, "Off"			},
+-	{0x00, 0x01, 0x80, 0x00, "On"			},
 -
--	{0   , 0xfe, 0   ,    2, "Speed Hacks"			},
--	{0x0f, 0x01, 0x01, 0x00, "Off"				},
--	{0x0f, 0x01, 0x01, 0x01, "On"				},
+-	{0   , 0xfd, 0   ,    2, "Speed Hacks"			},
+-	{0x01, 0x01, 0x01, 0x00, "Off"				},
+-	{0x01, 0x01, 0x01, 0x01, "On"				},
 -
 -	{0   , 0xfe, 0   ,    2, "Service Mode"		},
--	{0x10, 0x01, 0x04, 0x04, "Off"			},
--	{0x10, 0x01, 0x04, 0x00, "On"			},
+-	{0x02, 0x01, 0x04, 0x04, "Off"			},
+-	{0x02, 0x01, 0x04, 0x00, "On"			},
 -};
 -
 -STDDIPINFO(Dragngun)
@@ -3948,7 +3951,7 @@ index 6292782..79935bf 100644
 -
 -struct BurnDriver BurnDrvCaptaven = {
 -	"captaven", NULL, NULL, NULL, "1991",
--	"Captain America and The Avengers (Asia Rev 1.4)\0", NULL, "Data East Corporation", "DECO 32",
+-	"Captain America and The Avengers (Asia Version 1.4)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_HISCORE_SUPPORTED, 4, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 -	NULL, captavenRomInfo, captavenRomName, NULL, NULL, NULL, NULL, CaptavenInputInfo, CaptavenDIPInfo,
@@ -3998,7 +4001,7 @@ index 6292782..79935bf 100644
 -
 -struct BurnDriver BurnDrvCaptavena = {
 -	"captavena", "captaven", NULL, NULL, "1991",
--	"Captain America and The Avengers (Asia Rev 1.0)\0", NULL, "Data East Corporation", "DECO 32",
+-	"Captain America and The Avengers (Asia Version 1.0)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 4, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 -	NULL, captavenaRomInfo, captavenaRomName, NULL, NULL, NULL, NULL, CaptavenInputInfo, CaptavenDIPInfo,
@@ -4049,7 +4052,7 @@ index 6292782..79935bf 100644
 -
 -struct BurnDriver BurnDrvCaptavene = {
 -	"captavene", "captaven", NULL, NULL, "1991",
--	"Captain America and The Avengers (UK Rev 1.4)\0", NULL, "Data East Corporation", "DECO 32",
+-	"Captain America and The Avengers (UK Version 1.4)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 4, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 -	NULL, captaveneRomInfo, captaveneRomName, NULL, NULL, NULL, NULL, CaptavenInputInfo, CaptavenDIPInfo,
@@ -4099,7 +4102,7 @@ index 6292782..79935bf 100644
 -
 -struct BurnDriver BurnDrvCaptavenu = {
 -	"captavenu", "captaven", NULL, NULL, "1991",
--	"Captain America and The Avengers (US Rev 1.9)\0", NULL, "Data East Corporation", "DECO 32",
+-	"Captain America and The Avengers (US Version 1.9)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 4, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 -	NULL, captavenuRomInfo, captavenuRomName, NULL, NULL, NULL, NULL, CaptavenInputInfo, CaptavenDIPInfo,
@@ -4149,7 +4152,7 @@ index 6292782..79935bf 100644
 -
 -struct BurnDriver BurnDrvCaptavenuu = {
 -	"captavenuu", "captaven", NULL, NULL, "1991",
--	"Captain America and The Avengers (US Rev 1.6)\0", NULL, "Data East Corporation", "DECO 32",
+-	"Captain America and The Avengers (US Version 1.6)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 4, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 -	NULL, captavenuuRomInfo, captavenuuRomName, NULL, NULL, NULL, NULL, CaptavenInputInfo, CaptavenDIPInfo,
@@ -4199,7 +4202,7 @@ index 6292782..79935bf 100644
 -
 -struct BurnDriver BurnDrvCaptavenua = {
 -	"captavenua", "captaven", NULL, NULL, "1991",
--	"Captain America and The Avengers (US Rev 1.4)\0", NULL, "Data East Corporation", "DECO 32",
+-	"Captain America and The Avengers (US Version 1.4)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 4, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 -	NULL, captavenuaRomInfo, captavenuaRomName, NULL, NULL, NULL, NULL, CaptavenInputInfo, CaptavenDIPInfo,
@@ -4249,7 +4252,7 @@ index 6292782..79935bf 100644
 -
 -struct BurnDriver BurnDrvCaptavenj = {
 -	"captavenj", "captaven", NULL, NULL, "1991",
--	"Captain America and The Avengers (Japan Rev 0.2)\0", NULL, "Data East Corporation", "DECO 32",
+-	"Captain America and The Avengers (Japan Version 0.2)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 4, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 -	NULL, captavenjRomInfo, captavenjRomName, NULL, NULL, NULL, NULL, CaptavenInputInfo, CaptavenDIPInfo,
@@ -4295,7 +4298,7 @@ index 6292782..79935bf 100644
 -
 -struct BurnDriver BurnDrvFghthist = {
 -	"fghthist", NULL, NULL, NULL, "1993",
--	"Fighter's History (World ver 43-09, DE-0395-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
+-	"Fighter's History (World Version 43-09, DE-0395-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_VSFIGHT, 0,
 -	NULL, fghthistRomInfo, fghthistRomName, NULL, NULL, NULL, NULL, FghthistInputInfo, FghthistDIPInfo,
@@ -4341,7 +4344,7 @@ index 6292782..79935bf 100644
 -
 -struct BurnDriver BurnDrvFghthista = {
 -	"fghthista", "fghthist", NULL, NULL, "1993",
--	"Fighter's History (World ver 43-07, DE-0380-2 PCB)\0", NULL, "Data East Corporation", "DECO 32",
+-	"Fighter's History (World Version 43-07, DE-0380-2 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_VSFIGHT, 0,
 -	NULL, fghthistaRomInfo, fghthistaRomName, NULL, NULL, NULL, NULL, FghthistInputInfo, FghthistDIPInfo,
@@ -4387,7 +4390,7 @@ index 6292782..79935bf 100644
 -
 -struct BurnDriver BurnDrvFghthistb = {
 -	"fghthistb", "fghthist", NULL, NULL, "1993",
--	"Fighter's History (World ver 43-05, DE-0380-2 PCB)\0", NULL, "Data East Corporation", "DECO 32",
+-	"Fighter's History (World Version 43-05, DE-0380-2 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_VSFIGHT, 0,
 -	NULL, fghthistbRomInfo, fghthistbRomName, NULL, NULL, NULL, NULL, FghthistInputInfo, FghthistDIPInfo,
@@ -4433,7 +4436,7 @@ index 6292782..79935bf 100644
 -
 -struct BurnDriver BurnDrvFghthistu = {
 -	"fghthistu", "fghthist", NULL, NULL, "1993",
--	"Fighter's History (US ver 42-09, DE-0396-0 PCB)\0", NULL, "Data East Corporation", "DECO 32",
+-	"Fighter's History (US Version 42-09, DE-0396-0 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_VSFIGHT, 0,
 -	NULL, fghthistuRomInfo, fghthistuRomName, NULL, NULL, NULL, NULL, FghthistInputInfo, FghthistDIPInfo,
@@ -4479,7 +4482,7 @@ index 6292782..79935bf 100644
 -
 -struct BurnDriver BurnDrvFghthistua = {
 -	"fghthistua", "fghthist", NULL, NULL, "1993",
--	"Fighter's History (US ver 42-06, DE-0395-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
+-	"Fighter's History (US Version 42-06, DE-0395-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_VSFIGHT, 0,
 -	NULL, fghthistuaRomInfo, fghthistuaRomName, NULL, NULL, NULL, NULL, FghthistInputInfo, FghthistDIPInfo,
@@ -4525,7 +4528,7 @@ index 6292782..79935bf 100644
 -
 -struct BurnDriver BurnDrvFghthistub = {
 -	"fghthistub", "fghthist", NULL, NULL, "1993",
--	"Fighter's History (US ver 42-05, DE-0395-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
+-	"Fighter's History (US Version 42-05, DE-0395-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_VSFIGHT, 0,
 -	NULL, fghthistubRomInfo, fghthistubRomName, NULL, NULL, NULL, NULL, FghthistInputInfo, FghthistDIPInfo,
@@ -4571,7 +4574,7 @@ index 6292782..79935bf 100644
 -
 -struct BurnDriver BurnDrvFghthistuc = {
 -	"fghthistuc", "fghthist", NULL, NULL, "1993",
--	"Fighter's History (US ver 42-03, DE-0380-2 PCB)\0", NULL, "Data East Corporation", "DECO 32",
+-	"Fighter's History (US Version 42-03, DE-0380-2 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_VSFIGHT, 0,
 -	NULL, fghthistucRomInfo, fghthistucRomName, NULL, NULL, NULL, NULL, FghthistInputInfo, FghthistDIPInfo,
@@ -4612,7 +4615,7 @@ index 6292782..79935bf 100644
 -
 -struct BurnDriver BurnDrvFghthistj = {
 -	"fghthistj", "fghthist", NULL, NULL, "1993",
--	"Fighter's History (Japan ver 41-07, DE-0395-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
+-	"Fighter's History (Japan Version 41-07, DE-0395-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_VSFIGHT, 0,
 -	NULL, fghthistjRomInfo, fghthistjRomName, NULL, NULL, NULL, NULL, FghthistInputInfo, FghthistDIPInfo,
@@ -4658,7 +4661,7 @@ index 6292782..79935bf 100644
 -
 -struct BurnDriver BurnDrvFghthistja = {
 -	"fghthistja", "fghthist", NULL, NULL, "1993",
--	"Fighter's History (Japan ver 41-05, DE-0380-2 PCB)\0", NULL, "Data East Corporation", "DECO 32",
+-	"Fighter's History (Japan Version 41-05, DE-0380-2 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_VSFIGHT, 0,
 -	NULL, fghthistjaRomInfo, fghthistjaRomName, NULL, NULL, NULL, NULL, FghthistInputInfo, FghthistDIPInfo,
@@ -4704,7 +4707,7 @@ index 6292782..79935bf 100644
 -
 -struct BurnDriver BurnDrvFghthistjb = {
 -	"fghthistjb", "fghthist", NULL, NULL, "1993",
--	"Fighter's History (Japan ver 41-04, DE-0380-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
+-	"Fighter's History (Japan Version 41-04, DE-0380-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_VSFIGHT, 0,
 -	NULL, fghthistjbRomInfo, fghthistjbRomName, NULL, NULL, NULL, NULL, FghthistInputInfo, FghthistDIPInfo,
@@ -4756,7 +4759,7 @@ index 6292782..79935bf 100644
 -
 -struct BurnDriver BurnDrvNslasher = {
 -	"nslasher", NULL, NULL, NULL, "1994",
--	"Night Slashers (Korea Rev 1.3, DE-0397-0 PCB)\0", NULL, "Data East Corporation", "DECO 32",
+-	"Night Slashers (Korea Ver. 1.3, DE-0397-0 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_HISCORE_SUPPORTED, 3, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 -	NULL, nslasherRomInfo, nslasherRomName, NULL, NULL, NULL, NULL, NslasherInputInfo, NslasherDIPInfo,
@@ -4809,7 +4812,7 @@ index 6292782..79935bf 100644
 -
 -struct BurnDriver BurnDrvNslasherj = {
 -	"nslasherj", "nslasher", NULL, NULL, "1994",
--	"Night Slashers (Japan Rev 1.2, DE-0397-0 PCB)\0", NULL, "Data East Corporation", "DECO 32",
+-	"Night Slashers (Japan Ver. 1.2, DE-0397-0 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 3, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 -	NULL, nslasherjRomInfo, nslasherjRomName, NULL, NULL, NULL, NULL, NslasherInputInfo, NslasherDIPInfo,
@@ -4856,7 +4859,7 @@ index 6292782..79935bf 100644
 -
 -struct BurnDriver BurnDrvNslashers = {
 -	"nslashers", "nslasher", NULL, NULL, "1994",
--	"Night Slashers (Over Sea Rev 1.2, DE-0397-0 PCB)\0", NULL, "Data East Corporation", "DECO 32",
+-	"Night Slashers (World Ver. 1.2, DE-0397-0 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 3, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 -	NULL, nslashersRomInfo, nslashersRomName, NULL, NULL, NULL, NULL, NslasherInputInfo, NslasherDIPInfo,
@@ -4908,7 +4911,7 @@ index 6292782..79935bf 100644
 -
 -struct BurnDriver BurnDrvNslasheru = {
 -	"nslasheru", "nslasher", NULL, NULL, "1994",
--	"Night Slashers (US Rev 1.2, DE-0395-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
+-	"Night Slashers (US Ver. 1.2, DE-0395-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 3, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 -	NULL, nslasheruRomInfo, nslasheruRomName, NULL, NULL, NULL, NULL, NslasherInputInfo, NslasherDIPInfo,
@@ -5220,6 +5223,8 @@ index 6292782..79935bf 100644
 -	{ "mar-08.n21",		0x080000, 0xb9281dfd, 9 | BRF_SND },           // 38 MSM6295 #1 Samples
 -
 -	{ "mar-07.n19",		0x080000, 0x40287d62, 10 | BRF_SND },          // 39 MSM6295 #2 Samples
+-
+-	{ "dvi_decrypt.bin",	0x000400, 0x2d049a30, 0 | BRF_OPT },           // 40 DVI video rom decryption tables (reconstructed, not emulated)
 -};
 -
 -STD_ROM_PICK(dragngun)
@@ -5234,8 +5239,8 @@ index 6292782..79935bf 100644
 -}
 -
 -struct BurnDriver BurnDrvDragngun = {
--	"dragngun", NULL, NULL, NULL, "1993",
--	"Dragon Gun (US)\0", NULL, "Data East Corporation", "DECO 32",
+-	"dragngun", NULL, NULL, NULL, "1992",
+-	"Dragon Gun (US, LTEST-02 Version 0.00, 1992-12-08)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_SHOOT, 0,
 -	NULL, dragngunRomInfo, dragngunRomName, NULL, NULL, NULL, NULL, DragngunInputInfo, DragngunDIPInfo,
@@ -5296,14 +5301,16 @@ index 6292782..79935bf 100644
 -	{ "mar-08.n21",		0x080000, 0xb9281dfd, 9 | BRF_SND },           // 38 MSM6295 #1 Samples
 -
 -	{ "mar-07.n19",		0x080000, 0x40287d62, 10 | BRF_SND },          // 39 MSM6295 #2 Samples
+-
+-	{ "dvi_decrypt.bin",	0x000400, 0x2d049a30, 0 | BRF_OPT },           // 40 DVI video rom decryption tables (reconstructed, not emulated)
 -};
 -
 -STD_ROM_PICK(dragngunj)
 -STD_ROM_FN(dragngunj)
 -
 -struct BurnDriver BurnDrvDragngunj = {
--	"dragngunj", "dragngun", NULL, NULL, "1993",
--	"Dragon Gun (Japan)\0", NULL, "Data East Corporation", "DECO 32",
+-	"dragngunj", "dragngun", NULL, NULL, "1992",
+-	"Dragon Gun (Japan, Master Version 0.00, 1992-11-24)\0", NULL, "Data East Corporation", "DECO 32",
 -	NULL, NULL, NULL, NULL,
 -	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_SHOOT, 0,
 -	NULL, dragngunjRomInfo, dragngunjRomName, NULL, NULL, NULL, NULL, DragngunInputInfo, DragngunDIPInfo,
@@ -5525,7 +5532,7 @@ index 6292782..79935bf 100644
 +	{0x02, 0x01, 0x80, 0x80, "Off"			},
 +	{0x02, 0x01, 0x80, 0x00, "On"			},
 +
-+	{0   , 0xfe, 0   ,    2, "Speed Hacks"		},
++	{0   , 0xfd, 0   ,    2, "Speed Hacks"		},
 +	{0x03, 0x01, 0x01, 0x00, "Off"			},
 +	{0x03, 0x01, 0x01, 0x01, "On"			},
 +};
@@ -5569,16 +5576,17 @@ index 6292782..79935bf 100644
 +
 +static struct BurnDIPInfo FghthistDIPList[]=
 +{
-+	{0x1a, 0xff, 0xff, 0xef, NULL				},
-+	{0x1b, 0xff, 0xff, 0x00, NULL				},
++	DIP_OFFSET(0x1a)
++	{0x00, 0xff, 0xff, 0xef, NULL				},
++	{0x01, 0xff, 0xff, 0x00, NULL				},
 +
 +	{0   , 0xfe, 0   ,    2, "Service Mode"			},
-+	{0x1a, 0x01, 0x08, 0x08, "Off"				},
-+	{0x1a, 0x01, 0x08, 0x00, "On"				},
++	{0x00, 0x01, 0x08, 0x08, "Off"				},
++	{0x00, 0x01, 0x08, 0x00, "On"				},
 +
-+	{0   , 0xfe, 0   ,    2, "Speed Hacks"			},
-+	{0x1b, 0x01, 0x01, 0x00, "Off"				},
-+	{0x1b, 0x01, 0x01, 0x01, "On"				},
++	{0   , 0xfd, 0   ,    2, "Speed Hacks"			},
++	{0x01, 0x01, 0x01, 0x00, "Off"				},
++	{0x01, 0x01, 0x01, 0x01, "On"				},
 +};
 +
 +STDDIPINFO(Fghthist)
@@ -5628,11 +5636,11 @@ index 6292782..79935bf 100644
 +	{0x00, 0xff, 0xff, 0x08, NULL			},
 +	{0x01, 0xff, 0xff, 0x00, NULL			},
 +
-+	{0   , 0xfe, 0   ,    2, "Service Mode "	},
++	{0   , 0xfe, 0   ,    2, "Service Mode"	},
 +	{0x00, 0x01, 0x08, 0x08, "Off"			},
 +	{0x00, 0x01, 0x08, 0x00, "On"			},
 +
-+	{0   , 0xfe, 0   ,    2, "Speed Hacks"			},
++	{0   , 0xfd, 0   ,    2, "Speed Hacks"			},
 +	{0x01, 0x01, 0x01, 0x00, "Off"				},
 +	{0x01, 0x01, 0x01, 0x01, "On"				},
 +};
@@ -5677,12 +5685,13 @@ index 6292782..79935bf 100644
 +
 +static struct BurnDIPInfo TattassDIPList[]=
 +{
-+	{0x1b, 0xff, 0xff, 0x00, NULL			},
-+	{0x1c, 0xff, 0xff, 0x00, NULL			},
++	DIP_OFFSET(0x1b)
++	{0x00, 0xff, 0xff, 0x00, NULL			},
++	{0x01, 0xff, 0xff, 0x00, NULL			},
 +
-+	{0   , 0xfe, 0   ,    2, "Speed Hacks"			},
-+	{0x1c, 0x01, 0x01, 0x00, "Off"				},
-+	{0x1c, 0x01, 0x01, 0x01, "On"				},
++	{0   , 0xfd, 0   ,    2, "Speed Hacks"			},
++	{0x01, 0x01, 0x01, 0x00, "Off"				},
++	{0x01, 0x01, 0x01, 0x01, "On"				},
 +};
 +
 +STDDIPINFO(Tattass)
@@ -5715,29 +5724,30 @@ index 6292782..79935bf 100644
 +
 +static struct BurnDIPInfo DragngunDIPList[]=
 +{
-+	{0x0e, 0xff, 0xff, 0xfe, NULL			},
-+	{0x0f, 0xff, 0xff, 0x00, NULL			},
-+	{0x10, 0xff, 0xff, 0x04, NULL			},
++	DIP_OFFSET(0x0e)
++	{0x00, 0xff, 0xff, 0xfe, NULL			},
++	{0x01, 0xff, 0xff, 0x00, NULL			},
++	{0x02, 0xff, 0xff, 0x04, NULL			},
 +
 +	{0   , 0xfe, 0   ,    2, "Reset"		},
-+	{0x0e, 0x01, 0x01, 0x00, "Off"			},
-+	{0x0e, 0x01, 0x01, 0x01, "On"			},
++	{0x00, 0x01, 0x01, 0x00, "Off"			},
++	{0x00, 0x01, 0x01, 0x01, "On"			},
 +
 +	{0   , 0xfe, 0   ,    2, "Stage Select"		},
-+	{0x0e, 0x01, 0x40, 0x40, "Off"			},
-+	{0x0e, 0x01, 0x40, 0x00, "On"			},
++	{0x00, 0x01, 0x40, 0x40, "Off"			},
++	{0x00, 0x01, 0x40, 0x00, "On"			},
 +
 +	{0   , 0xfe, 0   ,    2, "Debug Mode"		},
-+	{0x0e, 0x01, 0x80, 0x80, "Off"			},
-+	{0x0e, 0x01, 0x80, 0x00, "On"			},
++	{0x00, 0x01, 0x80, 0x80, "Off"			},
++	{0x00, 0x01, 0x80, 0x00, "On"			},
 +
-+	{0   , 0xfe, 0   ,    2, "Speed Hacks"			},
-+	{0x0f, 0x01, 0x01, 0x00, "Off"				},
-+	{0x0f, 0x01, 0x01, 0x01, "On"				},
++	{0   , 0xfd, 0   ,    2, "Speed Hacks"			},
++	{0x01, 0x01, 0x01, 0x00, "Off"				},
++	{0x01, 0x01, 0x01, 0x01, "On"				},
 +
 +	{0   , 0xfe, 0   ,    2, "Service Mode"		},
-+	{0x10, 0x01, 0x04, 0x04, "Off"			},
-+	{0x10, 0x01, 0x04, 0x00, "On"			},
++	{0x02, 0x01, 0x04, 0x04, "Off"			},
++	{0x02, 0x01, 0x04, 0x00, "On"			},
 +};
 +
 +STDDIPINFO(Dragngun)
@@ -9255,7 +9265,7 @@ index 6292782..79935bf 100644
 +
 +struct BurnDriver BurnDrvCaptaven = {
 +	"captaven", NULL, NULL, NULL, "1991",
-+	"Captain America and The Avengers (Asia Rev 1.4)\0", NULL, "Data East Corporation", "DECO 32",
++	"Captain America and The Avengers (Asia Version 1.4)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_HISCORE_SUPPORTED, 4, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 +	NULL, captavenRomInfo, captavenRomName, NULL, NULL, NULL, NULL, CaptavenInputInfo, CaptavenDIPInfo,
@@ -9305,7 +9315,7 @@ index 6292782..79935bf 100644
 +
 +struct BurnDriver BurnDrvCaptavena = {
 +	"captavena", "captaven", NULL, NULL, "1991",
-+	"Captain America and The Avengers (Asia Rev 1.0)\0", NULL, "Data East Corporation", "DECO 32",
++	"Captain America and The Avengers (Asia Version 1.0)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 4, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 +	NULL, captavenaRomInfo, captavenaRomName, NULL, NULL, NULL, NULL, CaptavenInputInfo, CaptavenDIPInfo,
@@ -9356,7 +9366,7 @@ index 6292782..79935bf 100644
 +
 +struct BurnDriver BurnDrvCaptavene = {
 +	"captavene", "captaven", NULL, NULL, "1991",
-+	"Captain America and The Avengers (UK Rev 1.4)\0", NULL, "Data East Corporation", "DECO 32",
++	"Captain America and The Avengers (UK Version 1.4)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 4, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 +	NULL, captaveneRomInfo, captaveneRomName, NULL, NULL, NULL, NULL, CaptavenInputInfo, CaptavenDIPInfo,
@@ -9406,7 +9416,7 @@ index 6292782..79935bf 100644
 +
 +struct BurnDriver BurnDrvCaptavenu = {
 +	"captavenu", "captaven", NULL, NULL, "1991",
-+	"Captain America and The Avengers (US Rev 1.9)\0", NULL, "Data East Corporation", "DECO 32",
++	"Captain America and The Avengers (US Version 1.9)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 4, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 +	NULL, captavenuRomInfo, captavenuRomName, NULL, NULL, NULL, NULL, CaptavenInputInfo, CaptavenDIPInfo,
@@ -9456,7 +9466,7 @@ index 6292782..79935bf 100644
 +
 +struct BurnDriver BurnDrvCaptavenuu = {
 +	"captavenuu", "captaven", NULL, NULL, "1991",
-+	"Captain America and The Avengers (US Rev 1.6)\0", NULL, "Data East Corporation", "DECO 32",
++	"Captain America and The Avengers (US Version 1.6)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 4, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 +	NULL, captavenuuRomInfo, captavenuuRomName, NULL, NULL, NULL, NULL, CaptavenInputInfo, CaptavenDIPInfo,
@@ -9506,7 +9516,7 @@ index 6292782..79935bf 100644
 +
 +struct BurnDriver BurnDrvCaptavenua = {
 +	"captavenua", "captaven", NULL, NULL, "1991",
-+	"Captain America and The Avengers (US Rev 1.4)\0", NULL, "Data East Corporation", "DECO 32",
++	"Captain America and The Avengers (US Version 1.4)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 4, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 +	NULL, captavenuaRomInfo, captavenuaRomName, NULL, NULL, NULL, NULL, CaptavenInputInfo, CaptavenDIPInfo,
@@ -9556,7 +9566,7 @@ index 6292782..79935bf 100644
 +
 +struct BurnDriver BurnDrvCaptavenj = {
 +	"captavenj", "captaven", NULL, NULL, "1991",
-+	"Captain America and The Avengers (Japan Rev 0.2)\0", NULL, "Data East Corporation", "DECO 32",
++	"Captain America and The Avengers (Japan Version 0.2)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 4, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 +	NULL, captavenjRomInfo, captavenjRomName, NULL, NULL, NULL, NULL, CaptavenInputInfo, CaptavenDIPInfo,
@@ -9602,7 +9612,7 @@ index 6292782..79935bf 100644
 +
 +struct BurnDriver BurnDrvFghthist = {
 +	"fghthist", NULL, NULL, NULL, "1993",
-+	"Fighter's History (World ver 43-09, DE-0395-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
++	"Fighter's History (World Version 43-09, DE-0395-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_VSFIGHT, 0,
 +	NULL, fghthistRomInfo, fghthistRomName, NULL, NULL, NULL, NULL, FghthistInputInfo, FghthistDIPInfo,
@@ -9648,7 +9658,7 @@ index 6292782..79935bf 100644
 +
 +struct BurnDriver BurnDrvFghthista = {
 +	"fghthista", "fghthist", NULL, NULL, "1993",
-+	"Fighter's History (World ver 43-07, DE-0380-2 PCB)\0", NULL, "Data East Corporation", "DECO 32",
++	"Fighter's History (World Version 43-07, DE-0380-2 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_VSFIGHT, 0,
 +	NULL, fghthistaRomInfo, fghthistaRomName, NULL, NULL, NULL, NULL, FghthistInputInfo, FghthistDIPInfo,
@@ -9694,7 +9704,7 @@ index 6292782..79935bf 100644
 +
 +struct BurnDriver BurnDrvFghthistb = {
 +	"fghthistb", "fghthist", NULL, NULL, "1993",
-+	"Fighter's History (World ver 43-05, DE-0380-2 PCB)\0", NULL, "Data East Corporation", "DECO 32",
++	"Fighter's History (World Version 43-05, DE-0380-2 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_VSFIGHT, 0,
 +	NULL, fghthistbRomInfo, fghthistbRomName, NULL, NULL, NULL, NULL, FghthistInputInfo, FghthistDIPInfo,
@@ -9740,7 +9750,7 @@ index 6292782..79935bf 100644
 +
 +struct BurnDriver BurnDrvFghthistu = {
 +	"fghthistu", "fghthist", NULL, NULL, "1993",
-+	"Fighter's History (US ver 42-09, DE-0396-0 PCB)\0", NULL, "Data East Corporation", "DECO 32",
++	"Fighter's History (US Version 42-09, DE-0396-0 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_VSFIGHT, 0,
 +	NULL, fghthistuRomInfo, fghthistuRomName, NULL, NULL, NULL, NULL, FghthistInputInfo, FghthistDIPInfo,
@@ -9786,7 +9796,7 @@ index 6292782..79935bf 100644
 +
 +struct BurnDriver BurnDrvFghthistua = {
 +	"fghthistua", "fghthist", NULL, NULL, "1993",
-+	"Fighter's History (US ver 42-06, DE-0395-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
++	"Fighter's History (US Version 42-06, DE-0395-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_VSFIGHT, 0,
 +	NULL, fghthistuaRomInfo, fghthistuaRomName, NULL, NULL, NULL, NULL, FghthistInputInfo, FghthistDIPInfo,
@@ -9832,7 +9842,7 @@ index 6292782..79935bf 100644
 +
 +struct BurnDriver BurnDrvFghthistub = {
 +	"fghthistub", "fghthist", NULL, NULL, "1993",
-+	"Fighter's History (US ver 42-05, DE-0395-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
++	"Fighter's History (US Version 42-05, DE-0395-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_VSFIGHT, 0,
 +	NULL, fghthistubRomInfo, fghthistubRomName, NULL, NULL, NULL, NULL, FghthistInputInfo, FghthistDIPInfo,
@@ -9878,7 +9888,7 @@ index 6292782..79935bf 100644
 +
 +struct BurnDriver BurnDrvFghthistuc = {
 +	"fghthistuc", "fghthist", NULL, NULL, "1993",
-+	"Fighter's History (US ver 42-03, DE-0380-2 PCB)\0", NULL, "Data East Corporation", "DECO 32",
++	"Fighter's History (US Version 42-03, DE-0380-2 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_VSFIGHT, 0,
 +	NULL, fghthistucRomInfo, fghthistucRomName, NULL, NULL, NULL, NULL, FghthistInputInfo, FghthistDIPInfo,
@@ -9919,7 +9929,7 @@ index 6292782..79935bf 100644
 +
 +struct BurnDriver BurnDrvFghthistj = {
 +	"fghthistj", "fghthist", NULL, NULL, "1993",
-+	"Fighter's History (Japan ver 41-07, DE-0395-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
++	"Fighter's History (Japan Version 41-07, DE-0395-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_VSFIGHT, 0,
 +	NULL, fghthistjRomInfo, fghthistjRomName, NULL, NULL, NULL, NULL, FghthistInputInfo, FghthistDIPInfo,
@@ -9965,7 +9975,7 @@ index 6292782..79935bf 100644
 +
 +struct BurnDriver BurnDrvFghthistja = {
 +	"fghthistja", "fghthist", NULL, NULL, "1993",
-+	"Fighter's History (Japan ver 41-05, DE-0380-2 PCB)\0", NULL, "Data East Corporation", "DECO 32",
++	"Fighter's History (Japan Version 41-05, DE-0380-2 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_VSFIGHT, 0,
 +	NULL, fghthistjaRomInfo, fghthistjaRomName, NULL, NULL, NULL, NULL, FghthistInputInfo, FghthistDIPInfo,
@@ -10011,7 +10021,7 @@ index 6292782..79935bf 100644
 +
 +struct BurnDriver BurnDrvFghthistjb = {
 +	"fghthistjb", "fghthist", NULL, NULL, "1993",
-+	"Fighter's History (Japan ver 41-04, DE-0380-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
++	"Fighter's History (Japan Version 41-04, DE-0380-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_VSFIGHT, 0,
 +	NULL, fghthistjbRomInfo, fghthistjbRomName, NULL, NULL, NULL, NULL, FghthistInputInfo, FghthistDIPInfo,
@@ -10063,7 +10073,7 @@ index 6292782..79935bf 100644
 +
 +struct BurnDriver BurnDrvNslasher = {
 +	"nslasher", NULL, NULL, NULL, "1994",
-+	"Night Slashers (Korea Rev 1.3, DE-0397-0 PCB)\0", NULL, "Data East Corporation", "DECO 32",
++	"Night Slashers (Korea Ver. 1.3, DE-0397-0 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_HISCORE_SUPPORTED, 3, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 +	NULL, nslasherRomInfo, nslasherRomName, NULL, NULL, NULL, NULL, NslasherInputInfo, NslasherDIPInfo,
@@ -10116,7 +10126,7 @@ index 6292782..79935bf 100644
 +
 +struct BurnDriver BurnDrvNslasherj = {
 +	"nslasherj", "nslasher", NULL, NULL, "1994",
-+	"Night Slashers (Japan Rev 1.2, DE-0397-0 PCB)\0", NULL, "Data East Corporation", "DECO 32",
++	"Night Slashers (Japan Ver. 1.2, DE-0397-0 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 3, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 +	NULL, nslasherjRomInfo, nslasherjRomName, NULL, NULL, NULL, NULL, NslasherInputInfo, NslasherDIPInfo,
@@ -10163,7 +10173,7 @@ index 6292782..79935bf 100644
 +
 +struct BurnDriver BurnDrvNslashers = {
 +	"nslashers", "nslasher", NULL, NULL, "1994",
-+	"Night Slashers (Over Sea Rev 1.2, DE-0397-0 PCB)\0", NULL, "Data East Corporation", "DECO 32",
++	"Night Slashers (World Ver. 1.2, DE-0397-0 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 3, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 +	NULL, nslashersRomInfo, nslashersRomName, NULL, NULL, NULL, NULL, NslasherInputInfo, NslasherDIPInfo,
@@ -10215,7 +10225,7 @@ index 6292782..79935bf 100644
 +
 +struct BurnDriver BurnDrvNslasheru = {
 +	"nslasheru", "nslasher", NULL, NULL, "1994",
-+	"Night Slashers (US Rev 1.2, DE-0395-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
++	"Night Slashers (US Ver. 1.2, DE-0395-1 PCB)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 3, HARDWARE_PREFIX_DATAEAST, GBF_SCRFIGHT, 0,
 +	NULL, nslasheruRomInfo, nslasheruRomName, NULL, NULL, NULL, NULL, NslasherInputInfo, NslasherDIPInfo,
@@ -10527,6 +10537,8 @@ index 6292782..79935bf 100644
 +	{ "mar-08.n21",		0x080000, 0xb9281dfd, 9 | BRF_SND },           // 38 MSM6295 #1 Samples
 +
 +	{ "mar-07.n19",		0x080000, 0x40287d62, 10 | BRF_SND },          // 39 MSM6295 #2 Samples
++
++	{ "dvi_decrypt.bin",	0x000400, 0x2d049a30, 0 | BRF_OPT },           // 40 DVI video rom decryption tables (reconstructed, not emulated)
 +};
 +
 +STD_ROM_PICK(dragngun)
@@ -10541,8 +10553,8 @@ index 6292782..79935bf 100644
 +}
 +
 +struct BurnDriver BurnDrvDragngun = {
-+	"dragngun", NULL, NULL, NULL, "1993",
-+	"Dragon Gun (US)\0", NULL, "Data East Corporation", "DECO 32",
++	"dragngun", NULL, NULL, NULL, "1992",
++	"Dragon Gun (US, LTEST-02 Version 0.00, 1992-12-08)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_SHOOT, 0,
 +	NULL, dragngunRomInfo, dragngunRomName, NULL, NULL, NULL, NULL, DragngunInputInfo, DragngunDIPInfo,
@@ -10603,14 +10615,16 @@ index 6292782..79935bf 100644
 +	{ "mar-08.n21",		0x080000, 0xb9281dfd, 9 | BRF_SND },           // 38 MSM6295 #1 Samples
 +
 +	{ "mar-07.n19",		0x080000, 0x40287d62, 10 | BRF_SND },          // 39 MSM6295 #2 Samples
++
++	{ "dvi_decrypt.bin",	0x000400, 0x2d049a30, 0 | BRF_OPT },           // 40 DVI video rom decryption tables (reconstructed, not emulated)
 +};
 +
 +STD_ROM_PICK(dragngunj)
 +STD_ROM_FN(dragngunj)
 +
 +struct BurnDriver BurnDrvDragngunj = {
-+	"dragngunj", "dragngun", NULL, NULL, "1993",
-+	"Dragon Gun (Japan)\0", NULL, "Data East Corporation", "DECO 32",
++	"dragngunj", "dragngun", NULL, NULL, "1992",
++	"Dragon Gun (Japan, Master Version 0.00, 1992-11-24)\0", NULL, "Data East Corporation", "DECO 32",
 +	NULL, NULL, NULL, NULL,
 +	BDF_GAME_WORKING | BDF_CLONE | BDF_HISCORE_SUPPORTED, 2, HARDWARE_PREFIX_DATAEAST, GBF_SHOOT, 0,
 +	NULL, dragngunjRomInfo, dragngunjRomName, NULL, NULL, NULL, NULL, DragngunInputInfo, DragngunDIPInfo,
@@ -10619,7 +10633,7 @@ index 6292782..79935bf 100644
 +};
 diff --git a/src/burn/drv/konami/asp_idle.h b/src/burn/drv/konami/asp_idle.h
 new file mode 100644
-index 0000000..d917b27
+index 000000000..d917b2781
 --- /dev/null
 +++ b/src/burn/drv/konami/asp_idle.h
 @@ -0,0 +1,85 @@
@@ -10709,7 +10723,7 @@ index 0000000..d917b27
 +
 +#endif
 diff --git a/src/burn/drv/konami/d_asterix.cpp b/src/burn/drv/konami/d_asterix.cpp
-index 1c03650..57b1595 100644
+index 1c036507e..57b1595b4 100644
 --- a/src/burn/drv/konami/d_asterix.cpp
 +++ b/src/burn/drv/konami/d_asterix.cpp
 @@ -1,884 +1,907 @@
@@ -12505,7 +12519,7 @@ index 1c03650..57b1595 100644
 +	288, 224, 4, 3
 +};
 diff --git a/src/burn/drv/konami/d_moo.cpp b/src/burn/drv/konami/d_moo.cpp
-index e4315db..066481d 100644
+index e4315db4c..066481d9a 100644
 --- a/src/burn/drv/konami/d_moo.cpp
 +++ b/src/burn/drv/konami/d_moo.cpp
 @@ -9,6 +9,25 @@
@@ -12562,7 +12576,7 @@ index e4315db..066481d 100644
  		if (i == (nInterleave - 1)) {
  			if (moomesabl) {
 diff --git a/src/burn/drv/konami/d_mystwarr.cpp b/src/burn/drv/konami/d_mystwarr.cpp
-index bcd8e6c..e2550c5 100644
+index bcd8e6cc9..e2550c520 100644
 --- a/src/burn/drv/konami/d_mystwarr.cpp
 +++ b/src/burn/drv/konami/d_mystwarr.cpp
 @@ -30,6 +30,21 @@
@@ -12703,7 +12717,7 @@ index bcd8e6c..e2550c5 100644
  #ifdef BUILD_ASP
  	if (asp_samp) {
 diff --git a/src/burn/drv/konami/d_tmnt.cpp b/src/burn/drv/konami/d_tmnt.cpp
-index 7dfa9a7..6d64808 100644
+index 7dfa9a712..6d6480888 100644
 --- a/src/burn/drv/konami/d_tmnt.cpp
 +++ b/src/burn/drv/konami/d_tmnt.cpp
 @@ -10,6 +10,27 @@
@@ -12793,7 +12807,7 @@ index 7dfa9a7..6d64808 100644
  
  		ZetOpen(0);
 diff --git a/src/burn/drv/konami/d_xexex.cpp b/src/burn/drv/konami/d_xexex.cpp
-index f4474a9..5d36553 100644
+index f4474a959..5d36553e3 100644
 --- a/src/burn/drv/konami/d_xexex.cpp
 +++ b/src/burn/drv/konami/d_xexex.cpp
 @@ -1,996 +1,1019 @@
@@ -14813,7 +14827,7 @@ index f4474a9..5d36553 100644
 +	384, 256, 4, 3
 +};
 diff --git a/src/burn/drv/konami/d_xmen.cpp b/src/burn/drv/konami/d_xmen.cpp
-index 0135b06..545e5ff 100644
+index 0135b06a8..545e5ffae 100644
 --- a/src/burn/drv/konami/d_xmen.cpp
 +++ b/src/burn/drv/konami/d_xmen.cpp
 @@ -1,1325 +1,1348 @@
@@ -17491,7 +17505,7 @@ index 0135b06..545e5ff 100644
 +	288*2, 224, 8, 3
 +};
 diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
-index f8b7afa..b2a4ea0 100755
+index f8b7afa04..b2a4ea0c4 100755
 --- a/src/burner/pi/main_pi.cpp
 +++ b/src/burner/pi/main_pi.cpp
 @@ -305,6 +305,7 @@ extern int asp_exit_after_frames;
@@ -17512,7 +17526,7 @@ index f8b7afa..b2a4ea0 100755
  		return 0;
  	}
 diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
-index 649e349..0c8a640 100644
+index 649e349ba..0c8a64049 100644
 --- a/src/burner/pi/run_pi.cpp
 +++ b/src/burner/pi/run_pi.cpp
 @@ -105,6 +105,9 @@ int asp_draw_lead = 0;
@@ -17567,10 +17581,10 @@ index 649e349..0c8a640 100644
  		extern int asp_hash_frames;
  		extern unsigned int asp_hash_done, asp_hash_marks[6];
 diff --git a/src/cpu/z80_intf.cpp b/src/cpu/z80_intf.cpp
-index ab8b2f3..87cd8c0 100644
+index 38ae62559..96ce6bac0 100644
 --- a/src/cpu/z80_intf.cpp
 +++ b/src/cpu/z80_intf.cpp
-@@ -1,1162 +1,1210 @@
+@@ -1,1167 +1,1215 @@
 -// Z80 (Zed Eight-Ty) Interface
 -#include "burnint.h"
 -#include "z80_intf.h"
@@ -18246,6 +18260,11 @@ index ab8b2f3..87cd8c0 100644
 -	} else {
 -		return ZetCPUContext[nCPU]->reg.halt;
 -	}
+-}
+-
+-INT32 ZetIFF1()
+-{
+-	return ActiveZ80GetIFF1();
 -}
 -
 -INT32 ZetBc(INT32 n)
@@ -19458,6 +19477,11 @@ index ab8b2f3..87cd8c0 100644
 +	}
 +}
 +
++INT32 ZetIFF1()
++{
++	return ActiveZ80GetIFF1();
++}
++
 +INT32 ZetBc(INT32 n)
 +{
 +#if defined FBNEO_DEBUG
@@ -19944,10 +19968,10 @@ index ab8b2f3..87cd8c0 100644
 +
 +#undef MAX_Z80
 diff --git a/src/cpu/z80_intf.h b/src/cpu/z80_intf.h
-index 69b7bdc..e0dc753 100644
+index d31e05a1e..8969b8e90 100644
 --- a/src/cpu/z80_intf.h
 +++ b/src/cpu/z80_intf.h
-@@ -1,120 +1,123 @@
+@@ -1,121 +1,124 @@
 -// Z80 (Zed Eight-Ty) Interface
 -
 -#ifndef FASTCALL
@@ -19996,6 +20020,7 @@ index 69b7bdc..e0dc753 100644
 -UINT32 ZetGetPC(INT32 n);
 -INT32 ZetGetPrevPC(INT32 n);
 -INT32 ZetIsHalted(INT32 nCPU); // this is the actual HALT status of the z80
+-INT32 ZetIFF1();
 -INT32 ZetBc(INT32 n);
 -INT32 ZetDe(INT32 n);
 -INT32 ZetHL(INT32 n);
@@ -20116,6 +20141,7 @@ index 69b7bdc..e0dc753 100644
 +UINT32 ZetGetPC(INT32 n);
 +INT32 ZetGetPrevPC(INT32 n);
 +INT32 ZetIsHalted(INT32 nCPU); // this is the actual HALT status of the z80
++INT32 ZetIFF1();
 +INT32 ZetBc(INT32 n);
 +INT32 ZetDe(INT32 n);
 +INT32 ZetHL(INT32 n);

@@ -1,8 +1,8 @@
-From 76da5a95ba32040cf3d09175d05e8f3309a5816b Mon Sep 17 00:00:00 2001
+From 01c98d9281ddb0aefe191bcaf1f83c23a18f70bd Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 17:03:56 +0000
-Subject: [PATCH 20/27] ASP: difficulty tuning key sets every Difficulty / Game
- Level DIP group to Easy
+Subject: ASP: difficulty tuning key sets every Difficulty / Game Level DIP
+ group to Easy
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
@@ -11,7 +11,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  1 file changed, 87 insertions(+)
 
 diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
-index 472e002..9db66b3 100755
+index 472e002e9..9db66b347 100755
 --- a/src/burner/pi/main_pi.cpp
 +++ b/src/burner/pi/main_pi.cpp
 @@ -2,6 +2,10 @@

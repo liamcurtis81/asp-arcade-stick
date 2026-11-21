@@ -1,7 +1,7 @@
-From 624b91c9646c383da2715262c8324f6f71a5aaa8 Mon Sep 17 00:00:00 2001
+From 2ac6429b61805e44b1c704ceefb0736995c25ed0 Mon Sep 17 00:00:00 2001
 From: Liam Curtis <liamcurtis81@users.noreply.github.com>
 Date: Sun, 8 Nov 2026 15:31:55 +0000
-Subject: [PATCH 25/27] ASP: Chase H.Q. picture drawn on the second core
+Subject: ASP: Chase H.Q. picture drawn on the second core
 
 On the stick the Taito Z draw (road, scaled sprites) cost 13.5 ms against
 12.2 ms of emulation, so the game fell to 54.9 fps with broken sound. The
@@ -24,7 +24,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  7 files changed, 7518 insertions(+), 7393 deletions(-)
 
 diff --git a/src/burn/drv/taito/d_taitoz.cpp b/src/burn/drv/taito/d_taitoz.cpp
-index 315fb10..6d1fd14 100644
+index 86c6ab4d6..5f00b764e 100644
 --- a/src/burn/drv/taito/d_taitoz.cpp
 +++ b/src/burn/drv/taito/d_taitoz.cpp
 @@ -1,7361 +1,7403 @@
@@ -242,7 +242,7 @@ index 315fb10..6d1fd14 100644
 -	{"P1 Brake" 		 , BIT_DIGITAL   , TC0510NIOInputPort0 + 5, "p1 fire 1" },
 -	{"P1 Accelerator"	 , BIT_DIGITAL   , TC0510NIOInputPort1 + 5, "p1 fire 2" },
 -	{"P1 Pit In"		 , BIT_DIGITAL   , TC0510NIOInputPort1 + 0, "p1 fire 3" },
--	{"P1 Gear"  		 , BIT_DIGITAL   , TC0510NIOInputPort0 + 1, "p1 fire 4" },
+-	{"P1 Gear Shift"	 , BIT_DIGITAL   , TC0510NIOInputPort0 + 1, "p1 fire 4" },
 -	{"P1 Centre"		 , BIT_DIGITAL   , TC0510NIOInputPort1 + 2, "p1 fire 5" },
 -
 -	{"P2 Coin"           , BIT_DIGITAL   , TC0510NIOInputPort0 + 3, "p2 coin"   },
@@ -7603,7 +7603,7 @@ index 315fb10..6d1fd14 100644
 +	{"P1 Brake" 		 , BIT_DIGITAL   , TC0510NIOInputPort0 + 5, "p1 fire 1" },
 +	{"P1 Accelerator"	 , BIT_DIGITAL   , TC0510NIOInputPort1 + 5, "p1 fire 2" },
 +	{"P1 Pit In"		 , BIT_DIGITAL   , TC0510NIOInputPort1 + 0, "p1 fire 3" },
-+	{"P1 Gear"  		 , BIT_DIGITAL   , TC0510NIOInputPort0 + 1, "p1 fire 4" },
++	{"P1 Gear Shift"	 , BIT_DIGITAL   , TC0510NIOInputPort0 + 1, "p1 fire 4" },
 +	{"P1 Centre"		 , BIT_DIGITAL   , TC0510NIOInputPort1 + 2, "p1 fire 5" },
 +
 +	{"P2 Coin"           , BIT_DIGITAL   , TC0510NIOInputPort0 + 3, "p2 coin"   },
@@ -14793,7 +14793,7 @@ index 315fb10..6d1fd14 100644
 +	NULL, 0x1000, 320, 240, 4, 3
 +};
 diff --git a/src/burn/drv/taito/taito.cpp b/src/burn/drv/taito/taito.cpp
-index f3fd901..ae9ccc9 100644
+index f3fd901bd..ae9ccc9fb 100644
 --- a/src/burn/drv/taito/taito.cpp
 +++ b/src/burn/drv/taito/taito.cpp
 @@ -40,7 +40,7 @@ UINT8 *TaitoSharedRam          = NULL;
@@ -14815,7 +14815,7 @@ index f3fd901..ae9ccc9 100644
  INT32 TaitoXOffset = 0;
  INT32 TaitoYOffset = 0;
 diff --git a/src/burn/drv/taito/taito.h b/src/burn/drv/taito/taito.h
-index e02972c..200673b 100644
+index e02972cef..200673bba 100644
 --- a/src/burn/drv/taito/taito.h
 +++ b/src/burn/drv/taito/taito.h
 @@ -29,7 +29,7 @@ extern UINT8 *TaitoSharedRam;
@@ -14837,7 +14837,7 @@ index e02972c..200673b 100644
  extern INT32 TaitoXOffset;
  extern INT32 TaitoYOffset;
 diff --git a/src/burn/drv/taito/taito_ic.h b/src/burn/drv/taito/taito_ic.h
-index 1ca99ed..fade8a7 100644
+index 1ca99edb1..fade8a799 100644
 --- a/src/burn/drv/taito/taito_ic.h
 +++ b/src/burn/drv/taito/taito_ic.h
 @@ -60,13 +60,18 @@ void PC090OJScan(INT32 nAction);
@@ -14885,7 +14885,7 @@ index 1ca99ed..fade8a7 100644
  void TC0150RODDraw(INT32 yOffs, INT32 pOffs, INT32 Type, INT32 RoadTrans, INT32 LowPriority, INT32 HighPriority);
  void TC0150RODReset();
 diff --git a/src/burn/drv/taito/tc0100scn.cpp b/src/burn/drv/taito/tc0100scn.cpp
-index f796665..3c6bb5d 100644
+index f796665fb..3c6bb5d44 100644
 --- a/src/burn/drv/taito/tc0100scn.cpp
 +++ b/src/burn/drv/taito/tc0100scn.cpp
 @@ -4,30 +4,32 @@
@@ -14994,7 +14994,7 @@ index f796665..3c6bb5d 100644
  {
  	liquid_kludge = 23 - 8;
 diff --git a/src/burn/drv/taito/tc0110pcr.cpp b/src/burn/drv/taito/tc0110pcr.cpp
-index 7d435c7..4a50f59 100644
+index 7d435c7dd..4a50f591d 100644
 --- a/src/burn/drv/taito/tc0110pcr.cpp
 +++ b/src/burn/drv/taito/tc0110pcr.cpp
 @@ -6,12 +6,33 @@
@@ -15035,7 +15035,7 @@ index 7d435c7..4a50f59 100644
  {
  	bits &= 0x1f;
 diff --git a/src/burn/drv/taito/tc0150rod.cpp b/src/burn/drv/taito/tc0150rod.cpp
-index db37033..8fc266a 100644
+index db3703319..8fc266a8c 100644
 --- a/src/burn/drv/taito/tc0150rod.cpp
 +++ b/src/burn/drv/taito/tc0150rod.cpp
 @@ -5,7 +5,12 @@

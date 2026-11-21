@@ -1,8 +1,8 @@
-From 3df3699b5bcdd852cc57f8112972e8bf239495f4 Mon Sep 17 00:00:00 2001
+From ec917b6e7601e88b86c5272889f27cf1b8f6e3c6 Mon Sep 17 00:00:00 2001
 From: Liam Curtis <liamcurtis81@users.noreply.github.com>
 Date: Mon, 9 Nov 2026 19:13:46 +0000
-Subject: [PATCH 27/27] ASP: second-core drawing for Mystic Warriors, Asterix,
- Moo Mesa, Bucky O'Hare, Sunset Riders, Simpsons, Vendetta and Crude Buster
+Subject: ASP: second-core drawing for Mystic Warriors, Asterix, Moo Mesa,
+ Bucky O'Hare, Sunset Riders, Simpsons, Vendetta and Crude Buster
 
 Mystic Warriors' layer 3 reads colours past the end of the palette, into
 68K work RAM; the render thread's palette copy now has that RAM after it,
@@ -30,7 +30,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  12 files changed, 10058 insertions(+), 9721 deletions(-)
 
 diff --git a/src/burn/drv/dataeast/d_cbuster.cpp b/src/burn/drv/dataeast/d_cbuster.cpp
-index 46a83e9..53e01a7 100644
+index 46a83e96c..53e01a73e 100644
 --- a/src/burn/drv/dataeast/d_cbuster.cpp
 +++ b/src/burn/drv/dataeast/d_cbuster.cpp
 @@ -22,15 +22,18 @@ static UINT8 *DrvGfxROM2;
@@ -137,7 +137,7 @@ index 46a83e9..53e01a7 100644
  	}
  
 diff --git a/src/burn/drv/konami/d_asterix.cpp b/src/burn/drv/konami/d_asterix.cpp
-index 57b1595..0aa921f 100644
+index 57b1595b4..0aa921fff 100644
 --- a/src/burn/drv/konami/d_asterix.cpp
 +++ b/src/burn/drv/konami/d_asterix.cpp
 @@ -40,20 +40,20 @@ static UINT8 *AllRam;
@@ -234,7 +234,7 @@ index 57b1595..0aa921f 100644
  
  	return 0;
 diff --git a/src/burn/drv/konami/d_moo.cpp b/src/burn/drv/konami/d_moo.cpp
-index 37fb3c3..a730c67 100644
+index 37fb3c3fc..a730c673d 100644
 --- a/src/burn/drv/konami/d_moo.cpp
 +++ b/src/burn/drv/konami/d_moo.cpp
 @@ -62,7 +62,7 @@ static UINT8 *Drv68KRAM2;
@@ -342,7 +342,7 @@ index 37fb3c3..a730c67 100644
  
  	return 0;
 diff --git a/src/burn/drv/konami/d_mystwarr.cpp b/src/burn/drv/konami/d_mystwarr.cpp
-index e7ab683..1c8e791 100644
+index e7ab68354..1c8e791d0 100644
 --- a/src/burn/drv/konami/d_mystwarr.cpp
 +++ b/src/burn/drv/konami/d_mystwarr.cpp
 @@ -3108,8 +3108,9 @@ static INT32 asp_mw_zet_slice(INT32 target, INT32 done)
@@ -410,7 +410,7 @@ index e7ab683..1c8e791 100644
  }
  #define ASP_MW_DRAW() asp_mw_draw_or_async()
 diff --git a/src/burn/drv/konami/d_simpsons.cpp b/src/burn/drv/konami/d_simpsons.cpp
-index 138c6d4..5b23fe8 100644
+index 138c6d482..5b23fe886 100644
 --- a/src/burn/drv/konami/d_simpsons.cpp
 +++ b/src/burn/drv/konami/d_simpsons.cpp
 @@ -1,1036 +1,1073 @@
@@ -2524,7 +2524,7 @@ index 138c6d4..5b23fe8 100644
 +	288, 224, 4, 3
 +};
 diff --git a/src/burn/drv/konami/d_tmnt.cpp b/src/burn/drv/konami/d_tmnt.cpp
-index 6d64808..4b1a56e 100644
+index 6d6480888..4b1a56e63 100644
 --- a/src/burn/drv/konami/d_tmnt.cpp
 +++ b/src/burn/drv/konami/d_tmnt.cpp
 @@ -1,7265 +1,7304 @@
@@ -17098,7 +17098,7 @@ index 6d64808..4b1a56e 100644
 +	NULL, 0x810, 288, 224, 4, 3
 +};
 diff --git a/src/burn/drv/konami/d_vendetta.cpp b/src/burn/drv/konami/d_vendetta.cpp
-index 12fa1e1..dba2827 100644
+index 12fa1e1eb..dba282788 100644
 --- a/src/burn/drv/konami/d_vendetta.cpp
 +++ b/src/burn/drv/konami/d_vendetta.cpp
 @@ -1,1371 +1,1408 @@
@@ -19882,7 +19882,7 @@ index 12fa1e1..dba2827 100644
 +	288, 240, 4, 3
 +};
 diff --git a/src/burn/drv/konami/k052109.cpp b/src/burn/drv/konami/k052109.cpp
-index 04ce44e..b27496b 100644
+index 04ce44e42..b27496bff 100644
 --- a/src/burn/drv/konami/k052109.cpp
 +++ b/src/burn/drv/konami/k052109.cpp
 @@ -6,14 +6,14 @@
@@ -19971,7 +19971,7 @@ index 04ce44e..b27496b 100644
  static void update_scroll_one(INT32 nLayer, INT32 control, INT32 ram_offset)
  {
 diff --git a/src/burn/drv/konami/k053245.cpp b/src/burn/drv/konami/k053245.cpp
-index 242999e..17425d7 100644
+index 242999eae..17425d758 100644
 --- a/src/burn/drv/konami/k053245.cpp
 +++ b/src/burn/drv/konami/k053245.cpp
 @@ -9,7 +9,7 @@
@@ -20022,7 +20022,7 @@ index 242999e..17425d7 100644
  {
  	for (INT32 i = 0; i < K053245Active; i++) {
 diff --git a/src/burn/drv/konami/konamiic.h b/src/burn/drv/konami/konamiic.h
-index 6ff1bc8..1f8e217 100644
+index 6ff1bc88a..1f8e21724 100644
 --- a/src/burn/drv/konami/konamiic.h
 +++ b/src/burn/drv/konami/konamiic.h
 @@ -477,6 +477,8 @@ void K053247AspCapture(); void K053247AspBind();
@@ -20035,7 +20035,7 @@ index 6ff1bc8..1f8e217 100644
  void K055555AspCapture(); void K055555AspBind();
  void KonamiGXAspCapture(); void KonamiGXAspBind();
 diff --git a/src/burner/pi/asp_async.cpp b/src/burner/pi/asp_async.cpp
-index ccb74cb..280f91b 100644
+index ccb74cbce..280f91b15 100644
 --- a/src/burner/pi/asp_async.cpp
 +++ b/src/burner/pi/asp_async.cpp
 @@ -69,6 +69,13 @@ static void *worker(void *)
@@ -20053,7 +20053,7 @@ index ccb74cb..280f91b 100644
  		}
  		if (present_it) asp_present_external(rbuf);
 diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
-index 249e001..d96e0e9 100644
+index 249e0013a..d96e0e9ba 100644
 --- a/src/burner/pi/run_pi.cpp
 +++ b/src/burner/pi/run_pi.cpp
 @@ -265,6 +265,14 @@ static int RunFrame(int bDraw, int bPause)

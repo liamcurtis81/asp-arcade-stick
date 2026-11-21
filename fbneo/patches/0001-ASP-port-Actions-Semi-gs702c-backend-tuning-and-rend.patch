@@ -1,8 +1,8 @@
-From 6ae0aebed9f7785de62169b88a5c48795c372097 Mon Sep 17 00:00:00 2001
+From abcd3fd1aa84e4be3b57dab92fabd6ec8d5aa2bc Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Thu, 29 Oct 2026 21:00:11 +0000
-Subject: [PATCH 01/27] ASP port: Actions Semi gs702c backend, tuning, and
- renderer instrumentation
+Subject: ASP port: Actions Semi gs702c backend, tuning, and renderer
+ instrumentation
 
 Carries the Arcade Stick Pro work that has been living uncommitted in the
 working tree: the asp video backend, the makefiles, the audio and input glue,
@@ -39,7 +39,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
 
 diff --git a/makefile.asp b/makefile.asp
 new file mode 100644
-index 0000000..3e45754
+index 000000000..3e45754e0
 --- /dev/null
 +++ b/makefile.asp
 @@ -0,0 +1,637 @@
@@ -682,7 +682,7 @@ index 0000000..3e45754
 +FORCE:
 diff --git a/makefile.aspdisp b/makefile.aspdisp
 new file mode 100644
-index 0000000..ff8ac21
+index 000000000..ff8ac2169
 --- /dev/null
 +++ b/makefile.aspdisp
 @@ -0,0 +1,25 @@
@@ -712,7 +712,7 @@ index 0000000..ff8ac21
 +all:
 +	@$(MAKE) -f makefile.asp
 diff --git a/src/burn/drv/konami/konamigx.cpp b/src/burn/drv/konami/konamigx.cpp
-index 0402a4d..f33ea1c 100644
+index 0402a4d1a..f33ea1c38 100644
 --- a/src/burn/drv/konami/konamigx.cpp
 +++ b/src/burn/drv/konami/konamigx.cpp
 @@ -1,737 +1,783 @@
@@ -2237,7 +2237,7 @@ index 0402a4d..f33ea1c 100644
 +#endif
 +}
 diff --git a/src/burn/drv/konami/konamiic.cpp b/src/burn/drv/konami/konamiic.cpp
-index 74a554d..b836217 100644
+index 74a554da8..b83621759 100644
 --- a/src/burn/drv/konami/konamiic.cpp
 +++ b/src/burn/drv/konami/konamiic.cpp
 @@ -15,8 +15,40 @@ UINT32 *konami_bitmap32 = NULL;
@@ -2377,7 +2377,7 @@ index 74a554d..b836217 100644
  
  void konami_draw_16x16_priozoom_sprite(UINT8 *gfx, INT32 code, INT32 bpp, INT32 color, INT32 t, INT32 sx, INT32 sy, INT32 fx, INT32 fy, INT32 width, INT32 height, INT32 zoomx, INT32 zoomy, UINT32 priority)
 diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
-index 0441a93..f7dd0ad 100755
+index 0441a9340..f7dd0ad8d 100755
 --- a/src/burner/pi/main_pi.cpp
 +++ b/src/burner/pi/main_pi.cpp
 @@ -1,5 +1,7 @@
@@ -2790,7 +2790,7 @@ index 0441a93..f7dd0ad 100755
  
  	DrvExit();
 diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
-index d917a7c..00ca55a 100644
+index d917a7cea..00ca55ac8 100644
 --- a/src/burner/pi/run_pi.cpp
 +++ b/src/burner/pi/run_pi.cpp
 @@ -1,5 +1,7 @@
@@ -3193,7 +3193,7 @@ index d917a7c..00ca55a 100644
  }
  
 diff --git a/src/burner/sdl/config.cpp b/src/burner/sdl/config.cpp
-index 8eaacc2..0bf9049 100644
+index 8eaacc212..0bf9049c0 100644
 --- a/src/burner/sdl/config.cpp
 +++ b/src/burner/sdl/config.cpp
 @@ -3,6 +3,12 @@
@@ -3220,7 +3220,7 @@ index 8eaacc2..0bf9049 100644
  		VAR(nVidSelect);                           // video mode select
  		VAR(bVidFullStretch);
 diff --git a/src/intf/audio/sdl/aud_sdl.cpp b/src/intf/audio/sdl/aud_sdl.cpp
-index 5c0063f..c300fdd 100644
+index 5c0063fb3..c300fddd3 100644
 --- a/src/intf/audio/sdl/aud_sdl.cpp
 +++ b/src/intf/audio/sdl/aud_sdl.cpp
 @@ -1,230 +1,357 @@
@@ -3812,7 +3812,7 @@ index 5c0063f..c300fdd 100644
 +
 +struct AudOut AudOutSDL = { SDLSoundBlankSound, SDLSoundCheck, SDLSoundInit, SDLSetCallback, SDLSoundPlay, SDLSoundStop, SDLSoundExit, SDLSoundSetVolume, SDLGetSettings, _T("SDL audio output") };
 diff --git a/src/intf/input/pi/inp_pi.cpp b/src/intf/input/pi/inp_pi.cpp
-index f856045..3b57976 100644
+index f85604520..3b57976c1 100644
 --- a/src/intf/input/pi/inp_pi.cpp
 +++ b/src/intf/input/pi/inp_pi.cpp
 @@ -48,6 +48,224 @@ static int handleFreeplayHack(int player, int code);
@@ -4222,7 +4222,7 @@ index f856045..3b57976 100644
  struct InputInOut InputInOutSDL = { piInputInit, piInputExit, NULL, piInputStart, piInputState, NULL, NULL, NULL, NULL, NULL, _T("Raspberry Pi input") };
 diff --git a/src/intf/video/asp/asp_fbout.h b/src/intf/video/asp/asp_fbout.h
 new file mode 100644
-index 0000000..bd24e7f
+index 000000000..bd24e7f97
 --- /dev/null
 +++ b/src/intf/video/asp/asp_fbout.h
 @@ -0,0 +1,619 @@
@@ -4847,7 +4847,7 @@ index 0000000..bd24e7f
 +#endif /* ASP_FBOUT_H */
 diff --git a/src/intf/video/asp/vid_asp.cpp b/src/intf/video/asp/vid_asp.cpp
 new file mode 100644
-index 0000000..d0c4265
+index 000000000..d0c4265ad
 --- /dev/null
 +++ b/src/intf/video/asp/vid_asp.cpp
 @@ -0,0 +1,211 @@
@@ -5063,7 +5063,7 @@ index 0000000..d0c4265
 +	_T("Arcade Stick Pro direct framebuffer")
 +};
 diff --git a/src/intf/video/vid_interface.cpp b/src/intf/video/vid_interface.cpp
-index 2c40137..161933d 100644
+index 896ddfc72..e7a60e1f2 100644
 --- a/src/intf/video/vid_interface.cpp
 +++ b/src/intf/video/vid_interface.cpp
 @@ -6,7 +6,11 @@

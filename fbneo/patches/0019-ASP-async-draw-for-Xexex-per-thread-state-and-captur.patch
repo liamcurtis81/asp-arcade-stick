@@ -1,9 +1,8 @@
-From d2b678df6fa95b64ef88b48828da63fec4810dc3 Mon Sep 17 00:00:00 2001
+From 7563d01234c975fc44e182072c96f9dcfad1e32f Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Mon, 2 Nov 2026 11:05:50 +0000
-Subject: [PATCH 19/27] ASP: async draw for Xexex; per-thread state and
- capture/bind for K056832, K053247, K053250, K054338, K053251 and the Konami
- mixing bitmaps
+Subject: ASP: async draw for Xexex; per-thread state and capture/bind for
+ K056832, K053247, K053250, K054338, K053251 and the Konami mixing bitmaps
 
 Harness, 2400 frames: render-thread pictures identical to inline at all ten
 checkpoints (modes 1 and 2), sound hash identical, emulation waited twice.
@@ -23,7 +22,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  8 files changed, 1012 insertions(+), 838 deletions(-)
 
 diff --git a/src/burn/drv/konami/d_xexex.cpp b/src/burn/drv/konami/d_xexex.cpp
-index 01f1f17..243de89 100644
+index 01f1f1751..243de8929 100644
 --- a/src/burn/drv/konami/d_xexex.cpp
 +++ b/src/burn/drv/konami/d_xexex.cpp
 @@ -10,6 +10,10 @@
@@ -131,7 +130,7 @@ index 01f1f17..243de89 100644
  			}
  		}
 diff --git a/src/burn/drv/konami/k053247.cpp b/src/burn/drv/konami/k053247.cpp
-index 279af6c..dafe019 100644
+index 279af6c92..dafe0197d 100644
 --- a/src/burn/drv/konami/k053247.cpp
 +++ b/src/burn/drv/konami/k053247.cpp
 @@ -9,10 +9,10 @@
@@ -176,7 +175,7 @@ index 279af6c..dafe019 100644
  
  void K053247Reset()
 diff --git a/src/burn/drv/konami/k053250.cpp b/src/burn/drv/konami/k053250.cpp
-index 90fb6d5..4ec818f 100644
+index 90fb6d5eb..4ec818f89 100644
 --- a/src/burn/drv/konami/k053250.cpp
 +++ b/src/burn/drv/konami/k053250.cpp
 @@ -1,488 +1,505 @@
@@ -1174,7 +1173,7 @@ index 90fb6d5..4ec818f 100644
 +	return k053250Rom[0x80000 * regs[6] + 0x800 * regs[7] + offset/2];
 +}
 diff --git a/src/burn/drv/konami/k053251.cpp b/src/burn/drv/konami/k053251.cpp
-index 936d80c..60688f8 100644
+index 936d80cd0..60688f8d5 100644
 --- a/src/burn/drv/konami/k053251.cpp
 +++ b/src/burn/drv/konami/k053251.cpp
 @@ -3,8 +3,23 @@
@@ -1204,7 +1203,7 @@ index 936d80c..60688f8 100644
  void K053251ResetIndexes()
  {
 diff --git a/src/burn/drv/konami/k054338.cpp b/src/burn/drv/konami/k054338.cpp
-index 911b6aa..e311549 100644
+index 911b6aacf..e31154915 100644
 --- a/src/burn/drv/konami/k054338.cpp
 +++ b/src/burn/drv/konami/k054338.cpp
 @@ -1,311 +1,328 @@
@@ -1848,7 +1847,7 @@ index 911b6aa..e311549 100644
 +	k054338_alphainverted = invert;
 +}
 diff --git a/src/burn/drv/konami/k056832.cpp b/src/burn/drv/konami/k056832.cpp
-index 648b484..1c30c1b 100644
+index 648b4840c..1c30c1b78 100644
 --- a/src/burn/drv/konami/k056832.cpp
 +++ b/src/burn/drv/konami/k056832.cpp
 @@ -6,9 +6,9 @@
@@ -1968,7 +1967,7 @@ index 648b484..1c30c1b 100644
  	BurnFree (K056832TransTab);
  
 diff --git a/src/burn/drv/konami/konamiic.cpp b/src/burn/drv/konami/konamiic.cpp
-index b836217..b75412f 100644
+index b83621759..b75412f95 100644
 --- a/src/burn/drv/konami/konamiic.cpp
 +++ b/src/burn/drv/konami/konamiic.cpp
 @@ -11,9 +11,19 @@ UINT32 KonamiIC_K054338InUse = 0;
@@ -1995,7 +1994,7 @@ index b836217..b75412f 100644
  #ifdef BUILD_ASP
  // Stage timers for the Konami draw. The drawn-frame cost is known (20.4 ms on
 diff --git a/src/burn/drv/konami/konamiic.h b/src/burn/drv/konami/konamiic.h
-index abad380..72093d7 100644
+index abad3806b..72093d781 100644
 --- a/src/burn/drv/konami/konamiic.h
 +++ b/src/burn/drv/konami/konamiic.h
 @@ -16,9 +16,9 @@ extern UINT32 KonamiIC_K054338InUse;

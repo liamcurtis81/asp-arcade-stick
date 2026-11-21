@@ -1,8 +1,7 @@
-From dc532cef8a8888da09f1b9626da2016e719aa605 Mon Sep 17 00:00:00 2001
+From 708c51a840d2572cfd7bc39bd1a8d60bd8c7b8f8 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sun, 1 Nov 2026 16:47:50 +0000
-Subject: [PATCH 16/27] ASP: hash async-drawn pictures for A/B proof against
- inline draw
+Subject: ASP: hash async-drawn pictures for A/B proof against inline draw
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
@@ -12,7 +11,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  2 files changed, 30 insertions(+)
 
 diff --git a/src/burner/pi/asp_async.cpp b/src/burner/pi/asp_async.cpp
-index 65719e4..ccb74cb 100644
+index 65719e4a8..ccb74cbce 100644
 --- a/src/burner/pi/asp_async.cpp
 +++ b/src/burner/pi/asp_async.cpp
 @@ -27,6 +27,10 @@
@@ -46,7 +45,7 @@ index 65719e4..ccb74cb 100644
  
  		pthread_mutex_lock(&m);
 diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
-index a2ee2bb..71884a3 100644
+index a2ee2bb35..71884a3d1 100644
 --- a/src/burner/pi/run_pi.cpp
 +++ b/src/burner/pi/run_pi.cpp
 @@ -694,6 +694,20 @@ static void asp_log_framerate(unsigned int ticks, int emulated, int rendered)
