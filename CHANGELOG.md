@@ -5,6 +5,11 @@ together. Each emulator binary keeps its own build number on the card
 (`fba_v52.dge`, `psx_emu_p18.dge`, ...); the table under each release says
 which builds make it up.
 
+## 2.0.1 - 21 Nov 2026
+
+- Arcade (fba_v53): the cheat list no longer runs to the bottom when opened
+  from a pad; the pad's d-pad is read live while a list is open.
+
 ## 2.0 - 15 Nov 2026
 
 Everything in one place in the game, on every system the mods control.
