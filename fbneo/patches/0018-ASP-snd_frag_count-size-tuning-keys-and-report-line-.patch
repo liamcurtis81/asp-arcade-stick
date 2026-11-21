@@ -1,8 +1,8 @@
-From 5a27cc218bc8d90987ed2279fa0fae694a990a41 Mon Sep 17 00:00:00 2001
+From 53508d188153db77da0e00b75910beff2733c0a6 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Mon, 2 Nov 2026 10:41:58 +0000
-Subject: [PATCH 18/27] ASP: snd_frag_count/size tuning keys and report line
- for the actsnd SETFRAGMENT probe
+Subject: ASP: snd_frag_count/size tuning keys and report line for the actsnd
+ SETFRAGMENT probe
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
@@ -12,7 +12,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  2 files changed, 14 insertions(+)
 
 diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
-index eaf0d29..472e002 100755
+index eaf0d298e..472e002e9 100755
 --- a/src/burner/pi/main_pi.cpp
 +++ b/src/burner/pi/main_pi.cpp
 @@ -351,6 +351,11 @@ static int asp_tuning_apply(const char *key, int value)
@@ -28,7 +28,7 @@ index eaf0d29..472e002 100755
  		// read by our SDL's OSS backend when the audio opens (SDL_dspaudio.c)
  		char v[16]; snprintf(v, sizeof v, "%d", value);
 diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
-index 71884a3..249e001 100644
+index 71884a3d1..249e0013a 100644
 --- a/src/burner/pi/run_pi.cpp
 +++ b/src/burner/pi/run_pi.cpp
 @@ -694,6 +694,15 @@ static void asp_log_framerate(unsigned int ticks, int emulated, int rendered)

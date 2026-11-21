@@ -1,8 +1,8 @@
-From 2c0ca4060a2675578fde0ca34dcdee88cd548727 Mon Sep 17 00:00:00 2001
+From 24ea4e5d4e4a8cdef6ccbd029c00778fcc446b01 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sun, 1 Nov 2026 17:30:05 +0000
-Subject: [PATCH 17/27] ASP: stub analogue axis reads so games with analogue
- inputs don't jump to NULL
+Subject: ASP: stub analogue axis reads so games with analogue inputs don't
+ jump to NULL
 
 Forgotten Worlds crashed on its first frame in InputMake.
 
@@ -13,7 +13,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  1 file changed, 824 insertions(+), 816 deletions(-)
 
 diff --git a/src/intf/input/pi/inp_pi.cpp b/src/intf/input/pi/inp_pi.cpp
-index 3b57976..70efd79 100644
+index 3b57976c1..70efd797e 100644
 --- a/src/intf/input/pi/inp_pi.cpp
 +++ b/src/intf/input/pi/inp_pi.cpp
 @@ -1,816 +1,824 @@

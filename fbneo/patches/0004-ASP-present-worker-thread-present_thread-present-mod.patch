@@ -1,8 +1,8 @@
-From 40b1cd0387803115c4b58fe891c46b7a2ae753a9 Mon Sep 17 00:00:00 2001
+From 482dae2ea80f8cd040663219985f2d2b0faa1142 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 30 Oct 2026 16:15:17 +0000
-Subject: [PATCH 04/27] ASP: present worker thread (present_thread), present
- mode in exit report
+Subject: ASP: present worker thread (present_thread), present mode in exit
+ report
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
@@ -13,7 +13,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  3 files changed, 132 insertions(+), 3 deletions(-)
 
 diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
-index 8ab19b4..940b254 100755
+index 8ab19b48c..940b254b2 100755
 --- a/src/burner/pi/main_pi.cpp
 +++ b/src/burner/pi/main_pi.cpp
 @@ -302,6 +302,7 @@ extern int asp_aud_rate_override;
@@ -34,7 +34,7 @@ index 8ab19b4..940b254 100755
  		return 0;
  	}
 diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
-index 7702d49..730563e 100644
+index 7702d4959..730563ecb 100644
 --- a/src/burner/pi/run_pi.cpp
 +++ b/src/burner/pi/run_pi.cpp
 @@ -492,6 +492,10 @@ static void asp_log_framerate(unsigned int ticks, int emulated, int rendered)
@@ -49,7 +49,7 @@ index 7702d49..730563e 100644
  			extern int asp_speed_hacks;
  			if (asp_arm_insns > 0 && emulated > 0) {
 diff --git a/src/intf/video/asp/vid_asp.cpp b/src/intf/video/asp/vid_asp.cpp
-index d0c4265..6c5d079 100644
+index d0c4265ad..6c5d0793a 100644
 --- a/src/intf/video/asp/vid_asp.cpp
 +++ b/src/intf/video/asp/vid_asp.cpp
 @@ -23,6 +23,7 @@

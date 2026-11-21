@@ -1,8 +1,7 @@
-From 15fedfb4db6585caa5978d8aa353a5d97ce99233 Mon Sep 17 00:00:00 2001
+From 88adc631dd30eabbc3bfb5f138541bacbb51312e Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 31 Oct 2026 15:59:13 +0000
-Subject: [PATCH 09/27] ASP: report cycles skipped by the wait-loop skips in
- the exit log
+Subject: ASP: report cycles skipped by the wait-loop skips in the exit log
 
 All ten Konami games proved identical (frames to 2000, sound to 2000 frames) with skips off vs on.
 
@@ -16,7 +15,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  4 files changed, 16 insertions(+)
 
 diff --git a/src/burn/drv/konami/asp_idle.h b/src/burn/drv/konami/asp_idle.h
-index d917b27..677e281 100644
+index d917b2781..677e28182 100644
 --- a/src/burn/drv/konami/asp_idle.h
 +++ b/src/burn/drv/konami/asp_idle.h
 @@ -22,6 +22,7 @@
@@ -38,7 +37,7 @@ index d917b27..677e281 100644
  		rem -= k * iter;
  	}
 diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
-index b2a4ea0..e28cd41 100755
+index b2a4ea0c4..e28cd41ea 100755
 --- a/src/burner/pi/main_pi.cpp
 +++ b/src/burner/pi/main_pi.cpp
 @@ -306,6 +306,7 @@ extern int asp_present_thread;   // vid_asp.cpp
@@ -50,7 +49,7 @@ index b2a4ea0..e28cd41 100755
  extern int asp_reset_pending;
  
 diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
-index 0c8a640..c3c41c0 100644
+index 0c8a64049..c3c41c043 100644
 --- a/src/burner/pi/run_pi.cpp
 +++ b/src/burner/pi/run_pi.cpp
 @@ -669,6 +669,15 @@ static void asp_log_framerate(unsigned int ticks, int emulated, int rendered)
@@ -70,7 +69,7 @@ index 0c8a640..c3c41c0 100644
  		// Generic per-driver draw split (asp_ds_* filled by a driver's draw).
  		extern unsigned long long asp_ds_t[8];
 diff --git a/src/cpu/z80_intf.cpp b/src/cpu/z80_intf.cpp
-index 87cd8c0..89118d8 100644
+index 96ce6bac0..7052adcad 100644
 --- a/src/cpu/z80_intf.cpp
 +++ b/src/cpu/z80_intf.cpp
 @@ -394,6 +394,7 @@ static INT32 ZetRunReal(INT32 nCycles);

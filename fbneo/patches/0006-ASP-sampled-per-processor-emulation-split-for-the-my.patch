@@ -1,8 +1,7 @@
-From 11689a484e47bcc76b18ffebc02bed0133b6b0b5 Mon Sep 17 00:00:00 2001
+From 6179036a03fc5857fba62adf3bba3fc0937985d6 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 31 Oct 2026 09:47:55 +0000
-Subject: [PATCH 06/27] ASP: sampled per-processor emulation split for the
- mystwarr driver
+Subject: ASP: sampled per-processor emulation split for the mystwarr driver
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
@@ -12,7 +11,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  2 files changed, 66 insertions(+)
 
 diff --git a/src/burn/drv/konami/d_mystwarr.cpp b/src/burn/drv/konami/d_mystwarr.cpp
-index 3d7eff6..a524135 100644
+index 3d7eff64d..a524135f9 100644
 --- a/src/burn/drv/konami/d_mystwarr.cpp
 +++ b/src/burn/drv/konami/d_mystwarr.cpp
 @@ -2992,8 +2992,31 @@ void clear_opposites_viostorm(UINT16 &ipt)
@@ -93,7 +92,7 @@ index 3d7eff6..a524135 100644
  	ZetClose();
  	SekClose();
 diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
-index 8199584..649e349 100644
+index 8199584a2..649e349ba 100644
 --- a/src/burner/pi/run_pi.cpp
 +++ b/src/burner/pi/run_pi.cpp
 @@ -502,6 +502,21 @@ static void asp_log_framerate(unsigned int ticks, int emulated, int rendered)

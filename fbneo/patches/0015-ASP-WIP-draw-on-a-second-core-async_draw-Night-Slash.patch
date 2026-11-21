@@ -1,8 +1,8 @@
-From d1159d3ec5750640cde2332783ff3159c0623cbb Mon Sep 17 00:00:00 2001
+From e436f3e5fbbf071afb36b2543d440ced38ecb02e Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sun, 1 Nov 2026 16:34:27 +0000
-Subject: [PATCH 15/27] ASP WIP: draw on a second core (async_draw), Night
- Slashers first - unproven, building
+Subject: ASP WIP: draw on a second core (async_draw), Night Slashers first -
+ unproven, building
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
@@ -20,7 +20,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  create mode 100644 src/burner/pi/asp_async.cpp
 
 diff --git a/makefile.asp b/makefile.asp
-index 3e45754..3e66e9c 100644
+index 3e45754e0..3e66e9cbc 100644
 --- a/makefile.asp
 +++ b/makefile.asp
 @@ -96,7 +96,7 @@ depobj += cdlist.o \
@@ -33,7 +33,7 @@ index 3e45754..3e66e9c 100644
  
  
 diff --git a/src/burn/burn.cpp b/src/burn/burn.cpp
-index 2588732..4cd50ad 100644
+index 61f03a7d0..944409ac4 100644
 --- a/src/burn/burn.cpp
 +++ b/src/burn/burn.cpp
 @@ -68,9 +68,9 @@ INT32 nBurnFPS            = 6000;
@@ -50,10 +50,10 @@ index 2588732..4cd50ad 100644
  INT32 nBurnSoundRate = 0;			// sample rate of sound or zero for no sound
  INT32 nBurnSoundLen  = 0;			// length in samples per frame
 diff --git a/src/burn/burn.h b/src/burn/burn.h
-index c6c17bf..b50d2da 100644
+index 425fbd42e..1fed36679 100644
 --- a/src/burn/burn.h
 +++ b/src/burn/burn.h
-@@ -363,9 +363,16 @@ extern UINT32 nNamesExArray;
+@@ -414,9 +414,16 @@ extern UINT32 nNamesExArray;
  
  extern INT32 nMaxPlayers;
  
@@ -74,7 +74,7 @@ index c6c17bf..b50d2da 100644
  extern UINT8 nBurnLayer;			// Can be used externally to select which layers to show
  extern UINT8 nSpriteEnable;			// Can be used externally to select which Sprites to show
 diff --git a/src/burn/drv/dataeast/d_deco32.cpp b/src/burn/drv/dataeast/d_deco32.cpp
-index caeeeda..ef4a85b 100644
+index b23e565dd..f10d09813 100644
 --- a/src/burn/drv/dataeast/d_deco32.cpp
 +++ b/src/burn/drv/dataeast/d_deco32.cpp
 @@ -32,12 +32,12 @@ static UINT8 *DrvDVIROM; // dragngun
@@ -103,7 +103,7 @@ index caeeeda..ef4a85b 100644
  static UINT32 sprite_ctrl;
  static UINT32 lightgun_port;
  
-@@ -2319,6 +2319,12 @@ static INT32 DragngunCommonInit(INT32 has_z80, UINT32 speedhack)
+@@ -2322,6 +2322,12 @@ static INT32 DragngunCommonInit(INT32 has_z80, UINT32 speedhack)
  
  static INT32 DrvExit()
  {
@@ -116,7 +116,7 @@ index caeeeda..ef4a85b 100644
  	GenericTilesExit();
  	deco16Exit();
  
-@@ -3594,6 +3600,47 @@ static INT32 DragngunDrawScanline(INT32 line)
+@@ -3597,6 +3603,47 @@ static INT32 DragngunDrawScanline(INT32 line)
  	return 0;
  }
  
@@ -164,7 +164,7 @@ index caeeeda..ef4a85b 100644
  static INT32 DrvFrame()
  {
  	if (DrvReset) {
-@@ -3682,6 +3729,9 @@ static INT32 DrvFrame()
+@@ -3685,6 +3732,9 @@ static INT32 DrvFrame()
  	nExtraCycles[1] = nCyclesDone[1] - nCyclesTotal[1];
  
  	if (pBurnDraw && pDrawScanline == NULL) {
@@ -175,7 +175,7 @@ index caeeeda..ef4a85b 100644
  	}
  
 diff --git a/src/burn/drv/dataeast/deco16ic.cpp b/src/burn/drv/dataeast/deco16ic.cpp
-index c8add34..b0d9fc7 100644
+index c8add345f..b0d9fc70d 100644
 --- a/src/burn/drv/dataeast/deco16ic.cpp
 +++ b/src/burn/drv/dataeast/deco16ic.cpp
 @@ -37,9 +37,9 @@ static INT32 deco16_graphics_size[4];
@@ -192,7 +192,7 @@ index c8add34..b0d9fc7 100644
  UINT16 deco16_priority;
  
 diff --git a/src/burn/drv/dataeast/deco16ic.h b/src/burn/drv/dataeast/deco16ic.h
-index 840bc2a..1b9d001 100644
+index 840bc2a90..1b9d00155 100644
 --- a/src/burn/drv/dataeast/deco16ic.h
 +++ b/src/burn/drv/dataeast/deco16ic.h
 @@ -1,9 +1,11 @@
@@ -212,7 +212,7 @@ index 840bc2a..1b9d001 100644
  extern INT32 deco16_vblank;
 diff --git a/src/burner/pi/asp_async.cpp b/src/burner/pi/asp_async.cpp
 new file mode 100644
-index 0000000..65719e4
+index 000000000..65719e4a8
 --- /dev/null
 +++ b/src/burner/pi/asp_async.cpp
 @@ -0,0 +1,123 @@
@@ -340,7 +340,7 @@ index 0000000..65719e4
 +	return 1;
 +}
 diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
-index ed9cc68..eaf0d29 100755
+index ed9cc68ed..eaf0d298e 100755
 --- a/src/burner/pi/main_pi.cpp
 +++ b/src/burner/pi/main_pi.cpp
 @@ -348,6 +348,9 @@ static int asp_tuning_apply(const char *key, int value)
@@ -354,7 +354,7 @@ index ed9cc68..eaf0d29 100755
  		// read by our SDL's OSS backend when the audio opens (SDL_dspaudio.c)
  		char v[16]; snprintf(v, sizeof v, "%d", value);
 diff --git a/src/intf/video/asp/vid_asp.cpp b/src/intf/video/asp/vid_asp.cpp
-index 6c5d079..942ac94 100644
+index 6c5d0793a..942ac94e2 100644
 --- a/src/intf/video/asp/vid_asp.cpp
 +++ b/src/intf/video/asp/vid_asp.cpp
 @@ -311,8 +311,30 @@ static int AspRunFrame(bool bRedraw)

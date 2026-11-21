@@ -1,8 +1,8 @@
-From 6ba002276b5b13ad8ec2348fb144842cabdc7494 Mon Sep 17 00:00:00 2001
+From 30012ed7e040d69a2440827c5e55f94916fee545 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 31 Oct 2026 14:41:19 +0000
-Subject: [PATCH 07/27] ASP: Metamorphic Force sound Z80 idle-loop skip
- (z80_idle), output identical
+Subject: ASP: Metamorphic Force sound Z80 idle-loop skip (z80_idle), output
+ identical
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
@@ -12,7 +12,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  2 files changed, 78 insertions(+), 2 deletions(-)
 
 diff --git a/src/burn/drv/konami/d_mystwarr.cpp b/src/burn/drv/konami/d_mystwarr.cpp
-index a524135..bcd8e6c 100644
+index a524135f9..bcd8e6cc9 100644
 --- a/src/burn/drv/konami/d_mystwarr.cpp
 +++ b/src/burn/drv/konami/d_mystwarr.cpp
 @@ -3003,6 +3003,40 @@ unsigned long long asp_mw_t68k = 0, asp_mw_tz80 = 0, asp_mw_ttimer = 0,
@@ -135,7 +135,7 @@ index a524135..bcd8e6c 100644
  	SekClose();
  
 diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
-index a7bcc32..f8b7afa 100755
+index a7bcc326f..f8b7afa04 100755
 --- a/src/burner/pi/main_pi.cpp
 +++ b/src/burner/pi/main_pi.cpp
 @@ -304,6 +304,7 @@ extern int asp_hash_frames;

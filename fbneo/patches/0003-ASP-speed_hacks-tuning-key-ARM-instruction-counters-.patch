@@ -1,8 +1,8 @@
-From b383b25bfb8c12a67e87918a5412a79094d9920f Mon Sep 17 00:00:00 2001
+From 34aa7c4b9c539ff6f24be6c9040f327d7d8d4cc9 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 30 Oct 2026 10:15:11 +0000
-Subject: [PATCH 03/27] ASP: speed_hacks tuning key, ARM instruction counters,
- driver reset pulse
+Subject: ASP: speed_hacks tuning key, ARM instruction counters, driver reset
+ pulse
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
@@ -13,7 +13,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  3 files changed, 125 insertions(+)
 
 diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
-index cf28bc8..8ab19b4 100755
+index cf28bc8d1..8ab19b48c 100755
 --- a/src/burner/pi/main_pi.cpp
 +++ b/src/burner/pi/main_pi.cpp
 @@ -302,6 +302,13 @@ extern int asp_aud_rate_override;
@@ -120,7 +120,7 @@ index cf28bc8..8ab19b4 100755
  	// further line would be a write to the card during play.
  	asp_log_close();
 diff --git a/src/burner/pi/run_pi.cpp b/src/burner/pi/run_pi.cpp
-index e8ad44c..7702d49 100644
+index e8ad44cca..7702d4959 100644
 --- a/src/burner/pi/run_pi.cpp
 +++ b/src/burner/pi/run_pi.cpp
 @@ -133,6 +133,11 @@ int asp_hash_frames = 0;
@@ -176,7 +176,7 @@ index e8ad44c..7702d49 100644
  		for (int i = 1; i <= 8; i++) {
  			if (asp_batch_hist[i]) fprintf(f, " %d:%u", i, asp_batch_hist[i]);
 diff --git a/src/cpu/arm_intf.cpp b/src/cpu/arm_intf.cpp
-index 424ad5b..7fe45a6 100644
+index 424ad5bb2..7fe45a658 100644
 --- a/src/cpu/arm_intf.cpp
 +++ b/src/cpu/arm_intf.cpp
 @@ -26,6 +26,18 @@ static UINT8  (*pReadByteHandler)(UINT32) = NULL;

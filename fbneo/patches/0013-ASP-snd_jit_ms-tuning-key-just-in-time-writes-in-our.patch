@@ -1,8 +1,8 @@
-From 3cf67636a95e43fc2e7a65f534a046373ab496db Mon Sep 17 00:00:00 2001
+From 9fe4af0e93efcd628c7b6685624b7a736175f30b Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sun, 1 Nov 2026 16:17:05 +0000
-Subject: [PATCH 13/27] ASP: snd_jit_ms tuning key (just-in-time writes in our
- SDL OSS backend)
+Subject: ASP: snd_jit_ms tuning key (just-in-time writes in our SDL OSS
+ backend)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
@@ -11,7 +11,7 @@ Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
  1 file changed, 4 insertions(+)
 
 diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
-index e28cd41..ed9cc68 100755
+index e28cd41ea..ed9cc68ed 100755
 --- a/src/burner/pi/main_pi.cpp
 +++ b/src/burner/pi/main_pi.cpp
 @@ -348,6 +348,10 @@ static int asp_tuning_apply(const char *key, int value)

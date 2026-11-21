@@ -5,6 +5,16 @@ together. Each emulator binary keeps its own build number on the card
 (`fba_v52.dge`, `psx_emu_p18.dge`, ...); the table under each release says
 which builds make it up.
 
+## Unreleased - fba_v54 (not yet on the card)
+
+- Arcade rebased onto upstream FinalBurn Neo `5cde6a8` (21 Nov 2026).
+  Brings upstream's faster SH-2 core for CPS3 (predecoded opcodes and
+  generic idle-loop skipping in place of the old per-game speed hacks).
+- CPS1, CPS2 and Neo Geo save states now store more data upstream, so
+  states made with fba_v53 or earlier may not load.
+- `makefile.asp` builds upstream's new C scalers (patch 0032).
+- Needs testing on the stick before it replaces fba_v53.
+
 ## 2.0 - 15 Nov 2026
 
 Everything in one place in the game, on every system the mods control.
