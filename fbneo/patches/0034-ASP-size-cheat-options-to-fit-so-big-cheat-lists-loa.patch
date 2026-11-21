@@ -1,0 +1,136 @@
+From 737d1cdc1e95d753a94416970206b9d26e910fc9 Mon Sep 17 00:00:00 2001
+From: Liam Curtis <liamcurtis81@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 11:35:53 +0000
+Subject: [PATCH 34/34] ASP: size cheat options to fit so big cheat lists load
+ (fba_v56)
+
+Every cheat option was allocated for 512 addresses (~33KB). Red Earth's
+cheat file has 3859 options, which asked for ~127MB and got the emulator
+killed on the stick (256MB, ~130MB free). Shrink each option to the
+addresses it uses as soon as the parser moves on: Red Earth now peaks at
+~100MB instead of ~218MB.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/burner/conc.cpp | 56 ++++++++++++++++++++++++++++++++-------------
+ 1 file changed, 40 insertions(+), 16 deletions(-)
+
+diff --git a/src/burner/conc.cpp b/src/burner/conc.cpp
+index 1451884d6..e1a2b8fbd 100644
+--- a/src/burner/conc.cpp
++++ b/src/burner/conc.cpp
+@@ -1,6 +1,37 @@
+ // Burner cheat-file loader
+ #include "burner.h"
+ #include "neocdlist.h"
++#include <stddef.h>
++
++// ASP: every cheat option is allocated with room for CHEAT_MAX_ADDRESS (512)
++// addresses, about 33KB each. Red Earth's cheat file has 3859 options, so it
++// asked for ~127MB and the stick (256MB, ~130MB free) was killed outright.
++// Each option is cut down to the addresses it actually uses as soon as the
++// parser moves on to the next one, so only one full-size option exists at a
++// time. Options are always freshly allocated, never reused, so nothing writes
++// a full sizeof(CheatOption) into a shrunk one.
++static CheatOption** pAspOpenOpt = NULL;
++
++static void AspOptShrink()
++{
++	if (pAspOpenOpt == NULL || *pAspOpenOpt == NULL) { pAspOpenOpt = NULL; return; }
++	CheatOption* o = *pAspOpenOpt;
++	INT32 k = 0;
++	while (k < CHEAT_MAX_ADDRESS && o->AddressInfo[k].nAddress) k++;
++	size_t nSize = offsetof(CheatOption, AddressInfo) + (k + 1) * sizeof(CheatAddressInfo);
++	CheatOption* r = (CheatOption*)realloc(o, nSize);
++	if (r) *pAspOpenOpt = r;
++	pAspOpenOpt = NULL;
++}
++
++static void AspOptAlloc(CheatOption** pp)
++{
++	AspOptShrink();
++	if (*pp) free(*pp);
++	*pp = (CheatOption*)malloc(sizeof(CheatOption));
++	if (*pp) memset(*pp, 0, sizeof(CheatOption));
++	pAspOpenOpt = pp;
++}
+ 
+ // GameGenie stuff is handled a little differently..
+ #define HW_NES ( ((BurnDrvGetHardwareCode() & HARDWARE_PUBLIC_MASK) == HARDWARE_NES) || ((BurnDrvGetHardwareCode() & HARDWARE_PUBLIC_MASK) == HARDWARE_FDS) )
+@@ -276,10 +307,7 @@ static INT32 ConfigParseFile(TCHAR* pszFilename)
+ 				}
+ 				s = szEnd;
+ 
+-				if (pCurrentCheat->pOption[n] == NULL) {
+-					pCurrentCheat->pOption[n] = (CheatOption*)malloc(sizeof(CheatOption));
+-				}
+-				memset(pCurrentCheat->pOption[n], 0, sizeof(CheatOption));
++				AspOptAlloc(&pCurrentCheat->pOption[n]);
+ 
+ 				memcpy(pCurrentCheat->pOption[n]->szOptionName, szQuote, QUOTE_MAX * sizeof(TCHAR));
+ 
+@@ -466,10 +494,7 @@ static INT32 ConfigParseNebulaFile(TCHAR* pszFilename)
+ 			if (szLine[i] == '=' && i < 4) j = i+1;
+ 			if (szLine[i] == ',' || szLine[i] == '\r' || szLine[i] == '\n')
+ 			{
+-				if (pCurrentCheat->pOption[n] == NULL) {
+-					pCurrentCheat->pOption[n] = (CheatOption*)malloc(sizeof(CheatOption));
+-				}
+-				memset(pCurrentCheat->pOption[n], 0, sizeof(CheatOption));
++				AspOptAlloc(&pCurrentCheat->pOption[n]);
+ 
+ 				_tcsncpy (pCurrentCheat->pOption[n]->szOptionName, szLine + j, QUOTE_MAX * sizeof(TCHAR));
+ 				pCurrentCheat->pOption[n]->szOptionName[i-j] = '\0';
+@@ -556,10 +581,7 @@ static INT32 ConfigParseMAMEFile_internal(FILE *fz, const TCHAR *pszFileHeading,
+ 	}
+ 
+ #define OptionName(a)	\
+-	if (pCurrentCheat->pOption[n] == NULL) {						\
+-		pCurrentCheat->pOption[n] = (CheatOption*)malloc(sizeof(CheatOption));		\
+-	}											\
+-	memset(pCurrentCheat->pOption[n], 0, sizeof(CheatOption));				\
++	AspOptAlloc(&pCurrentCheat->pOption[n]);						\
+ 	_tcsncpy (pCurrentCheat->pOption[n]->szOptionName, a, QUOTE_MAX * sizeof(TCHAR));	\
+ 
+ #define tmpcpy(a)	\
+@@ -919,10 +941,7 @@ static INT32 ConfigParseVCT(TCHAR* pszFilename)
+ 	}
+ 
+ #define OptionName(a)	\
+-	if (pCurrentCheat->pOption[n] == NULL) {						\
+-		pCurrentCheat->pOption[n] = (CheatOption*)malloc(sizeof(CheatOption));		\
+-	}											\
+-	memset(pCurrentCheat->pOption[n], 0, sizeof(CheatOption));				\
++	AspOptAlloc(&pCurrentCheat->pOption[n]);						\
+ 	_tcsncpy (pCurrentCheat->pOption[n]->szOptionName, a, QUOTE_MAX * sizeof(TCHAR));	\
+ 
+ #define tmpcpy(a)	\
+@@ -1072,19 +1091,24 @@ INT32 ConfigCheatLoad()
+ 	if (HW_NES) { // only for NES/FC!
+ 		_stprintf(szFilename, _T("%s%s.vct"), szAppCheatsPath, szDrvName);
+ 		ConfigParseVCT(szFilename);
++		AspOptShrink();
+ 	} // keep loading & adding stuff even if .vct file loads.
+ 
+ 	// cheat.dat, cheatnes.dat, cheatsnes.dat, wayder_cheat.dat
+ 	ConfigParseMAMEFile(0 /* cheat.dat, cheatnes.dat, cheatsnes.dat */);
++	AspOptShrink();
+ 	ConfigParseMAMEFile(1 /* wayder */);
++	AspOptShrink();
+ 
+ 	// ini-style file
+ 	_stprintf(szFilename, _T("%s%s.ini"), szAppCheatsPath, szDrvName);
+ 	ConfigParseFile(szFilename);
++	AspOptShrink();
+ 
+ 	// nebula-format .dat file
+ 	_stprintf(szFilename, _T("%s%s.dat"), szAppCheatsPath, szDrvName);
+ 	ConfigParseNebulaFile(szFilename);
++	AspOptShrink();
+ 
+ 	if (pCheatInfo) {
+ 		INT32 nCurrentCheat = 0;
+-- 
+2.43.0
+

@@ -5,6 +5,19 @@ together. Each emulator binary keeps its own build number on the card
 (`fba_v52.dge`, `psx_emu_p18.dge`, ...); the table under each release says
 which builds make it up.
 
+## 2.2 - 21 Nov 2026
+
+- Arcade (fba_v56): big cheat lists no longer run the stick out of memory.
+  Every cheat option was allocated for 512 addresses; Red Earth's 3859 options
+  asked for ~127MB and the system killed the emulator. Options are now trimmed
+  to what they use (patch 0034), so Red Earth peaks at ~100MB instead of
+  ~218MB.
+- fba_v55 (old SH-2 core) was a wrong diagnosis and is superseded; v56 keeps
+  upstream's core (patch 0033 records the round trip).
+- JoJo romsets renamed to the sets FinalBurn Neo matches them to:
+  `jojo.zip` is `jojou` (USA 990128), `jojoba.zip` is `jojobajr1`
+  (Japan 990927). The old names asked for BIOS files those zips don't have.
+
 ## 2.1 - 21 Nov 2026
 
 - Arcade (fba_v54): rebased onto upstream FinalBurn Neo `5cde6a8`, bringing

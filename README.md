@@ -1,6 +1,6 @@
 # Neo Geo Arcade Stick Pro: emulator mods
 
-**Version 2.1** (21 Nov 2026). See [CHANGELOG.md](CHANGELOG.md) for what each version added.
+**Version 2.2** (21 Nov 2026). See [CHANGELOG.md](CHANGELOG.md) for what each version added.
 
 Custom emulators, launcher pages and in-game extras for the **SNK Neo Geo
 Arcade Stick Pro** (ASP) running the HyloStick launcher from a USB card.
