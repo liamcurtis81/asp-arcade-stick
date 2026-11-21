@@ -7,6 +7,9 @@ which builds make it up.
 
 ## 2.2 - 21 Nov 2026
 
+- Arcade (fba_v57): arcade cheats now take effect. The frontend had the
+  cheat engine switched off, so the list could be ticked but nothing changed
+  in the game (patch 0035).
 - Arcade (fba_v56): big cheat lists no longer run the stick out of memory.
   Every cheat option was allocated for 512 addresses; Red Earth's 3859 options
   asked for ~127MB and the system killed the emulator. Options are now trimmed

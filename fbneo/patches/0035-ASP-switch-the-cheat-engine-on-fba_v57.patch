@@ -1,0 +1,54 @@
+From 4849eab49f0d2ccd5a93c5f4d5b6afc3c59d2735 Mon Sep 17 00:00:00 2001
+From: Liam Curtis <liamcurtis81@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 12:19:46 +0000
+Subject: [PATCH] ASP: switch the cheat engine on (fba_v57)
+
+The Pi frontend sets bCheatsAllowed = false, so CheatEnable() returned
+without doing anything: the arcade cheat list has never changed a game.
+Allow cheats in the ASP build, and count only cheats the core accepted
+in the log line. Checked: Red Earth's Infinite Credits shows CREDITS:9.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/burner/pi/main_pi.cpp      | 7 +++++++
+ src/intf/video/asp/vid_asp.cpp | 4 ++--
+ 2 files changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/src/burner/pi/main_pi.cpp b/src/burner/pi/main_pi.cpp
+index 9db66b347..9df08952a 100755
+--- a/src/burner/pi/main_pi.cpp
++++ b/src/burner/pi/main_pi.cpp
+@@ -800,7 +800,14 @@ int main(int argc, char *argv[])
+ 		mkdir(nvramPath, 0777);
+ 	}
+ 
++#ifdef BUILD_ASP
++	// The Pi frontend switched the cheat engine off, so every CheatEnable()
++	// returned without doing anything and the in-game cheat list was a menu
++	// with nothing behind it. The ASP build has a cheat list: allow cheats.
++	bCheatsAllowed = true;
++#else
+ 	bCheatsAllowed = false;
++#endif
+ 
+ 	if (DrvInit(driverId, 0) != 0) {
+ 		fprintf(stderr, "Driver init failed\n");
+diff --git a/src/intf/video/asp/vid_asp.cpp b/src/intf/video/asp/vid_asp.cpp
+index 7dfe18097..a76a12c1f 100644
+--- a/src/intf/video/asp/vid_asp.cpp
++++ b/src/intf/video/asp/vid_asp.cpp
+@@ -296,8 +296,8 @@ static int asp_cheats_emulator_apply(void)
+ 	for (int i = 0; i < cht_n; i++) {
+ 		int o = 0;
+ 		if (cht_usable(i) && cht[i].on) o = cht[i].nopt > 2 ? cht[i].opt : 1;
+-		CheatEnable(i, o ? o : -1);
+-		if (o) n++;
++		// Count only what the core accepted, so the log says if it refused.
++		if (CheatEnable(i, o ? o : -1) == 0 && o) n++;
+ 	}
+ 	return n;
+ }
+-- 
+2.43.0
+
