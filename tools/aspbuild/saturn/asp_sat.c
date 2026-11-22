@@ -632,6 +632,8 @@ static int16_t input_state(unsigned port, unsigned device, unsigned index, unsig
 /* ---- audio buffer status, for the core's automatic frameskip ----------- */
 extern int asp_frameskip_req;   /* vdp2.c (ASP patch) */
 extern int asp_m68k_thread;     /* scsp.c (ASP patch) */
+extern int asp_slave_idle_enable;          /* sh2_dynarec.c (ASP patch) */
+extern unsigned long asp_onchip_reads[2][512], asp_slave_skips;
 extern double asp_render_wait_us, asp_drawend_us, asp_m68k_wait_us;
 static int cpu_boost_on = 1;   /* sat_options.txt: asp_cpu_boost */
 static int max_skip = 3, skip_below = 50;   /* sat_options.txt: asp_max_skip, asp_skip_below */
@@ -676,6 +678,10 @@ static void load_overrides(void)
 	while (n_ovr < 32 && fgets(line, sizeof(line), f)) {
 		if (line[0] == '#' || sscanf(line, "%63s %47s", ovr_k[n_ovr], ovr_v[n_ovr]) != 2)
 			continue;
+		if (strcmp(ovr_k[n_ovr], "asp_slave_idle") == 0) {
+			asp_slave_idle_enable = atoi(ovr_v[n_ovr]);
+			continue;
+		}
 		if (strcmp(ovr_k[n_ovr], "asp_m68k_thread") == 0) {
 			asp_m68k_thread = atoi(ovr_v[n_ovr]);
 			fprintf(stderr, "asp: sound CPU on its own core: %s\n", asp_m68k_thread ? "yes" : "no");
@@ -998,6 +1004,30 @@ static void prof_handler(int sig, siginfo_t *si, void *ctx)
 	prof_pc[i] = uc->uc_mcontext.arm_pc;
 	prof_tid[i] = (uint16_t)syscall(SYS_gettid);
 }
+static void crash_handler(int sig, siginfo_t *si, void *ctx)
+{
+	ucontext_t *uc = ctx;
+	char b[200];
+	int n = snprintf(b, sizeof(b), "\nasp: CRASH signal %d at pc %08lx lr %08lx address %p thread %ld\n",
+		sig, (unsigned long)uc->uc_mcontext.arm_pc, (unsigned long)uc->uc_mcontext.arm_lr,
+		si->si_addr, (long)syscall(SYS_gettid));
+	if (n > 0) { ssize_t w = write(2, b, n); (void)w; }
+	fsync(2);
+	signal(sig, SIG_DFL);
+	raise(sig);
+}
+static void crash_install(void)
+{
+	struct sigaction sa;
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_sigaction = crash_handler;
+	sa.sa_flags = SA_SIGINFO;
+	sigaction(SIGSEGV, &sa, NULL);
+	sigaction(SIGBUS, &sa, NULL);
+	sigaction(SIGILL, &sa, NULL);
+	sigaction(SIGFPE, &sa, NULL);
+	sigaction(SIGABRT, &sa, NULL);
+}
 static void prof_start(void)
 {
 	struct sigaction sa;
@@ -1016,32 +1046,29 @@ static void prof_dump(const char *dir)
 	char path[600];
 	FILE *f;
 	unsigned n = prof_n;
-	snprintf(path, sizeof(path), "%ssat_prof.bin", dir);
+	char final[600];
+	/* Written under a temporary name and renamed, so a power-off mid-write
+	 * leaves the previous profile rather than a broken file. */
+	snprintf(path, sizeof(path), "%ssat_prof.tmp", dir);
+	snprintf(final, sizeof(final), "%ssat_prof.bin", dir);
 	f = fopen(path, "wb");
 	if (!f) return;
 	fwrite(&n, 4, 1, f);
 	fwrite(prof_pc, 4, n, f);
 	fwrite(prof_tid, 2, n, f);
+	fflush(f);
+	fsync(fileno(f));
 	fclose(f);
+	rename(path, final);
 	sync();
 }
 static void prof_stop(const char *dir)
 {
 	struct itimerval it;
-	char path[600];
-	FILE *f;
 	memset(&it, 0, sizeof(it));
 	setitimer(ITIMER_PROF, &it, NULL);
-	snprintf(path, sizeof(path), "%ssat_prof.bin", dir);
-	f = fopen(path, "wb");
-	if (f) {
-		unsigned n = prof_n;
-		fwrite(&n, 4, 1, f);
-		fwrite(prof_pc, 4, n, f);
-		fwrite(prof_tid, 2, n, f);
-		fclose(f);
-	}
-	fprintf(stderr, "asp: profiler wrote %u samples to %s\n", prof_n, path);
+	prof_dump(dir);
+	fprintf(stderr, "asp: profiler wrote %u samples\n", prof_n);
 }
 
 int main(int argc, char **argv)
@@ -1120,6 +1147,7 @@ int main(int argc, char **argv)
 	manual_find(src);
 	cheats_find(src);
 	asp_stats_begin(bin_dir, "saturn", src);
+	crash_install();
 	cpu_boost();
 	if (!getenv("ASP_NO_PROF")) prof_start();
 	retro_init();
@@ -1209,7 +1237,25 @@ int main(int argc, char **argv)
 				asp_render_wait_us / 1000.0 / 1200, asp_drawend_us / 1000.0 / 1200, asp_m68k_wait_us / 1000.0 / 1200);
 			asp_render_wait_us = asp_drawend_us = asp_m68k_wait_us = 0;
 			fprintf(stderr, "asp: pictures not drawn so far: %lu\n", asp_frames_skipped);
-			prof_dump(bin_dir);
+			{
+				int cpu, k, r;
+				fprintf(stderr, "asp: slave timeslices skipped as idle: %lu\n", asp_slave_skips);
+				for (cpu = 0; cpu < 2; cpu++) {
+					fprintf(stderr, "asp: %s on-chip byte reads:", cpu ? "slave" : "master");
+					for (k = 0; k < 4; k++) {
+						int best = -1;
+						for (r = 0; r < 512; r++)
+							if (best < 0 || asp_onchip_reads[cpu][r] > asp_onchip_reads[cpu][best]) best = r;
+						if (!asp_onchip_reads[cpu][best]) break;
+						fprintf(stderr, " %03X x%lu", best, asp_onchip_reads[cpu][best]);
+						asp_onchip_reads[cpu][best] = 0;
+					}
+					memset(asp_onchip_reads[cpu], 0, sizeof(asp_onchip_reads[cpu]));
+					fprintf(stderr, "\n");
+				}
+				asp_slave_skips = 0;
+			}
+			if (frame % 3600 == 0) prof_dump(bin_dir);
 			cpu_threads_report();
 			fprintf(stderr, "asp: %lu frames in %.1f s (%.2f fps), sound underruns %u (%lu silent samples), overruns %u, low-sound frames %lu\n",
 				frame, el / 1000.0, frame * 1000.0 / (el ? el : 1), underruns, out_short, overruns, frames_skipped_hint);

@@ -1,5 +1,5 @@
 --- sh2_dynarec/linkage_arm.s.orig	2026-11-22 13:44:16.859682518 +0000
-+++ sh2_dynarec/linkage_arm.s	2026-11-22 13:44:16.892684002 +0000
++++ sh2_dynarec/linkage_arm.s	2026-11-22 19:14:32.498522874 +0000
 @@ -229,9 +229,9 @@
  	ldr	r0, [fp, #sh2cycles-dynarec_local]
  	str	r10, [fp, #master_cc-dynarec_local]
@@ -12,7 +12,28 @@
  	ldr	r4, [fp, #slave_ip-dynarec_local]
  	/*movw	r7, #:lower16:SSH2*/
  	/*movt	r7, #:upper16:SSH2*/
-@@ -267,9 +267,9 @@
+@@ -251,11 +251,20 @@
+ 	ldr	r12, [r7, r8]
+ 	tst	r12, r12
+ 	bne	slave_handle_interrupts
++	/* ASP: skip an idle slave's timeslice (its timers still run) */
++	mov	r0, r6
++	bl	AspSlaveSkip
++	tst	r0, r0
++	bne	cc_interrupt_master
+ 	ldr	r10, [fp, #slave_cc-dynarec_local]
+ 	sub	r10, r10, r6
+ 	mov	pc, r4
+ slave_handle_interrupts:
+ 	bl	DynarecSlaveHandleInterrupts
++	mov	r0, r6
++	bl	AspSlaveSkip
++	tst	r0, r0
++	bne	cc_interrupt_master
+ 	ldr	r10, [fp, #slave_cc-dynarec_local]
+ 	sub	r10, r10, r6
+ 	ldr	pc, [fp, #slave_ip-dynarec_local]
+@@ -267,9 +276,9 @@
  	ldr	r0, [fp, #sh2cycles-dynarec_local]
  	str	r10, [fp, #slave_cc-dynarec_local]
  	str	r8, [fp, #slave_ip-dynarec_local]
@@ -24,7 +45,7 @@
  	.size	cc_interrupt, .-cc_interrupt
  	.global	cc_interrupt_master
  	.type	cc_interrupt_master, %function
-@@ -734,11 +734,11 @@
+@@ -734,11 +743,11 @@
  	ldr	r2, [r12, r2, lsl #2]
  	mov	r12, #1
  	tst	r12, r2, ror r3
@@ -38,7 +59,7 @@
  	.size	WriteInvalidateLong, .-WriteInvalidateLong
  	.align	2
  	.global	WriteInvalidateWord
-@@ -756,11 +756,11 @@
+@@ -756,11 +765,11 @@
  	/*uxth	r1, r1*/
  	bic	r1, r1, #0xFF0000
  	tst	r12, r2, ror r3
@@ -52,7 +73,7 @@
  	.size	WriteInvalidateWord, .-WriteInvalidateWord
  	.align	2
  	.global	WriteInvalidateByteSwapped
-@@ -780,11 +780,11 @@
+@@ -780,11 +789,11 @@
  	mov	r12, #1
  	and	r1, r1, #0xff
  	tst	r12, r2, ror r3
@@ -66,7 +87,7 @@
  	.size	WriteInvalidateByte, .-WriteInvalidateByte
  
  	.align	2
-@@ -862,10 +862,10 @@
+@@ -862,10 +871,10 @@
  	mov	r8, r0 /* MACL */
  	mov	r9, r1 /* MACH */
  	mov	r0, r6
@@ -79,7 +100,7 @@
  	add	r5, r5, #4
  	add	r6, r6, #4
  	mov	r12, r0
-@@ -899,11 +899,11 @@
+@@ -899,11 +908,11 @@
  	mov	r8, r0 /* MACL */
  	mov	r9, r1 /* MACH */
  	mov	r0, r6
@@ -153,8 +174,8 @@
    if(type==RMWA_STUB)
      emit_andimm(0,imm[i],1);
 --- sh2_dynarec/sh2_dynarec.c.orig	2026-11-22 13:44:16.863354411 +0000
-+++ sh2_dynarec/sh2_dynarec.c	2026-11-22 13:44:20.038345120 +0000
-@@ -30,6 +30,21 @@
++++ sh2_dynarec/sh2_dynarec.c	2026-11-22 19:14:43.474291653 +0000
+@@ -30,6 +30,79 @@
  #include "../sh2core.h"
  #include "../yabause.h"
  #include "sh2_dynarec.h"
@@ -165,7 +186,65 @@
 + * API, where the SH-2 being run was the global CurrentSH2. The core now
 + * passes the SH-2 explicitly; these wrappers bridge the two. */
 +SH2_struct *CurrentSH2;
-+u8  DynReadByte(u32 a) { return MappedMemoryReadByteNocache(CurrentSH2, a); }
++/* ASP: slave idle skip. Many games park the slave SH-2 in a loop that
++ * reads one on-chip register (the FRT status, waiting for the master to
++ * poke it) until something changes. When the slave reads the same on-chip
++ * byte with the same value 16 times running, its next timeslices are
++ * skipped (its timers still run) until the register is poked, an interrupt
++ * is pending, or 8 skips have passed and it gets to look again.
++ * "asp_slave_idle 0" in sat_options.txt turns it off. */
++int asp_slave_idle_enable = 1;
++extern int slave_reg[22];
++#define asp_slave_reg slave_reg   /* [16] is SR */
++unsigned long asp_onchip_reads[2][512], asp_slave_skips;
++static int slave_idle, slave_skip_run, same_n, last_r = -1, last_v = -1;
++void asp_slave_wake(void) { slave_idle = 0; slave_skip_run = 0; same_n = 0; }
++u8 DynReadByte(u32 a)
++{
++   if (a >= 0xFFFFFE00)
++   {
++      u32 r = a & 0x1FF;
++      u8 v = OnchipReadByte(CurrentSH2, r);
++      int sl = CurrentSH2 == SSH2;
++      asp_onchip_reads[sl][r]++;
++      if (sl && asp_slave_idle_enable)
++      {
++         if ((int)r == last_r && (int)v == last_v)
++         {
++            if (++same_n >= 16) slave_idle = 1;
++         }
++         else
++         {
++            same_n = 0; last_r = r; last_v = v; slave_idle = 0;
++         }
++      }
++      return v;
++   }
++   return MappedMemoryReadByteNocache(CurrentSH2, a);
++}
++/* Called from slave_entry (linkage_arm.s) with the line's cycles: returns 1
++ * if the slave's timeslice is skipped this time. */
++int AspSlaveSkip(u32 cycles)
++{
++   if (!slave_idle)
++      return 0;
++   if (SSH2->NumberOfInterrupts > 0 &&
++       SSH2->interrupts[SSH2->NumberOfInterrupts-1].level > ((asp_slave_reg[16]>>4)&0xF))
++   {
++      asp_slave_wake();
++      return 0;
++   }
++   if (++slave_skip_run > 8)
++   {
++      asp_slave_wake();
++      same_n = 12;   /* a few more identical reads and it sleeps again */
++      return 0;
++   }
++   FRTExec(SSH2, cycles);
++   WDTExec(SSH2, cycles);
++   asp_slave_skips++;
++   return 1;
++}
 +u16 DynReadWord(u32 a) { return MappedMemoryReadWordNocache(CurrentSH2, a); }
 +u32 DynReadLong(u32 a) { return MappedMemoryReadLongNocache(CurrentSH2, a); }
 +void DynWriteByte(u32 a, u8 v)  { MappedMemoryWriteByteNocache(CurrentSH2, a, v); }
@@ -176,6 +255,14 @@
  
  #ifdef __i386__
  #include "assem_x86.h"
+@@ -8205,6 +8278,7 @@
+     SSH2->NumberOfInterrupts--;
+     SSH2->isIdle = 0;
+     SSH2->isSleeping = 0;
++    asp_slave_wake();   /* ASP: it has an interrupt to service */
+   }
+   //printf("DynarecSlaveHandleInterrupts pc=%x ip=%x\n",slave_pc,(int)slave_ip);
+   //printf("master_cc=%d slave_cc=%d\n",master_cc,slave_cc);
 diff --git a/yabause/src/libretro/libretro.c b/yabause/src/libretro/libretro.c
 index a5c771f..27d8537 100644
 --- a/yabause/src/libretro/libretro.c
@@ -239,6 +326,25 @@ index a5c771f..27d8537 100644
     yinit.carttype             = addon_cart_type;
     yinit.regionid             = REGION_AUTODETECT;
     yinit.buppath              = bup_path;
+diff --git a/yabause/src/sh2core.c b/yabause/src/sh2core.c
+index 2663ffe..1b6e8e2 100644
+--- a/yabause/src/sh2core.c
++++ b/yabause/src/sh2core.c
+@@ -2827,8 +2827,14 @@ void FASTCALL MSH2InputCaptureWriteWord(SH2_struct *sh, UNUSED u32 addr, UNUSED
+ 
+ //////////////////////////////////////////////////////////////////////////////
+ 
++#ifdef SH2_DYNAREC
++void asp_slave_wake(void);
++#endif
+ void FASTCALL SSH2InputCaptureWriteWord(SH2_struct *sh, UNUSED u32 addr, UNUSED u16 data)
+ {
++#ifdef SH2_DYNAREC
++   asp_slave_wake();
++#endif
+    // Set Input Capture Flag
+    SSH2->onchip.FTCSR |= 0x80;
+ 
 diff --git a/yabause/src/titan/titan.c b/yabause/src/titan/titan.c
 index 75dd13e..1f1425c 100644
 --- a/yabause/src/titan/titan.c
