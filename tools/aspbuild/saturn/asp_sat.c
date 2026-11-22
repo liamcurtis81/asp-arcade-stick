@@ -247,13 +247,13 @@ static unsigned long frames_shown;
 extern int asp_frame_dummy;          /* vdp2.c: the frame now starting is not drawn */
 extern unsigned long asp_frames_skipped;
 static int cur_frame_dummy;          /* the frame retro_run is finishing */
+static int frame_new;                /* video_refresh handed us a new picture */
 static void video_refresh(const void *data, unsigned w, unsigned h, size_t pitch)
 {
 	if (data == NULL)           /* frame dupe: keep what is on screen */
 		return;
-	if (cur_frame_dummy)        /* Yabause skipped drawing it: same picture, skip the copy */
-		return;
 	frame_data = data;
+	frame_new = 1;
 	frame_w = w;
 	frame_h = h;
 	frame_pitch = pitch;
@@ -294,6 +294,16 @@ static void hash_frame(const uint16_t *d, unsigned w, unsigned h, unsigned pitch
 		for (y = 0; y < h; y++)
 			for (x = 0; x < w; x++) { hsh ^= d[y * pitch_px + x]; hsh *= 16777619u; }
 		fprintf(stderr, "asp: frame %lu hash %08x\n", n, hsh);
+		if (getenv("ASP_SHOTS")) {
+			char fn[256]; FILE *f;
+			snprintf(fn, sizeof(fn), "%s/shot_%05lu.raw", getenv("ASP_SHOTS"), n);
+			if ((f = fopen(fn, "wb")) != NULL) {
+				uint32_t hd[2] = { w, h };
+				fwrite(hd, 4, 2, f);
+				for (y = 0; y < h; y++) fwrite(d + y * pitch_px, 2, w, f);
+				fclose(f);
+			}
+		}
 	}
 }
 
@@ -335,6 +345,11 @@ static void present(void)
 	unsigned y, w = frame_w, h = frame_h, pitch_px = (unsigned)(frame_pitch / 2);
 	if (frame_data == NULL || w == 0 || h == 0 || w * h > PBUF_MAX)
 		return;
+	/* ASP: on frames the core did not draw, frame_data still pointed at the
+	   last picture, which was copied and scaled again every frame. */
+	if (!frame_new)
+		return;
+	frame_new = 0;
 	pthread_mutex_lock(&pb_mx);
 	i = (pb_busy == 0) ? 1 : (pb_busy == 1 ? 0 : (pb_ready == 0 ? 1 : 0));
 	if (pb_ready >= 0) frames_dropped++;
@@ -588,6 +603,20 @@ static void input_poll(void)
 			since = 0;
 	}
 	asp_crt_poll(pad_mode ? (jb(PAD_SELECT) || jb(PAD_MINUS)) : jb(STK_SELECT), pad_mode ? joy : NULL);
+	{
+		/* Test harness: ASP_INPUT="from-to:mask,..." presses libretro
+		 * button bits on those polls (one poll per frame). */
+		static long pf; static const char *sc;
+		const char *q;
+		pf++;
+		if (sc == NULL) { sc = getenv("ASP_INPUT"); if (sc == NULL) sc = ""; }
+		for (q = sc; *q; ) {
+			long a, z; unsigned m; int used = 0;
+			if (sscanf(q, "%ld-%ld:%x%n", &a, &z, &m, &used) != 3 || used == 0) break;
+			if (pf >= a && pf <= z) b |= m;
+			q += used; if (*q == ',') q++;
+		}
+	}
 	pad_bits = b;
 }
 
@@ -685,6 +714,22 @@ static void load_overrides(void)
 		}
 		if (strcmp(ovr_k[n_ovr], "asp_slave_idle") == 0) {
 			asp_slave_idle_enable = atoi(ovr_v[n_ovr]);
+			continue;
+		}
+		if (strcmp(ovr_k[n_ovr], "asp_slave_idle_max") == 0) {
+			extern int asp_slave_idle_max;
+			asp_slave_idle_max = atoi(ovr_v[n_ovr]);
+			continue;
+		}
+		if (strcmp(ovr_k[n_ovr], "asp_slave_timer_wake") == 0) {
+			extern int asp_slave_timer_wake;
+			asp_slave_timer_wake = atoi(ovr_v[n_ovr]);
+			continue;
+		}
+		if (strcmp(ovr_k[n_ovr], "asp_finisher") == 0) {
+			extern int asp_finisher_enable;
+			asp_finisher_enable = atoi(ovr_v[n_ovr]);
+			fprintf(stderr, "asp: picture finished on its own thread: %s\n", asp_finisher_enable ? "yes" : "no");
 			continue;
 		}
 		if (strcmp(ovr_k[n_ovr], "asp_m68k_thread") == 0) {
@@ -1103,6 +1148,7 @@ int main(int argc, char **argv)
 	}
 	mkdir(save_dir, 0777);
 	if (getenv("ASP_EXIT_AFTER")) exit_after = strtoul(getenv("ASP_EXIT_AFTER"), NULL, 10);
+	{ extern int asp_fin_sync; if (getenv("ASP_SYNC_PICTURES")) asp_fin_sync = 1; }
 
 	src = argv[1];
 	snprintf(name, sizeof(name), "%s", base_name(src));
@@ -1242,6 +1288,31 @@ int main(int argc, char **argv)
 				asp_render_wait_us / 1000.0 / 1200, asp_drawend_us / 1000.0 / 1200, asp_m68k_wait_us / 1000.0 / 1200);
 			asp_render_wait_us = asp_drawend_us = asp_m68k_wait_us = 0;
 			fprintf(stderr, "asp: pictures not drawn so far: %lu\n", asp_frames_skipped);
+			{
+				extern unsigned long asp_acc[6][256], asp_inv_calls, asp_inv_pages, asp_recompiles;
+				static const char *tn[6] = { "rb", "rw", "rl", "wb", "ww", "wl" };
+				int t, r;
+				fprintf(stderr, "asp: per frame: recompiles %.1f, invalidations %.1f (%.1f pages)\n",
+					asp_recompiles / 1200.0, asp_inv_calls / 1200.0, asp_inv_pages / 1200.0);
+				{ extern unsigned long asp_inv_cpu, asp_inv_cpu500, asp_inv_dma, asp_inv_trap; fprintf(stderr, "asp: writes to data in pages with code: %.0f per frame\n", asp_inv_trap / 1200.0); asp_inv_trap = 0; extern uint32_t asp_inv_last[8];
+				  fprintf(stderr, "asp: invalidations from code writes %lu, after 500 writes %lu, from DMA %lu; last %08x %08x %08x %08x\n",
+					asp_inv_cpu, asp_inv_cpu500, asp_inv_dma, asp_inv_last[0], asp_inv_last[1], asp_inv_last[2], asp_inv_last[3]);
+				  asp_inv_cpu = asp_inv_cpu500 = asp_inv_dma = 0; }
+				asp_recompiles = asp_inv_calls = asp_inv_pages = 0;
+				for (t = 0; t < 6; t++) for (r = 0; r < 256; r++) {
+					if (asp_acc[t][r] >= 1200) fprintf(stderr, "asp: slow %s %02x0xxxxx %.0f per frame\n", tn[t], r, asp_acc[t][r] / 1200.0);
+					asp_acc[t][r] = 0;
+				}
+				{
+					extern struct asp_hot { uint32_t addr; unsigned long n; } asp_hot[6][1024];
+					int i;
+					for (t = 0; t < 6; t++) for (i = 0; i < 1024; i++) {
+						if (asp_hot[t][i].n >= 600) fprintf(stderr, "asp: hot %s %08x ~%.0f per frame\n", tn[t], asp_hot[t][i].addr, asp_hot[t][i].n / 1200.0);
+						asp_hot[t][i].n = 0; asp_hot[t][i].addr = 0;
+					}
+				}
+			}
+			{ extern unsigned asp_snap_bytes; fprintf(stderr, "asp: video RAM copied for the picture threads: %u KB per frame\n", asp_snap_bytes / 1024 / 1200); asp_snap_bytes = 0; }
 			{
 				int cpu, k, r;
 				fprintf(stderr, "asp: slave timeslices skipped as idle: %lu\n", asp_slave_skips);

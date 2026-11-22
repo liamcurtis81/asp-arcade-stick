@@ -22,4 +22,4 @@ print('samples',n,'threads',dict(ct.most_common()))
 for nm,k in c.most_common(45): print('%5.1f%% %s'%(100*k/n,nm))
 for t,cc in bythread.items():
     print('--- thread',t, sum(cc.values()))
-    for nm,k in cc.most_common(8): print('   %5.1f%% %s'%(100*k/sum(cc.values()),nm))
+    for nm,k in cc.most_common(int(__import__("os").environ.get("TOPN","8"))): print('   %5.1f%% %s'%(100*k/sum(cc.values()),nm))

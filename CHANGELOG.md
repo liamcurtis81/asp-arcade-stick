@@ -5,7 +5,25 @@ together. Each emulator binary keeps its own build number on the card
 (`fba_v52.dge`, `psx_emu_p18.dge`, ...); the table under each release says
 which builds make it up.
 
-## 2.2 - 21 Nov 2026
+## 2.3 (in progress) - 22 Nov 2026
+
+- Saturn (test, `sat_emu_t19`): libretro Yabause with Ari64's SH-2
+  recompiler re-enabled on ARM, on its own launcher page. Main-thread work cut:
+  - the drawing threads' snapshot of VDP1/VDP2 RAM copies only the 2KB pages
+    written since the last picture (~10KB a frame instead of ~1.3MB);
+  - VDP1 draws straight into its back framebuffer, no copy in and out;
+  - the back screen is held as one colour per line, not a full frame;
+  - the layer composite (Titan) runs on a finisher thread while emulation
+    continues; pictures can be a frame late (`asp_finisher 0` turns it off);
+  - undrawn frames are no longer copied and rescaled again by the frontend;
+  - an idle slave SH-2 sleeps up to 32 slices (`asp_slave_idle_max`) but
+    wakes at once when its timer flags change;
+  - fixed a lost wake-up in Yabause's thread sleep that could freeze a game
+    with a drawing thread asleep and the emulation waiting for it;
+  - SH-2 DMA passed an end address where a length was expected when telling
+    the recompiler about written memory.
+- PlayStation discs being converted to CHD (same games, about 45% smaller).
+
 
 - Arcade (fba_v57): arcade cheats now take effect. The frontend had the
   cheat engine switched off, so the list could be ticked but nothing changed
