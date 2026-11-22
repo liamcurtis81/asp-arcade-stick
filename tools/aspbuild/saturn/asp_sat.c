@@ -918,6 +918,10 @@ int main(int argc, char **argv)
 		SDL_Quit();
 		return 1;
 	}
+	/* Yabause starts with no pad in either port (PlayStation's core assumes
+	 * one); without this every button reaches the frontend and stops there. */
+	retro_set_controller_port_device(0, RETRO_DEVICE_JOYPAD);
+	retro_set_controller_port_device(1, RETRO_DEVICE_JOYPAD);
 	retro_get_system_av_info(&av);
 	if (av.timing.sample_rate > 0) in_rate = av.timing.sample_rate;
 	if (av.timing.fps > 0) fps = av.timing.fps;
