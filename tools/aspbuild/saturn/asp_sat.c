@@ -631,7 +631,7 @@ static int16_t input_state(unsigned port, unsigned device, unsigned index, unsig
 
 /* ---- audio buffer status, for the core's automatic frameskip ----------- */
 extern int asp_frameskip_req;   /* vdp2.c (ASP patch) */
-extern int asp_m68k_thread;     /* scsp.c (ASP patch) */
+extern int asp_m68k_thread, asp_m68k_batch;     /* scsp.c (ASP patch) */
 extern int asp_slave_idle_enable;          /* sh2_dynarec.c (ASP patch) */
 extern unsigned long asp_onchip_reads[2][512], asp_slave_skips;
 extern double asp_render_wait_us, asp_drawend_us, asp_m68k_wait_us;
@@ -678,6 +678,11 @@ static void load_overrides(void)
 	while (n_ovr < 32 && fgets(line, sizeof(line), f)) {
 		if (line[0] == '#' || sscanf(line, "%63s %47s", ovr_k[n_ovr], ovr_v[n_ovr]) != 2)
 			continue;
+		if (strcmp(ovr_k[n_ovr], "asp_m68k_batch") == 0) {
+			asp_m68k_batch = atoi(ovr_v[n_ovr]);
+			if (asp_m68k_batch < 1) asp_m68k_batch = 1;
+			continue;
+		}
 		if (strcmp(ovr_k[n_ovr], "asp_slave_idle") == 0) {
 			asp_slave_idle_enable = atoi(ovr_v[n_ovr]);
 			continue;
@@ -1233,7 +1238,7 @@ int main(int argc, char **argv)
 			break;
 		if (frame % 1200 == 0) {
 			Uint32 el = SDL_GetTicks() - t_start;
-			fprintf(stderr, "asp: per frame: waiting for the picture threads %.2f ms, finishing the picture %.2f ms, waiting for the sound CPU %.2f ms\n",
+			fprintf(stderr, "asp: per frame: waiting for the picture threads %.2f ms, finishing the picture %.2f ms, waiting for the sound thread %.2f ms\n",
 				asp_render_wait_us / 1000.0 / 1200, asp_drawend_us / 1000.0 / 1200, asp_m68k_wait_us / 1000.0 / 1200);
 			asp_render_wait_us = asp_drawend_us = asp_m68k_wait_us = 0;
 			fprintf(stderr, "asp: pictures not drawn so far: %lu\n", asp_frames_skipped);

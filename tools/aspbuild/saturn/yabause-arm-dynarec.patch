@@ -264,20 +264,29 @@
    //printf("DynarecSlaveHandleInterrupts pc=%x ip=%x\n",slave_pc,(int)slave_ip);
    //printf("master_cc=%d slave_cc=%d\n",master_cc,slave_cc);
 diff --git a/yabause/src/libretro/libretro.c b/yabause/src/libretro/libretro.c
-index a5c771f..27d8537 100644
+index a5c771f..3c3e67f 100644
 --- a/yabause/src/libretro/libretro.c
 +++ b/yabause/src/libretro/libretro.c
-@@ -21,6 +21,9 @@
+@@ -21,6 +21,10 @@
  #include "peripheral.h"
  #include "cdbase.h"
  #include "yabause.h"
++#include "scsp.h"
 +#ifdef SH2_DYNAREC
 +#include "sh2_dynarec/sh2_dynarec.h"
 +#endif
  #include "yui.h"
  #include "cheat.h"
  
-@@ -457,9 +460,8 @@ M68K_struct *M68KCoreList[] = {
+@@ -334,6 +338,7 @@ static int PERLIBRETROHandleEvents(void)
+ 
+    if ( YabauseExec() != 0 )
+       return -1;
++   AspSoundFlush();   /* ASP: hand the frame's last sound lines to the worker */
+    return 0;
+ }
+ 
+@@ -457,9 +462,8 @@ M68K_struct *M68KCoreList[] = {
      &M68KDummy,
  #ifdef HAVE_MUSASHI
      &M68KMusashi,
@@ -288,7 +297,7 @@ index a5c771f..27d8537 100644
      NULL
  };
  
-@@ -468,6 +470,9 @@ SH2Interface_struct *SH2CoreList[] = {
+@@ -468,6 +472,9 @@ SH2Interface_struct *SH2CoreList[] = {
      &SH2DebugInterpreter,
  #ifdef HAVE_PLAY_JIT
      &SH2Jit,
@@ -298,7 +307,7 @@ index a5c771f..27d8537 100644
  #endif
      NULL
  };
-@@ -1101,16 +1106,25 @@ bool retro_load_game(const struct retro_game_info *info)
+@@ -1101,16 +1108,25 @@ bool retro_load_game(const struct retro_game_info *info)
     yinit.sh2coretype          = SH2CORE_JIT;
     yinit.use_scu_dsp_jit      = 1;
     yinit.use_scsp_dsp_dynarec = 1;
@@ -326,6 +335,19 @@ index a5c771f..27d8537 100644
     yinit.carttype             = addon_cart_type;
     yinit.regionid             = REGION_AUTODETECT;
     yinit.buppath              = bup_path;
+diff --git a/yabause/src/scsp.h b/yabause/src/scsp.h
+index 41918c7..99426c6 100644
+--- a/yabause/src/scsp.h
++++ b/yabause/src/scsp.h
+@@ -105,6 +105,8 @@ int ScspInit(int coreid);
+ int ScspChangeSoundCore(int coreid);
+ void ScspDeInit(void);
+ void M68KStart(void);
++void AspSoundSync(void);
++void AspSoundFlush(void);
+ void M68KStop(void);
+ void ScspReset(void);
+ int ScspChangeVideoFormat(int type);
 diff --git a/yabause/src/sh2core.c b/yabause/src/sh2core.c
 index 2663ffe..1b6e8e2 100644
 --- a/yabause/src/sh2core.c
@@ -758,8 +780,8 @@ index 94bbc7d..29ddf90 100644
  }
  
 --- scsp.c.orig	2026-11-22 18:31:31.311769372 +0000
-+++ scsp.c	2026-11-22 18:31:31.391694439 +0000
-@@ -1,6300 +1,6369 @@
++++ scsp.c	2026-11-22 19:23:08.280373459 +0000
+@@ -1,6300 +1,6469 @@
 -/*
 - * Copyright 2004 Stephane Dallongeville
 - * Copyright 2004-2007 Theo Berkau
@@ -11759,7 +11781,7 @@ index 94bbc7d..29ddf90 100644
 +void FASTCALL
 +Sh2ScspWriteByte(SH2_struct *sh, u32 addr, u8 val)
 +{
-+   M68KSync();
++   AspSoundSync();
 +   ScspWriteByte(addr, val);
 +}
 +
@@ -11776,7 +11798,7 @@ index 94bbc7d..29ddf90 100644
 +void FASTCALL
 +Sh2ScspWriteWord(SH2_struct *sh, u32 addr, u16 val)
 +{
-+   M68KSync();
++   AspSoundSync();
 +   ScspWriteWord(addr, val);
 +}
 +
@@ -11793,7 +11815,7 @@ index 94bbc7d..29ddf90 100644
 +void FASTCALL
 +Sh2ScspWriteLong(SH2_struct *sh, u32 addr, u32 val)
 +{
-+   M68KSync();
++   AspSoundSync();
 +   ScspWriteLong(addr, val);
 +}
 +
@@ -11958,6 +11980,7 @@ index 94bbc7d..29ddf90 100644
 +void
 +ScspDeInit (void)
 +{
++  AspSoundSync();
 +  if (scspchannel[0].data32)
 +    free(scspchannel[0].data32);
 +  scspchannel[0].data32 = NULL;
@@ -11982,7 +12005,7 @@ index 94bbc7d..29ddf90 100644
 +void
 +M68KStart (void)
 +{
-+  M68KSync();
++  AspSoundSync();
 +  M68K->Reset ();
 +  savedcycles = 0;
 +  IsM68KRunning = 1;
@@ -11993,7 +12016,7 @@ index 94bbc7d..29ddf90 100644
 +void
 +M68KStop (void)
 +{
-+  M68KSync();
++  AspSoundSync();
 +  IsM68KRunning = 0;
 +}
 +
@@ -12002,6 +12025,7 @@ index 94bbc7d..29ddf90 100644
 +void
 +ScspReset (void)
 +{
++  AspSoundSync();
 +  scsp_reset();
 +}
 +
@@ -12031,78 +12055,162 @@ index 94bbc7d..29ddf90 100644
 +#endif
 +static s32 FASTCALL M68KExecBP (s32 cycles);
 +
-+/* ASP: the sound CPU (68000) on its own core. M68KExec hands the line's
-+ * cycles to a worker that spins on a flag (a futex per scanline would cost
-+ * more than the work); M68KSync, which the frame loop already calls before
-+ * the SCSP runs and at the end of each frame, waits for it. SH-2 writes to
-+ * the SCSP registers sync first; sound RAM is shared unsynchronised, as on
-+ * the PSP port this hook was made for. "asp_m68k_thread 0" turns it off. */
++/* ASP: the sound side (68000 + SCSP) on its own core.
++ * The frame loop's per-line ScspExec and M68KExec calls are queued; every
++ * asp_m68k_batch lines the queue is handed to a worker thread, which runs
++ * them in the original order (ScspExec, then the 68000's cycles, per line)
++ * while the SH-2s carry on. The worker sleeps between batches. Full syncs
++ * (wait for the worker) happen at the end of each frame and before any SH-2
++ * write to the SCSP registers; interrupts the SCSP raises for the main CPUs
++ * are held and delivered on the main thread at the next handover. Sound RAM
++ * is shared unsynchronised. "asp_m68k_thread 0" restores the old timing. */
 +#include <pthread.h>
++#include <time.h>
 +int asp_m68k_thread = 1;
-+double asp_m68k_wait_us;          /* main thread time spent in M68KSync */
-+static volatile int m68k_job_pending, m68k_job_active;
-+static volatile s32 m68k_job_cycles, m68k_job_result, m68k_job_base;
-+static pthread_t m68k_worker;
-+static int m68k_worker_up;
-+static void *m68k_worker_main(void *arg)
++int asp_m68k_batch = 16;
++double asp_m68k_wait_us;          /* main thread time spent waiting for the worker */
++#define ASPQ_MAX 512
++static s32 aspq[2][ASPQ_MAX];     /* >= 0: 68000 cycles; -1: ScspExec */
++static int aspq_n[2], aspq_fill;  /* main fills aspq[aspq_fill] */
++static int aspq_lines;
++static volatile int asp_worker_busy;
++static int asp_worker_up, asp_on_worker;
++static pthread_t asp_worker;
++static pthread_mutex_t asp_mx = PTHREAD_MUTEX_INITIALIZER;
++static pthread_cond_t asp_cv_go = PTHREAD_COND_INITIALIZER, asp_cv_done = PTHREAD_COND_INITIALIZER;
++static volatile int asp_pending_main_irq;
++static void (*asp_real_mintf)(void);
++void ScspExecReal(void);
++static void M68KExecReal(s32 cycles);
++
++static void asp_mintf_proxy(void)
++{
++  if (asp_on_worker)
++    __sync_fetch_and_add(&asp_pending_main_irq, 1);
++  else if (asp_real_mintf)
++    asp_real_mintf();
++}
++static void asp_deliver_irqs(void)
++{
++  int n = asp_pending_main_irq;
++  if (n)
++    {
++      __sync_fetch_and_sub(&asp_pending_main_irq, n);
++      while (n-- > 0 && asp_real_mintf)
++        asp_real_mintf();
++    }
++}
++static void *asp_worker_main(void *arg)
 +{
 +  (void)arg;
 +  for (;;)
 +    {
-+      while (!m68k_job_pending)
-+        __asm__ volatile("yield");
-+      __sync_synchronize();
-+      m68k_job_result = (*m68kexecptr)(m68k_job_cycles);
-+      __sync_synchronize();
-+      m68k_job_pending = 0;
++      int b, i, n;
++      pthread_mutex_lock(&asp_mx);
++      while (!asp_worker_busy)
++        pthread_cond_wait(&asp_cv_go, &asp_mx);
++      pthread_mutex_unlock(&asp_mx);
++      b = aspq_fill ^ 1;
++      n = aspq_n[b];
++      asp_on_worker = 1;
++      for (i = 0; i < n; i++)
++        {
++          if (aspq[b][i] < 0) ScspExecReal();
++          else M68KExecReal(aspq[b][i]);
++        }
++      asp_on_worker = 0;
++      aspq_n[b] = 0;
++      pthread_mutex_lock(&asp_mx);
++      asp_worker_busy = 0;
++      pthread_cond_signal(&asp_cv_done);
++      pthread_mutex_unlock(&asp_mx);
 +    }
 +  return NULL;
 +}
-+#include <time.h>
-+static void m68k_async_sync(void)
++static void asp_wait_worker(void)
 +{
-+  if (m68k_job_active)
++  if (!asp_worker_busy) return;
++  {
++    struct timespec a, b;
++    clock_gettime(CLOCK_MONOTONIC, &a);
++    pthread_mutex_lock(&asp_mx);
++    while (asp_worker_busy)
++      pthread_cond_wait(&asp_cv_done, &asp_mx);
++    pthread_mutex_unlock(&asp_mx);
++    clock_gettime(CLOCK_MONOTONIC, &b);
++    asp_m68k_wait_us += (b.tv_sec - a.tv_sec) * 1e6 + (b.tv_nsec - a.tv_nsec) / 1e3;
++  }
++}
++static void asp_dispatch(void)
++{
++  asp_wait_worker();
++  asp_deliver_irqs();
++  if (aspq_n[aspq_fill] == 0) return;
++  if (!asp_worker_up)
 +    {
-+      if (m68k_job_pending)
++      asp_worker_up = pthread_create(&asp_worker, NULL, asp_worker_main, NULL) == 0;
++      if (!asp_worker_up)
 +        {
-+          struct timespec a, b;
-+          clock_gettime(CLOCK_MONOTONIC, &a);
-+          while (m68k_job_pending)
-+            __asm__ volatile("yield");
-+          clock_gettime(CLOCK_MONOTONIC, &b);
-+          asp_m68k_wait_us += (b.tv_sec - a.tv_sec) * 1e6 + (b.tv_nsec - a.tv_nsec) / 1e3;
++          int i, f = aspq_fill;
++          for (i = 0; i < aspq_n[f]; i++)
++            { if (aspq[f][i] < 0) ScspExecReal(); else M68KExecReal(aspq[f][i]); }
++          aspq_n[f] = 0;
++          return;
 +        }
-+      __sync_synchronize();
-+      savedcycles = m68k_job_base + m68k_job_result;
-+      m68k_job_active = 0;
 +    }
++  pthread_mutex_lock(&asp_mx);
++  aspq_fill ^= 1;            /* worker takes the filled one */
++  asp_worker_busy = 1;
++  pthread_cond_signal(&asp_cv_go);
++  pthread_mutex_unlock(&asp_mx);
++  aspq_lines = 0;
++}
++/* Full sync: everything queued has run. */
++static void asp_sound_sync(void)
++{
++  if (!asp_worker_up && aspq_n[aspq_fill] == 0) { asp_deliver_irqs(); return; }
++  asp_dispatch();
++  asp_wait_worker();
++  asp_deliver_irqs();
++}
++static void aspq_push(s32 v)
++{
++  if (aspq_n[aspq_fill] >= ASPQ_MAX) asp_dispatch();
++  aspq[aspq_fill][aspq_n[aspq_fill]++] = v;
++}
++/* Per-line sync point the frame loop already calls: hand over a batch every
++ * asp_m68k_batch lines, and deliver any SCSP interrupts for the main CPUs. */
++static void asp_line_point(void)
++{
++  if (!asp_worker_busy) asp_deliver_irqs();
++  if (aspq_lines >= asp_m68k_batch) asp_dispatch();
++}
++
++void
++ScspExec ()
++{
++  if (!asp_m68k_thread) { asp_sound_sync(); ScspExecReal(); return; }
++  if (scsp.mintf != asp_mintf_proxy) { asp_sound_sync(); asp_real_mintf = scsp.mintf; scsp.mintf = asp_mintf_proxy; }
++  aspq_push(-1);
++  aspq_lines++;
 +}
 +
 +void
 +M68KExec (s32 cycles)
 +{
-+  s32 newcycles;
-+  m68k_async_sync();
-+  newcycles = savedcycles - cycles;
++  if (!asp_m68k_thread) { asp_sound_sync(); M68KExecReal(cycles); return; }
++  aspq_push(cycles < 0 ? 0 : cycles);
++}
++
++static void
++M68KExecReal (s32 cycles)
++{
++  s32 newcycles = savedcycles - cycles;
 +  if (LIKELY(IsM68KRunning))
 +    {
 +      if (LIKELY(newcycles < 0))
 +        {
 +          s32 cyclestoexec = -newcycles;
-+          if (asp_m68k_thread && m68kexecptr != M68KExecBP)
-+            {
-+              if (!m68k_worker_up)
-+                m68k_worker_up = pthread_create(&m68k_worker, NULL, m68k_worker_main, NULL) == 0;
-+              if (m68k_worker_up)
-+                {
-+                  m68k_job_base = newcycles;
-+                  m68k_job_cycles = cyclestoexec;
-+                  m68k_job_active = 1;
-+                  __sync_synchronize();
-+                  m68k_job_pending = 1;
-+                  return;
-+                }
-+            }
 +          newcycles += (*m68kexecptr)(cyclestoexec);
 +        }
 +      savedcycles = newcycles;
@@ -12202,8 +12310,22 @@ index 94bbc7d..29ddf90 100644
 +void
 +M68KSync (void)
 +{
-+  m68k_async_sync();
++  /* Called per line and at frame end by the frame loop: a handover point,
++   * not a full sync (AspSoundFrameEnd does that). */
++  asp_line_point();
 +  M68K->Sync();
++}
++
++void
++AspSoundSync (void)
++{
++  asp_sound_sync();
++}
++
++void
++AspSoundFlush (void)
++{
++  asp_dispatch();
 +}
 +
 +//////////////////////////////////////////////////////////////////////////////
@@ -12312,7 +12434,7 @@ index 94bbc7d..29ddf90 100644
 +}
 +
 +void
-+ScspExec ()
++ScspExecReal ()
 +{
 +  u32 audiosize;
 +
