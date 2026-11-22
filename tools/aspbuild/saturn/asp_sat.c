@@ -624,6 +624,8 @@ static int16_t input_state(unsigned port, unsigned device, unsigned index, unsig
 }
 
 /* ---- audio buffer status, for the core's automatic frameskip ----------- */
+extern int asp_frameskip_req;   /* vdp2.c (ASP patch) */
+static int max_skip = 3, skip_below = 50;   /* sat_options.txt: asp_max_skip, asp_skip_below */
 static retro_audio_buffer_status_callback_t buf_status_cb;
 static unsigned long frames_skipped_hint;
 static double t_run_ms, t_copy_ms, t_wait_ms, t_loop_ms;
@@ -631,9 +633,18 @@ static unsigned long frames_waited;
 static void report_audio_buffer(void)
 {
 	unsigned fill, occ;
-	if (buf_status_cb == NULL || !audio_ok) return;
+	if (!audio_ok) return;
 	fill = ring_w - ring_r;
 	occ = fill >= TARGET_FR ? 100 : fill * 100 / TARGET_FR;
+	if (buf_status_cb == NULL) {
+		/* Yabause has no audio-buffer callback: ask it directly to skip
+		 * drawing the next frame when the sound queue runs low, at most two
+		 * in a row, so a slow stretch drops a picture, never a sound. */
+		static int run;
+		if ((int)occ < skip_below && run < max_skip) { asp_frameskip_req = 1; run++; frames_skipped_hint++; }
+		else run = 0;
+		return;
+	}
 	buf_status_cb(true, occ, occ < 25);
 	if (occ < 25) frames_skipped_hint++;
 }
@@ -656,6 +667,16 @@ static void load_overrides(void)
 	while (n_ovr < 32 && fgets(line, sizeof(line), f)) {
 		if (line[0] == '#' || sscanf(line, "%63s %47s", ovr_k[n_ovr], ovr_v[n_ovr]) != 2)
 			continue;
+		if (strcmp(ovr_k[n_ovr], "asp_max_skip") == 0) {
+			max_skip = atoi(ovr_v[n_ovr]);
+			fprintf(stderr, "asp: at most %d skipped pictures in a row\n", max_skip);
+			continue;
+		}
+		if (strcmp(ovr_k[n_ovr], "asp_skip_below") == 0) {
+			skip_below = atoi(ovr_v[n_ovr]);
+			fprintf(stderr, "asp: skip a picture when the sound queue is below %d%%\n", skip_below);
+			continue;
+		}
 		if (strcmp(ovr_k[n_ovr], "asp_sound_queue_ms") == 0) {
 			int ms = atoi(ovr_v[n_ovr]);
 			if (ms >= 10 && ms <= 200) TARGET_FR = (unsigned)(ms * 441 / 10);
@@ -687,7 +708,7 @@ static bool environment(unsigned cmd, void *data)
 	case RETRO_ENVIRONMENT_GET_VARIABLE: {
 		struct retro_variable *v = data;
 		static const struct { const char *k, *val; } opts[] = {
-			{ "yabause_frameskip", "enabled" },
+			{ "yabause_frameskip", "disabled" },  /* its own clock-based skip busy-waits; we drive skips from the sound queue */
 			{ "yabause_force_hle_bios", "disabled" },  /* real BIOS if present, else HLE */
 			{ "yabause_addon_cartridge", "none" },
 			{ "yabause_multitap_port1", "disabled" },

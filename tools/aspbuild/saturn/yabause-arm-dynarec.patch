@@ -209,3 +209,29 @@ index a5c771f..f0f8c14 100644
  #else
     yinit.sh2coretype          = SH2CORE_INTERPRETER;
  #endif
+diff --git a/yabause/src/vdp2.c b/yabause/src/vdp2.c
+index db73d00..821218e 100644
+--- a/yabause/src/vdp2.c
++++ b/yabause/src/vdp2.c
+@@ -410,6 +410,8 @@ void SpeedThrottleDisable(void) {
+ 
+ //////////////////////////////////////////////////////////////////////////////
+ 
++int asp_frameskip_req;   /* ASP: set by the frontend when its sound queue runs low */
++
+ void Vdp2VBlankOUT(void) {
+    static int framestoskip = 0;
+    static int framesskipped = 0;
+@@ -427,6 +429,12 @@ void Vdp2VBlankOUT(void) {
+ 
+    Vdp2Regs->TVSTAT = ((Vdp2Regs->TVSTAT & ~0x0008) & ~0x0002) | (vdp2_is_odd_frame << 1);
+ 
++   if (asp_frameskip_req)
++   {
++      asp_frameskip_req = 0;
++      if (!skipnextframe) { skipnextframe = 1; framestoskip = 1; }
++   }
++
+    if (skipnextframe && (! saved))
+    {
+       saved = VIDCore;
