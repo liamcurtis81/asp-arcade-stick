@@ -22,3 +22,12 @@ CFLAGS="$A" CXXFLAGS="$A" make platform=armv-neon-softfloat STATIC_LINKING=1 \
 A real BIOS (`saturn_bios.bin`, `sega_101.bin` or `mpr-17933.bin`) beside the
 binary is used if present; otherwise the core's HLE BIOS, which many games
 don't run with.
+
+## ARM recompiler (experiment)
+
+`yabause-arm-dynarec.patch` re-enables Ari64's SH-2 recompiler on ARM
+(build with `DYNAREC=3` and `-DHAVE_ARMv7 -DHAVE_ARMv6 -DHAVE_ARMv5`, and
+assemble `sh2_dynarec/linkage_arm.s` separately: STATIC_LINKING leaves it out
+of the archive). Its ARM code still used the old memory and timer API, where
+the running SH-2 was the global `CurrentSH2`; the patch adds wrappers that pass
+it to the current functions. Untested on hardware at the time of writing.
