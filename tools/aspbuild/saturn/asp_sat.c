@@ -832,6 +832,61 @@ static void sav_store(int force)
 }
 
 /* ---- main -------------------------------------------------------------- */
+
+/* ---- sampling profiler (test builds) ----------------------------------
+ * SIGPROF every millisecond of CPU time, from whichever thread was running;
+ * each sample is the interrupted program counter and the thread. Written raw
+ * to sat_prof.bin beside the binary at exit and symbolised off-device. */
+#include <signal.h>
+#include <sys/time.h>
+#include <sys/syscall.h>
+#include <ucontext.h>
+#define PROF_MAX 400000
+static uint32_t prof_pc[PROF_MAX];
+static uint16_t prof_tid[PROF_MAX];
+static volatile unsigned prof_n;
+static void prof_handler(int sig, siginfo_t *si, void *ctx)
+{
+	ucontext_t *uc = ctx;
+	unsigned i = prof_n;
+	(void)sig; (void)si;
+	if (i >= PROF_MAX) return;
+	prof_n = i + 1;
+	prof_pc[i] = uc->uc_mcontext.arm_pc;
+	prof_tid[i] = (uint16_t)syscall(SYS_gettid);
+}
+static void prof_start(void)
+{
+	struct sigaction sa;
+	struct itimerval it;
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_sigaction = prof_handler;
+	sa.sa_flags = SA_SIGINFO | SA_RESTART;
+	sigaction(SIGPROF, &sa, NULL);
+	it.it_interval.tv_sec = 0; it.it_interval.tv_usec = 1000;
+	it.it_value = it.it_interval;
+	setitimer(ITIMER_PROF, &it, NULL);
+	fprintf(stderr, "asp: profiler on (main thread %ld)\n", (long)syscall(SYS_gettid));
+}
+static void prof_stop(const char *dir)
+{
+	struct itimerval it;
+	char path[600];
+	FILE *f;
+	memset(&it, 0, sizeof(it));
+	setitimer(ITIMER_PROF, &it, NULL);
+	snprintf(path, sizeof(path), "%ssat_prof.bin", dir);
+	f = fopen(path, "wb");
+	if (f) {
+		unsigned n = prof_n;
+		fwrite(&n, 4, 1, f);
+		fwrite(prof_pc, 4, n, f);
+		fwrite(prof_tid, 2, n, f);
+		fclose(f);
+	}
+	fprintf(stderr, "asp: profiler wrote %u samples to %s\n", prof_n, path);
+}
+
 int main(int argc, char **argv)
 {
 	struct retro_game_info gi;
@@ -908,6 +963,7 @@ int main(int argc, char **argv)
 	manual_find(src);
 	cheats_find(src);
 	asp_stats_begin(bin_dir, "saturn", src);
+	if (!getenv("ASP_NO_PROF")) prof_start();
 	retro_init();
 
 	memset(&gi, 0, sizeof(gi));
@@ -1000,6 +1056,7 @@ int main(int argc, char **argv)
 	}
 	{
 		Uint32 el = SDL_GetTicks() - t_start;
+		prof_stop(bin_dir);
 		fprintf(stderr, "asp: leaving after %lu frames in %.1f s (%.2f fps), sound underruns %u, overruns %u\n",
 			frame, el / 1000.0, frame * 1000.0 / (el ? el : 1), underruns, overruns);
 	}
