@@ -626,6 +626,8 @@ static int16_t input_state(unsigned port, unsigned device, unsigned index, unsig
 
 /* ---- audio buffer status, for the core's automatic frameskip ----------- */
 extern int asp_frameskip_req;   /* vdp2.c (ASP patch) */
+extern int asp_m68k_thread;     /* scsp.c (ASP patch) */
+extern double asp_render_wait_us, asp_drawend_us, asp_m68k_wait_us;
 static int cpu_boost_on = 1;   /* sat_options.txt: asp_cpu_boost */
 static int max_skip = 3, skip_below = 50;   /* sat_options.txt: asp_max_skip, asp_skip_below */
 static retro_audio_buffer_status_callback_t buf_status_cb;
@@ -669,6 +671,11 @@ static void load_overrides(void)
 	while (n_ovr < 32 && fgets(line, sizeof(line), f)) {
 		if (line[0] == '#' || sscanf(line, "%63s %47s", ovr_k[n_ovr], ovr_v[n_ovr]) != 2)
 			continue;
+		if (strcmp(ovr_k[n_ovr], "asp_m68k_thread") == 0) {
+			asp_m68k_thread = atoi(ovr_v[n_ovr]);
+			fprintf(stderr, "asp: sound CPU on its own core: %s\n", asp_m68k_thread ? "yes" : "no");
+			continue;
+		}
 		if (strcmp(ovr_k[n_ovr], "asp_cpu_boost") == 0) {
 			cpu_boost_on = atoi(ovr_v[n_ovr]);
 			continue;
@@ -845,7 +852,7 @@ static void sav_store(int force)
  * now) it brings every core online and sets the performance governor,
  * restoring the governors on exit. At exit it logs each thread's CPU time. */
 #include <dirent.h>
-static char cpu_saved_gov[8][32];
+static char cpu_saved_gov[8][32], cpu_saved_max[8][32];
 static int rd_line(const char *path, char *buf, int n)
 {
 	FILE *f = fopen(path, "r");
@@ -908,6 +915,14 @@ static void cpu_boost(void)
 		fprintf(stderr, "asp: cpu%d online <- 1: %s\n", c, wr_line(p, "1") ? "ok" : strerror(errno));
 	}
 	for (c = 0; c < 8; c++) {
+		char mx[32];
+		snprintf(p, sizeof(p), "/sys/devices/system/cpu/cpu%d/cpufreq/cpuinfo_max_freq", c);
+		if (!rd_line(p, mx, sizeof(mx))) continue;
+		snprintf(p, sizeof(p), "/sys/devices/system/cpu/cpu%d/cpufreq/scaling_max_freq", c);
+		rd_line(p, cpu_saved_max[c], sizeof(cpu_saved_max[c]));
+		fprintf(stderr, "asp: cpu%d max clock %s <- %s: %s\n", c, cpu_saved_max[c], mx, wr_line(p, mx) ? "ok" : strerror(errno));
+	}
+	for (c = 0; c < 8; c++) {
 		snprintf(p, sizeof(p), "/sys/devices/system/cpu/cpu%d/cpufreq/scaling_governor", c);
 		if (!rd_line(p, cpu_saved_gov[c], sizeof(cpu_saved_gov[c]))) continue;
 		fprintf(stderr, "asp: cpu%d governor %s <- performance: %s\n", c, cpu_saved_gov[c],
@@ -944,6 +959,11 @@ static void cpu_restore(void)
 	int c;
 	cpu_report("at exit");
 	cpu_threads_report();
+	for (c = 0; c < 8; c++) {
+		if (!cpu_saved_max[c][0]) continue;
+		snprintf(p, sizeof(p), "/sys/devices/system/cpu/cpu%d/cpufreq/scaling_max_freq", c);
+		wr_line(p, cpu_saved_max[c]);
+	}
 	for (c = 0; c < 8; c++) {
 		if (!cpu_saved_gov[c][0]) continue;
 		snprintf(p, sizeof(p), "/sys/devices/system/cpu/cpu%d/cpufreq/scaling_governor", c);
@@ -1163,12 +1183,16 @@ int main(int argc, char **argv)
 		}
 		if (exit_after && frame >= exit_after)
 			break;
-		if (frame % 3600 == 0) {
+		if (frame % 1200 == 0) {
 			Uint32 el = SDL_GetTicks() - t_start;
+			fprintf(stderr, "asp: per frame: waiting for the picture threads %.2f ms, finishing the picture %.2f ms, waiting for the sound CPU %.2f ms\n",
+				asp_render_wait_us / 1000.0 / 1200, asp_drawend_us / 1000.0 / 1200, asp_m68k_wait_us / 1000.0 / 1200);
+			asp_render_wait_us = asp_drawend_us = asp_m68k_wait_us = 0;
+			cpu_threads_report();
 			fprintf(stderr, "asp: %lu frames in %.1f s (%.2f fps), sound underruns %u (%lu silent samples), overruns %u, low-sound frames %lu\n",
 				frame, el / 1000.0, frame * 1000.0 / (el ? el : 1), underruns, out_short, overruns, frames_skipped_hint);
-			fprintf(stderr, "asp: per frame this minute: emulation %.2f ms, copy %.2f ms, waiting for sound %.2f ms (%lu frames waited), whole loop %.2f ms; scaling %.2f ms on its own thread, pictures dropped %lu\n",
-				t_run_ms / 3600, t_copy_ms / 3600, t_wait_ms / 3600, frames_waited, t_loop_ms / 3600, t_present_ms / 3600, frames_dropped);
+			fprintf(stderr, "asp: per frame, last 1200 frames: emulation %.2f ms, copy %.2f ms, waiting for sound %.2f ms (%lu frames waited), whole loop %.2f ms; scaling %.2f ms on its own thread, pictures dropped %lu\n",
+				t_run_ms / 1200, t_copy_ms / 1200, t_wait_ms / 1200, frames_waited, t_loop_ms / 1200, t_present_ms / 1200, frames_dropped);
 			t_run_ms = t_present_ms = t_copy_ms = t_wait_ms = t_loop_ms = 0;
 			frames_waited = 0;
 		}
