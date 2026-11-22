@@ -39,6 +39,7 @@
 #include <stdint.h>
 #include <stdarg.h>
 #include <unistd.h>
+#include <errno.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <SDL.h>
@@ -625,6 +626,7 @@ static int16_t input_state(unsigned port, unsigned device, unsigned index, unsig
 
 /* ---- audio buffer status, for the core's automatic frameskip ----------- */
 extern int asp_frameskip_req;   /* vdp2.c (ASP patch) */
+static int cpu_boost_on = 1;   /* sat_options.txt: asp_cpu_boost */
 static int max_skip = 3, skip_below = 50;   /* sat_options.txt: asp_max_skip, asp_skip_below */
 static retro_audio_buffer_status_callback_t buf_status_cb;
 static unsigned long frames_skipped_hint;
@@ -667,6 +669,10 @@ static void load_overrides(void)
 	while (n_ovr < 32 && fgets(line, sizeof(line), f)) {
 		if (line[0] == '#' || sscanf(line, "%63s %47s", ovr_k[n_ovr], ovr_v[n_ovr]) != 2)
 			continue;
+		if (strcmp(ovr_k[n_ovr], "asp_cpu_boost") == 0) {
+			cpu_boost_on = atoi(ovr_v[n_ovr]);
+			continue;
+		}
 		if (strcmp(ovr_k[n_ovr], "asp_max_skip") == 0) {
 			max_skip = atoi(ovr_v[n_ovr]);
 			fprintf(stderr, "asp: at most %d skipped pictures in a row\n", max_skip);
@@ -833,6 +839,118 @@ static void sav_store(int force)
 
 /* ---- main -------------------------------------------------------------- */
 
+/* ---- CPU diagnostics and boost (test builds) ----------------------------
+ * Logs how many cores are online, their governor and clock, and lists the
+ * hotplug knobs; with "asp_cpu_boost 1" in sat_options.txt (the default for
+ * now) it brings every core online and sets the performance governor,
+ * restoring the governors on exit. At exit it logs each thread's CPU time. */
+#include <dirent.h>
+static char cpu_saved_gov[8][32];
+static int rd_line(const char *path, char *buf, int n)
+{
+	FILE *f = fopen(path, "r");
+	if (!f) { buf[0] = 0; return 0; }
+	if (!fgets(buf, n, f)) buf[0] = 0;
+	fclose(f);
+	buf[strcspn(buf, "\n")] = 0;
+	return buf[0] != 0;
+}
+static int wr_line(const char *path, const char *v)
+{
+	FILE *f = fopen(path, "w");
+	int ok;
+	if (!f) return 0;
+	ok = fputs(v, f) >= 0;
+	return fclose(f) == 0 && ok;
+}
+static void cpu_report(const char *when)
+{
+	char b[128], p[128], g[64], fq[64], mx[64];
+	int c;
+	rd_line("/sys/devices/system/cpu/online", b, sizeof(b));
+	fprintf(stderr, "asp: cpu %s: online %s, sysconf %ld/%ld\n", when, b,
+		sysconf(_SC_NPROCESSORS_ONLN), sysconf(_SC_NPROCESSORS_CONF));
+	for (c = 0; c < 8; c++) {
+		snprintf(p, sizeof(p), "/sys/devices/system/cpu/cpu%d", c);
+		if (access(p, F_OK) != 0) break;
+		snprintf(p, sizeof(p), "/sys/devices/system/cpu/cpu%d/online", c); rd_line(p, b, sizeof(b));
+		snprintf(p, sizeof(p), "/sys/devices/system/cpu/cpu%d/cpufreq/scaling_governor", c); rd_line(p, g, sizeof(g));
+		snprintf(p, sizeof(p), "/sys/devices/system/cpu/cpu%d/cpufreq/scaling_cur_freq", c); rd_line(p, fq, sizeof(fq));
+		snprintf(p, sizeof(p), "/sys/devices/system/cpu/cpu%d/cpufreq/cpuinfo_max_freq", c); rd_line(p, mx, sizeof(mx));
+		fprintf(stderr, "asp:   cpu%d online=%s governor=%s freq=%s max=%s\n", c, b, g, fq, mx);
+	}
+}
+static void cpu_list_dir(const char *d)
+{
+	DIR *dp = opendir(d);
+	struct dirent *e;
+	char line[512] = "";
+	if (!dp) return;
+	while ((e = readdir(dp)) != NULL)
+		if (e->d_name[0] != '.' && strlen(line) + strlen(e->d_name) + 2 < sizeof(line)) {
+			strcat(line, e->d_name); strcat(line, " ");
+		}
+	closedir(dp);
+	fprintf(stderr, "asp: %s: %s\n", d, line);
+}
+static void cpu_boost(void)
+{
+	char p[128];
+	int c;
+	cpu_report("at start");
+	cpu_list_dir("/sys/devices/system/cpu");
+	cpu_list_dir("/sys/devices/system/cpu/cpufreq");
+	cpu_list_dir("/sys/devices/system/cpu/cpu0/cpufreq");
+	if (!cpu_boost_on) return;
+	for (c = 1; c < 8; c++) {
+		snprintf(p, sizeof(p), "/sys/devices/system/cpu/cpu%d/online", c);
+		if (access(p, F_OK) != 0) continue;
+		fprintf(stderr, "asp: cpu%d online <- 1: %s\n", c, wr_line(p, "1") ? "ok" : strerror(errno));
+	}
+	for (c = 0; c < 8; c++) {
+		snprintf(p, sizeof(p), "/sys/devices/system/cpu/cpu%d/cpufreq/scaling_governor", c);
+		if (!rd_line(p, cpu_saved_gov[c], sizeof(cpu_saved_gov[c]))) continue;
+		fprintf(stderr, "asp: cpu%d governor %s <- performance: %s\n", c, cpu_saved_gov[c],
+			wr_line(p, "performance") ? "ok" : strerror(errno));
+	}
+	cpu_report("after boost");
+}
+static void cpu_threads_report(void)
+{
+	DIR *dp = opendir("/proc/self/task");
+	struct dirent *e;
+	long hz = sysconf(_SC_CLK_TCK);
+	if (!dp) return;
+	while ((e = readdir(dp)) != NULL) {
+		char p[128], b[512];
+		unsigned long ut = 0, st = 0;
+		char *q;
+		int i;
+		if (e->d_name[0] == '.') continue;
+		snprintf(p, sizeof(p), "/proc/self/task/%s/stat", e->d_name);
+		if (!rd_line(p, b, sizeof(b))) continue;
+		q = strrchr(b, ')');
+		if (!q) continue;
+		q += 2;
+		for (i = 0; i < 11 && q; i++) { q = strchr(q, ' '); if (q) q++; }
+		if (q) sscanf(q, "%lu %lu", &ut, &st);
+		fprintf(stderr, "asp: thread %s cpu %.1f s\n", e->d_name, (double)(ut + st) / (hz ? hz : 100));
+	}
+	closedir(dp);
+}
+static void cpu_restore(void)
+{
+	char p[128];
+	int c;
+	cpu_report("at exit");
+	cpu_threads_report();
+	for (c = 0; c < 8; c++) {
+		if (!cpu_saved_gov[c][0]) continue;
+		snprintf(p, sizeof(p), "/sys/devices/system/cpu/cpu%d/cpufreq/scaling_governor", c);
+		wr_line(p, cpu_saved_gov[c]);
+	}
+}
+
 /* ---- sampling profiler (test builds) ----------------------------------
  * SIGPROF every millisecond of CPU time, from whichever thread was running;
  * each sample is the interrupted program counter and the thread. Written raw
@@ -963,6 +1081,7 @@ int main(int argc, char **argv)
 	manual_find(src);
 	cheats_find(src);
 	asp_stats_begin(bin_dir, "saturn", src);
+	cpu_boost();
 	if (!getenv("ASP_NO_PROF")) prof_start();
 	retro_init();
 
@@ -1057,6 +1176,7 @@ int main(int argc, char **argv)
 	{
 		Uint32 el = SDL_GetTicks() - t_start;
 		prof_stop(bin_dir);
+		cpu_restore();
 		fprintf(stderr, "asp: leaving after %lu frames in %.1f s (%.2f fps), sound underruns %u, overruns %u\n",
 			frame, el / 1000.0, frame * 1000.0 / (el ? el : 1), underruns, overruns);
 	}
