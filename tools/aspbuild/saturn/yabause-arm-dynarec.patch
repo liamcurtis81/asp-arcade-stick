@@ -368,7 +368,7 @@ index 2663ffe..1b6e8e2 100644
     SSH2->onchip.FTCSR |= 0x80;
  
 diff --git a/yabause/src/titan/titan.c b/yabause/src/titan/titan.c
-index 75dd13e..1f1425c 100644
+index 75dd13e..0d82755 100644
 --- a/yabause/src/titan/titan.c
 +++ b/yabause/src/titan/titan.c
 @@ -1,3 +1,4 @@
@@ -376,7 +376,61 @@ index 75dd13e..1f1425c 100644
  /*  Copyright 2012 Guillaume Duhamel
  
      This file is part of Yabause.
-@@ -580,7 +581,7 @@ void TitanStartPriorityThread(int which)
+@@ -420,17 +421,50 @@ int TitanInit()
+    return 0;
+ }
+ 
++/* ASP: clearing all six layer buffers (about 3MB) on the main thread every
++ * drawn frame was a large share of its time. Now TitanErase only marks them;
++ * each layer's draw function clears its own buffer on its own thread, only
++ * if something was drawn there before, and DrawEnd clears whatever is still
++ * marked and dirty before compositing. */
++static volatile int tt_erase_pending;
++static int tt_dirty[6] = { 1, 1, 1, 1, 1, 1 };
++static int tt_erase_bytes;
++
+ void TitanErase()
+ {
+-   int i = 0;
+-
+    int height = tt_context.vdp2height;
+ 
+    if (vdp2_interlace)
+       height /= 2;
+ 
++   tt_erase_bytes = sizeof(struct PixelData) * tt_context.vdp2width * height;
++   tt_erase_pending = 0x3F;
++}
++
++void TitanEraseLayer(int i)
++{
++   if (tt_erase_pending & (1 << i))
++   {
++      __sync_fetch_and_and(&tt_erase_pending, ~(1 << i));
++      if (tt_dirty[i])
++         memset(tt_context.vdp2framebuffer[i], 0, tt_erase_bytes);
++   }
++   tt_dirty[i] = 1;   /* about to be drawn into */
++}
++
++void TitanEraseRemaining()
++{
++   int i;
+    for (i = 0; i < 6; i++)
+-      memset(tt_context.vdp2framebuffer[i], 0, sizeof(struct PixelData) * tt_context.vdp2width * height);
++      if (tt_erase_pending & (1 << i))
++      {
++         __sync_fetch_and_and(&tt_erase_pending, ~(1 << i));
++         if (tt_dirty[i])
++         {
++            memset(tt_context.vdp2framebuffer[i], 0, tt_erase_bytes);
++            tt_dirty[i] = 0;
++         }
++      }
+ }
+ 
+ int TitanDeInit()
+@@ -580,7 +614,7 @@ void TitanStartPriorityThread(int which)
  
  void TitanWaitForPriorityThread(int which)
  {
@@ -385,6 +439,19 @@ index 75dd13e..1f1425c 100644
  }
  
  void TitanRenderThreads(pixel_t * dispbuffer, int can_use_simplified)
+diff --git a/yabause/src/titan/titan.h b/yabause/src/titan/titan.h
+index a368448..2ce420f 100644
+--- a/yabause/src/titan/titan.h
++++ b/yabause/src/titan/titan.h
+@@ -41,6 +41,8 @@
+ int TitanInit();
+ int TitanDeInit();
+ void TitanErase();
++void TitanEraseLayer(int i);
++void TitanEraseRemaining(void);
+ 
+ void TitanSetResolution(int width, int height);
+ void TitanGetResolution(int * width, int * height);
 diff --git a/yabause/src/vdp2.c b/yabause/src/vdp2.c
 index db73d00..ebede69 100644
 --- a/yabause/src/vdp2.c
@@ -423,7 +490,7 @@ index db73d00..ebede69 100644
  
     if (Vdp2Regs->TVMD & 0x8000) {
 diff --git a/yabause/src/vidsoft.c b/yabause/src/vidsoft.c
-index 94bbc7d..29ddf90 100644
+index 94bbc7d..145ac84 100644
 --- a/yabause/src/vidsoft.c
 +++ b/yabause/src/vidsoft.c
 @@ -1,3 +1,5 @@
@@ -462,7 +529,47 @@ index 94bbc7d..29ddf90 100644
  }vidsoft_vdp1_thread_context;
  
  int vidsoft_vdp1_thread_enabled = 0;
-@@ -2070,14 +2072,14 @@ struct {
+@@ -1545,6 +1547,7 @@ static void LoadLineParamsNBG0(vdp2draw_struct * info, screeninfo_struct * sinfo
+ 
+ static void Vdp2DrawNBG0(Vdp2* lines, Vdp2* regs, u8* ram, u8* color_ram, struct CellScrollData * cell_data)
+ {
++   TitanEraseLayer(TITAN_NBG0);
+    vdp2draw_struct info = { 0 };
+    vdp2rotationparameterfp_struct parameter[2];
+ 
+@@ -1695,6 +1698,7 @@ static void LoadLineParamsNBG1(vdp2draw_struct * info, screeninfo_struct * sinfo
+ 
+ static void Vdp2DrawNBG1(Vdp2* lines, Vdp2* regs, u8* ram, u8* color_ram, struct CellScrollData * cell_data)
+ {
++   TitanEraseLayer(TITAN_NBG1);
+    vdp2draw_struct info = { 0 };
+ 
+    info.titan_which_layer = TITAN_NBG1;
+@@ -1801,6 +1805,7 @@ static void LoadLineParamsNBG2(vdp2draw_struct * info, screeninfo_struct * sinfo
+ 
+ static void Vdp2DrawNBG2(Vdp2* lines, Vdp2* regs, u8* ram, u8* color_ram, struct CellScrollData * cell_data)
+ {
++   TitanEraseLayer(TITAN_NBG2);
+    vdp2draw_struct info = { 0 };
+ 
+    info.titan_which_layer = TITAN_NBG2;
+@@ -1873,6 +1878,7 @@ static void LoadLineParamsNBG3(vdp2draw_struct * info, screeninfo_struct * sinfo
+ 
+ static void Vdp2DrawNBG3(Vdp2* lines, Vdp2* regs, u8* ram, u8* color_ram, struct CellScrollData * cell_data)
+ {
++   TitanEraseLayer(TITAN_NBG3);
+    vdp2draw_struct info = { 0 };
+ 
+    info.titan_which_layer = TITAN_NBG3;
+@@ -1945,6 +1951,7 @@ static void LoadLineParamsRBG0(vdp2draw_struct * info, screeninfo_struct * sinfo
+ 
+ static void Vdp2DrawRBG0(Vdp2* lines, Vdp2* regs, u8* ram, u8* color_ram, struct CellScrollData * cell_data)
+ {
++   TitanEraseLayer(TITAN_RBG0);
+    vdp2draw_struct info = { 0 };
+    vdp2rotationparameterfp_struct parameter[2];
+ 
+@@ -2070,14 +2077,14 @@ struct {
     volatile int need_draw[6];
     volatile int draw_finished[6];
     Vdp2 lines[270];
@@ -480,7 +587,7 @@ index 94bbc7d..29ddf90 100644
  { \
     for (;;) \
     { \
-@@ -2085,16 +2087,16 @@ void NAME(void * data) \
+@@ -2085,16 +2092,16 @@ void NAME(void * data) \
        { \
           vidsoft_thread_context.need_draw[LAYER] = 0; \
           FUNC(vidsoft_thread_context.lines, &vidsoft_thread_context.regs, vidsoft_thread_context.ram, vidsoft_thread_context.color_ram, vidsoft_thread_context.cell_scroll_data); \
@@ -505,7 +612,7 @@ index 94bbc7d..29ddf90 100644
  DECLARE_THREAD(VidsoftNbg3Thread, TITAN_NBG3, Vdp2DrawNBG3)
  
  //////////////////////////////////////////////////////////////////////////////
-@@ -2128,7 +2130,7 @@ void VidsoftWaitForVdp1Thread()
+@@ -2128,7 +2135,7 @@ void VidsoftWaitForVdp1Thread()
  {
     if (vidsoft_vdp1_thread_enabled)
     {
@@ -514,7 +621,7 @@ index 94bbc7d..29ddf90 100644
     }
  }
  
-@@ -2185,20 +2187,20 @@ int VIDSoftInit(void)
+@@ -2185,20 +2192,20 @@ int VIDSoftInit(void)
           return -1;
  #endif
  
@@ -543,7 +650,7 @@ index 94bbc7d..29ddf90 100644
     YabThreadStart(YAB_THREAD_VIDSOFT_LAYER_NBG3, VidsoftNbg3Thread, 0);
     YabThreadStart(YAB_THREAD_VIDSOFT_LAYER_SPRITE, VidsoftSpriteThread, 0);
  
-@@ -2680,25 +2682,25 @@ static int CheckDil(int y, Vdp1 * regs)
+@@ -2680,25 +2687,25 @@ static int CheckDil(int y, Vdp1 * regs)
     return 0;
  }
  
@@ -585,7 +692,7 @@ index 94bbc7d..29ddf90 100644
     {
        int is_user_clipped = IsUserClipped(x, y, regs);
  
-@@ -3444,68 +3446,68 @@ void VIDSoftVdp1LocalCoordinate(u8* ram, Vdp1*regs)
+@@ -3444,68 +3451,68 @@ void VIDSoftVdp1LocalCoordinate(u8* ram, Vdp1*regs)
  
  //////////////////////////////////////////////////////////////////////////////
  
@@ -712,7 +819,15 @@ index 94bbc7d..29ddf90 100644
     }
  }
  
-@@ -3892,21 +3894,27 @@ void VidsoftDrawSprite(Vdp2 * vdp2_regs, u8 * spr_window_mask, u8* vdp1_front_fr
+@@ -3549,6 +3556,7 @@ void VIDSoftVdp2DrawStart(void)
+ 
+ void VidsoftDrawSprite(Vdp2 * vdp2_regs, u8 * spr_window_mask, u8* vdp1_front_framebuffer, u8 * vdp2_ram, Vdp1* vdp1_regs, Vdp2* vdp2_lines, u8*color_ram)
+ {
++   TitanEraseLayer(TITAN_SPRITE);
+    int i, i2;
+    u16 pixel;
+    u8 prioritytable[8];
+@@ -3892,21 +3900,28 @@ void VidsoftDrawSprite(Vdp2 * vdp2_regs, u8 * spr_window_mask, u8* vdp1_front_fr
     }
  }
  
@@ -739,6 +854,7 @@ index 94bbc7d..29ddf90 100644
  
 +   t1 = asp_now_us();
 +   asp_render_wait_us += t1 - t0;
++   TitanEraseRemaining();
     TitanRender(dispbuffer);
  
     VIDSoftVdp1SwapFrameBuffer();
@@ -746,7 +862,7 @@ index 94bbc7d..29ddf90 100644
  
     if (OSDUseBuffer())
        OSDDisplayMessages(dispbuffer, vdp2width, vdp2height);
-@@ -3931,19 +3939,19 @@ void VIDSoftVdp2DrawEnd(void)
+@@ -3931,19 +3946,19 @@ void VIDSoftVdp2DrawEnd(void)
  
  void VidsoftStartLayerThread(int * layer_priority, int * draw_priority_0, int * num_threads_dispatched, int which_layer, void(*layer_func) (Vdp2* lines, Vdp2* regs, u8* ram, u8* color_ram, struct CellScrollData * cell_data))
  {
