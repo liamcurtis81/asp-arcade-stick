@@ -19,6 +19,8 @@ BLUE = (54, 60, 158)            # the planet, sampled from Liam's logo
 FIELD = (214, 218, 228)
 FONT = os.path.join(fg.HERE, "fonts", "Michroma-Regular.ttf")
 OUT = os.path.join(fg.HERE, "out_flat")
+EMBLEM_H = 520          # px tall; the planet is near-square
+EMBLEM_BLEED = 0.18     # share of it below the bottom edge
 
 
 def text_mask(text, size, font=FONT):
@@ -34,8 +36,10 @@ def build():
     planet = st.crop((0, 0, st.width, int(st.height * 0.56)))      # planet and rings, no lettering
     planet = planet.crop(planet.getbbox())
     alpha = planet.getchannel("A")
-    em = fg.fit(alpha, fg.LOGO_BOTTOM_W, fg.LOGO_BOTTOM_H)
-    fg.stamp(img, em, ((fg.W - em.width) // 2, fg.H - fg.LOGO_BOTTOM_PAD - em.height), BLUE, 0.08)
+    # Liam, 22 Nov: much bigger than the other pages' emblems. Centred
+    # under the covers and running off the bottom edge.
+    em = fg.fit(alpha, 1000, EMBLEM_H)
+    fg.stamp(img, em, ((fg.W - em.width) // 2, fg.H - int(em.height * (1 - EMBLEM_BLEED))), BLUE, 0.08)
     logo = Image.open(os.path.join(fg.LOGOS, "saturn_wide.png")).convert("RGBA")
     logo = fg.fit(logo.crop(logo.getbbox()), 420, fg.MARK_H)
     img.alpha_composite(logo, (fg.MARGIN, fg.TITLE_TOP))
