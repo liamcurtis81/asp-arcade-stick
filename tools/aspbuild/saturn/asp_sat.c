@@ -244,9 +244,14 @@ static unsigned frame_w, frame_h;
 static size_t frame_pitch;
 static unsigned long frames_shown;
 
+extern int asp_frame_dummy;          /* vdp2.c: the frame now starting is not drawn */
+extern unsigned long asp_frames_skipped;
+static int cur_frame_dummy;          /* the frame retro_run is finishing */
 static void video_refresh(const void *data, unsigned w, unsigned h, size_t pitch)
 {
 	if (data == NULL)           /* frame dupe: keep what is on screen */
+		return;
+	if (cur_frame_dummy)        /* Yabause skipped drawing it: same picture, skip the copy */
 		return;
 	frame_data = data;
 	frame_w = w;
@@ -1006,6 +1011,20 @@ static void prof_start(void)
 	setitimer(ITIMER_PROF, &it, NULL);
 	fprintf(stderr, "asp: profiler on (main thread %ld)\n", (long)syscall(SYS_gettid));
 }
+static void prof_dump(const char *dir)
+{
+	char path[600];
+	FILE *f;
+	unsigned n = prof_n;
+	snprintf(path, sizeof(path), "%ssat_prof.bin", dir);
+	f = fopen(path, "wb");
+	if (!f) return;
+	fwrite(&n, 4, 1, f);
+	fwrite(prof_pc, 4, n, f);
+	fwrite(prof_tid, 2, n, f);
+	fclose(f);
+	sync();
+}
 static void prof_stop(const char *dir)
 {
 	struct itimerval it;
@@ -1147,6 +1166,7 @@ int main(int argc, char **argv)
 			 * across retro_run, which is what garbled the first timings. */
 			static volatile double t0;
 			t0 = now_ms();
+			cur_frame_dummy = asp_frame_dummy;
 			retro_run();
 			t_run_ms += now_ms() - t0;
 		}
@@ -1188,6 +1208,8 @@ int main(int argc, char **argv)
 			fprintf(stderr, "asp: per frame: waiting for the picture threads %.2f ms, finishing the picture %.2f ms, waiting for the sound CPU %.2f ms\n",
 				asp_render_wait_us / 1000.0 / 1200, asp_drawend_us / 1000.0 / 1200, asp_m68k_wait_us / 1000.0 / 1200);
 			asp_render_wait_us = asp_drawend_us = asp_m68k_wait_us = 0;
+			fprintf(stderr, "asp: pictures not drawn so far: %lu\n", asp_frames_skipped);
+			prof_dump(bin_dir);
 			cpu_threads_report();
 			fprintf(stderr, "asp: %lu frames in %.1f s (%.2f fps), sound underruns %u (%lu silent samples), overruns %u, low-sound frames %lu\n",
 				frame, el / 1000.0, frame * 1000.0 / (el ? el : 1), underruns, out_short, overruns, frames_skipped_hint);

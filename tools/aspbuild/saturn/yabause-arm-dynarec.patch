@@ -258,19 +258,21 @@ index 75dd13e..1f1425c 100644
  
  void TitanRenderThreads(pixel_t * dispbuffer, int can_use_simplified)
 diff --git a/yabause/src/vdp2.c b/yabause/src/vdp2.c
-index db73d00..821218e 100644
+index db73d00..ebede69 100644
 --- a/yabause/src/vdp2.c
 +++ b/yabause/src/vdp2.c
-@@ -410,6 +410,8 @@ void SpeedThrottleDisable(void) {
+@@ -410,6 +410,10 @@ void SpeedThrottleDisable(void) {
  
  //////////////////////////////////////////////////////////////////////////////
  
 +int asp_frameskip_req;   /* ASP: set by the frontend when its sound queue runs low */
++int asp_frame_dummy;              /* ASP: this frame is not being drawn */
++unsigned long asp_frames_skipped;
 +
  void Vdp2VBlankOUT(void) {
     static int framestoskip = 0;
     static int framesskipped = 0;
-@@ -427,6 +429,12 @@ void Vdp2VBlankOUT(void) {
+@@ -427,6 +431,12 @@ void Vdp2VBlankOUT(void) {
  
     Vdp2Regs->TVSTAT = ((Vdp2Regs->TVSTAT & ~0x0008) & ~0x0002) | (vdp2_is_odd_frame << 1);
  
@@ -283,6 +285,15 @@ index db73d00..821218e 100644
     if (skipnextframe && (! saved))
     {
        saved = VIDCore;
+@@ -438,6 +448,8 @@ void Vdp2VBlankOUT(void) {
+       saved = NULL;
+    }
+ 
++   asp_frame_dummy = (saved != NULL);
++   if (asp_frame_dummy) asp_frames_skipped++;
+    VIDCore->Vdp2DrawStart();
+ 
+    if (Vdp2Regs->TVMD & 0x8000) {
 diff --git a/yabause/src/vidsoft.c b/yabause/src/vidsoft.c
 index 94bbc7d..29ddf90 100644
 --- a/yabause/src/vidsoft.c
