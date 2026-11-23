@@ -109,7 +109,7 @@ index a5c771f..2585c4b 100644
  
  #ifdef ANDROID
 diff --git a/yabause/src/scsp.c b/yabause/src/scsp.c
-index d46d52e..ec57f7d 100644
+index d46d52e..988e74c 100644
 --- a/yabause/src/scsp.c
 +++ b/yabause/src/scsp.c
 @@ -4697,6 +4697,7 @@ Sh2ScspReadByte(SH2_struct *sh, u32 addr)
@@ -168,7 +168,7 @@ index d46d52e..ec57f7d 100644
    scsp_reset();
  }
  
-@@ -4964,8 +4971,155 @@ __attribute__((noinline))
+@@ -4964,8 +4971,161 @@ __attribute__((noinline))
  #endif
  static s32 FASTCALL M68KExecBP (s32 cycles);
  
@@ -297,10 +297,16 @@ index d46d52e..ec57f7d 100644
 +}
 +/* Per-line sync point the frame loop already calls: hand over a batch every
 + * asp_m68k_batch lines, and deliver any SCSP interrupts for the main CPUs. */
++int asp_sound_nowait = 1;   /* sat_options.txt: asp_sound_nowait */
 +static void asp_line_point(void)
 +{
 +  if (!asp_worker_busy) asp_deliver_irqs();
-+  if (aspq_lines >= asp_m68k_batch) asp_dispatch();
++  /* ASP: if the worker is still on the last batch, keep queuing instead of
++     waiting for it (up to three quarters of the queue, about a frame). The
++     emulation waited 2-7 ms a frame here in 3D games. */
++  if (aspq_lines >= asp_m68k_batch &&
++      (!asp_sound_nowait || !asp_worker_busy || aspq_n[aspq_fill] >= ASPQ_MAX * 3 / 4))
++    asp_dispatch();
 +}
 +
 +void
@@ -324,7 +330,7 @@ index d46d52e..ec57f7d 100644
  {
    s32 newcycles = savedcycles - cycles;
    if (LIKELY(IsM68KRunning))
-@@ -5072,9 +5226,24 @@ M68KStep (void)
+@@ -5072,9 +5232,26 @@ M68KStep (void)
  void
  M68KSync (void)
  {
@@ -343,13 +349,15 @@ index d46d52e..ec57f7d 100644
 +void
 +AspSoundFlush (void)
 +{
++  if (asp_sound_nowait && asp_worker_busy && aspq_n[aspq_fill] < ASPQ_MAX * 3 / 4)
++    return;                   /* goes with the next batch */
 +  asp_dispatch();
 +}
 +
  //////////////////////////////////////////////////////////////////////////////
  
  void
-@@ -5181,7 +5350,7 @@ void new_scsp_update_samples(s32 *bufL, s32 *bufR, int scspsoundlen)
+@@ -5181,7 +5358,7 @@ void new_scsp_update_samples(s32 *bufL, s32 *bufR, int scspsoundlen)
  }
  
  void

@@ -744,6 +744,11 @@ static void load_overrides(void)
 			asp_vdp1_async = atoi(ovr_v[n_ovr]);
 			continue;
 		}
+		if (strcmp(ovr_k[n_ovr], "asp_sound_nowait") == 0) {
+			extern int asp_sound_nowait;
+			asp_sound_nowait = atoi(ovr_v[n_ovr]);
+			continue;
+		}
 		if (strcmp(ovr_k[n_ovr], "asp_pin") == 0) {
 			asp_pin = atoi(ovr_v[n_ovr]);
 			continue;

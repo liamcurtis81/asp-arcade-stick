@@ -7,7 +7,7 @@ which builds make it up.
 
 ## 2.3 (in progress) - 22 Nov 2026
 
-- Saturn (test, `sat_emu_t25`): libretro Yabause with Ari64's SH-2
+- Saturn (test, `sat_emu_t26`): libretro Yabause with Ari64's SH-2
   recompiler re-enabled on ARM, on its own launcher page. Main-thread work cut:
   - the drawing threads' snapshot of VDP1/VDP2 RAM copies only the 2KB pages
     written since the last picture (~10KB a frame instead of ~1.3MB);
@@ -40,6 +40,9 @@ which builds make it up.
     a list arriving while the last is unfinished or unshown is dropped, and
     a swap with the list unfinished keeps the old picture
     (`asp_vdp1_async 0` turns it off);
+  - the emulation no longer waits for the sound worker at each 16-line
+    handover; it keeps queuing (up to ~a frame) while the worker catches up
+    (`asp_sound_nowait 0` turns it off);
   - `asp_pin 0` (all four cores shared) froze the stick in a Sega Rally
     race; the card's `sat_options.txt` keeps `asp_pin 1`;
   - SH-2 DMA passed an end address where a length was expected when telling
