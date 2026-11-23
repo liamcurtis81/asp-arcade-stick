@@ -729,6 +729,16 @@ static void load_overrides(void)
 			asp_slave_timer_wake = atoi(ovr_v[n_ovr]);
 			continue;
 		}
+		if (strcmp(ovr_k[n_ovr], "asp_vdp1_bands") == 0) {
+			extern int asp_vdp1_bands;
+			asp_vdp1_bands = atoi(ovr_v[n_ovr]);
+			continue;
+		}
+		if (strcmp(ovr_k[n_ovr], "asp_render_nice") == 0) {
+			extern int asp_render_nice;
+			asp_render_nice = atoi(ovr_v[n_ovr]);
+			continue;
+		}
 		if (strcmp(ovr_k[n_ovr], "asp_pin") == 0) {
 			asp_pin = atoi(ovr_v[n_ovr]);
 			continue;

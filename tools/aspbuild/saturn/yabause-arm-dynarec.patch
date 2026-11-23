@@ -749,20 +749,24 @@ index 2663ffe..9eb8e78 100644
     SSH2->onchip.FTCSR |= 0x80;
  
 diff --git a/yabause/src/thr-rthreads.c b/yabause/src/thr-rthreads.c
-index 45b7068..f95a9db 100644
+index 45b7068..f0dcc85 100644
 --- a/yabause/src/thr-rthreads.c
 +++ b/yabause/src/thr-rthreads.c
-@@ -33,7 +33,9 @@ struct thd_s {
+@@ -33,7 +33,13 @@ struct thd_s {
  	sthread_t *thd;
  	slock_t *mutex;
  	scond_t *cond;
 +	int pending;   /* ASP: a wake that arrived before the thread slept */
  };
 +static __thread int asp_my_id = -1;
++int asp_render_nice = 4;
++#include <sys/resource.h>
++#include <sys/syscall.h>
++#include <unistd.h>
  
  static struct thd_s thread_handle[YAB_NUM_THREADS];
  
-@@ -86,19 +88,27 @@ void YabThreadSleep(void)
+@@ -86,19 +92,33 @@ void YabThreadSleep(void)
  {
  	unsigned int i, id;
  
@@ -784,6 +788,12 @@ index 45b7068..f95a9db 100644
  		}
 +		if (id == YAB_NUM_THREADS) return;
 +		asp_my_id = id;
++		/* ASP: picture layer and compositing threads yield to the sound
++		   worker and the VDP1 thread, which the emulation waits on */
++		if (asp_render_nice > 0 &&
++		    ((id >= YAB_THREAD_VIDSOFT_LAYER_NBG3 && id <= YAB_THREAD_VIDSOFT_LAYER_RBG0) ||
++		     (id >= YAB_THREAD_VIDSOFT_PRIORITY_0 && id <= YAB_THREAD_VIDSOFT_LAYER_SPRITE)))
++			setpriority(PRIO_PROCESS, (id_t)syscall(SYS_gettid), asp_render_nice);
  	}
  
 -	if (id == YAB_NUM_THREADS) return;
@@ -799,7 +809,7 @@ index 45b7068..f95a9db 100644
  	slock_unlock(thread_handle[id].mutex);
  }
  
-@@ -112,6 +122,7 @@ void YabThreadWake(unsigned int id)
+@@ -112,6 +132,7 @@ void YabThreadWake(unsigned int id)
  		return;  // Thread wasn't running in the first place
  
  	slock_lock(thread_handle[id].mutex);
@@ -1143,17 +1153,18 @@ index db73d00..f7eefd4 100644
     // Read CRAM
     MemStateRead((void *)Vdp2ColorRam, 0x1000, 1, stream);
 diff --git a/yabause/src/vidsoft.c b/yabause/src/vidsoft.c
-index 94bbc7d..202796c 100644
+index 94bbc7d..bce113e 100644
 --- a/yabause/src/vidsoft.c
 +++ b/yabause/src/vidsoft.c
-@@ -1,3 +1,6 @@
+@@ -1,3 +1,7 @@
++#include <stdint.h>
 +#include <pthread.h>
 +#include <time.h>
 +#include <sched.h>  /* ASP: waits yield the core instead of spinning */
  /*  Copyright 2003-2004 Guillaume Duhamel
      Copyright 2004-2008 Theo Berkau
      Copyright 2006 Fabien Coulon
-@@ -102,6 +105,7 @@ void VIDSoftVdp1EraseFrameBuffer(Vdp1* regs, u8 * back_framebuffer);
+@@ -102,6 +106,7 @@ void VIDSoftVdp1EraseFrameBuffer(Vdp1* regs, u8 * back_framebuffer);
  void VidsoftDrawSprite(Vdp2 * vdp2_regs, u8 * sprite_window_mask, u8* vdp1_front_framebuffer, u8 * vdp2_ram, Vdp1* vdp1_regs, Vdp2* vdp2_lines, u8*color_ram);
  void VIDSoftGetNativeResolution(int *width, int *height, int*interlace);
  void VIDSoftVdp2DispOff(void);
@@ -1161,7 +1172,7 @@ index 94bbc7d..202796c 100644
  
  VideoInterface_struct VIDSoft = {
  VIDCORE_SOFT,
-@@ -176,8 +180,28 @@ struct VidsoftVdp1ThreadContext
+@@ -176,8 +181,28 @@ struct VidsoftVdp1ThreadContext
     Vdp1 regs;
     u8 ram[0x80000];
     u8 back_framebuffer[0x40000];
@@ -1190,7 +1201,7 @@ index 94bbc7d..202796c 100644
  int vidsoft_vdp1_thread_enabled = 0;
  
  typedef struct { s16 x; s16 y; } vdp1vertex;
-@@ -500,11 +524,9 @@ int WindowLogic(int wctl, int w0, int w1)
+@@ -500,11 +525,9 @@ int WindowLogic(int wctl, int w0, int w1)
  
  static INLINE int TestBothWindow(int wctl, clipping_struct *clip, int x, int y)
  {
@@ -1204,7 +1215,7 @@ index 94bbc7d..202796c 100644
      if ((wctl & 0x2a) == 0)
      {
         if ((wctl & 0x80) == 0x80)
-@@ -513,6 +535,10 @@ static INLINE int TestBothWindow(int wctl, clipping_struct *clip, int x, int y)
+@@ -513,6 +536,10 @@ static INLINE int TestBothWindow(int wctl, clipping_struct *clip, int x, int y)
            return 1;
      }
  
@@ -1215,7 +1226,7 @@ index 94bbc7d..202796c 100644
      //if only window 0 is enabled
      if ((w1 & 2) && (spr & 2)) return w0 & 1;
      //if only window 1 is enabled
-@@ -1545,6 +1571,7 @@ static void LoadLineParamsNBG0(vdp2draw_struct * info, screeninfo_struct * sinfo
+@@ -1545,6 +1572,7 @@ static void LoadLineParamsNBG0(vdp2draw_struct * info, screeninfo_struct * sinfo
  
  static void Vdp2DrawNBG0(Vdp2* lines, Vdp2* regs, u8* ram, u8* color_ram, struct CellScrollData * cell_data)
  {
@@ -1223,7 +1234,7 @@ index 94bbc7d..202796c 100644
     vdp2draw_struct info = { 0 };
     vdp2rotationparameterfp_struct parameter[2];
  
-@@ -1695,6 +1722,7 @@ static void LoadLineParamsNBG1(vdp2draw_struct * info, screeninfo_struct * sinfo
+@@ -1695,6 +1723,7 @@ static void LoadLineParamsNBG1(vdp2draw_struct * info, screeninfo_struct * sinfo
  
  static void Vdp2DrawNBG1(Vdp2* lines, Vdp2* regs, u8* ram, u8* color_ram, struct CellScrollData * cell_data)
  {
@@ -1231,7 +1242,7 @@ index 94bbc7d..202796c 100644
     vdp2draw_struct info = { 0 };
  
     info.titan_which_layer = TITAN_NBG1;
-@@ -1801,6 +1829,7 @@ static void LoadLineParamsNBG2(vdp2draw_struct * info, screeninfo_struct * sinfo
+@@ -1801,6 +1830,7 @@ static void LoadLineParamsNBG2(vdp2draw_struct * info, screeninfo_struct * sinfo
  
  static void Vdp2DrawNBG2(Vdp2* lines, Vdp2* regs, u8* ram, u8* color_ram, struct CellScrollData * cell_data)
  {
@@ -1239,7 +1250,7 @@ index 94bbc7d..202796c 100644
     vdp2draw_struct info = { 0 };
  
     info.titan_which_layer = TITAN_NBG2;
-@@ -1873,6 +1902,7 @@ static void LoadLineParamsNBG3(vdp2draw_struct * info, screeninfo_struct * sinfo
+@@ -1873,6 +1903,7 @@ static void LoadLineParamsNBG3(vdp2draw_struct * info, screeninfo_struct * sinfo
  
  static void Vdp2DrawNBG3(Vdp2* lines, Vdp2* regs, u8* ram, u8* color_ram, struct CellScrollData * cell_data)
  {
@@ -1247,7 +1258,7 @@ index 94bbc7d..202796c 100644
     vdp2draw_struct info = { 0 };
  
     info.titan_which_layer = TITAN_NBG3;
-@@ -1945,6 +1975,7 @@ static void LoadLineParamsRBG0(vdp2draw_struct * info, screeninfo_struct * sinfo
+@@ -1945,6 +1976,7 @@ static void LoadLineParamsRBG0(vdp2draw_struct * info, screeninfo_struct * sinfo
  
  static void Vdp2DrawRBG0(Vdp2* lines, Vdp2* regs, u8* ram, u8* color_ram, struct CellScrollData * cell_data)
  {
@@ -1255,17 +1266,96 @@ index 94bbc7d..202796c 100644
     vdp2draw_struct info = { 0 };
     vdp2rotationparameterfp_struct parameter[2];
  
-@@ -2113,8 +2144,7 @@ void VidsoftVdp1Thread(void* data)
+@@ -2106,6 +2138,78 @@ void VIDSoftSetNumLayerThreads(int num)
+ 
+ //////////////////////////////////////////////////////////////////////////////
+ 
++static __thread int asp_band_y0 = -0x7fffffff, asp_band_y1 = 0x7fffffff;
++int asp_vdp1_bands = 3;                   /* sat_options.txt: asp_vdp1_bands */
++#define ASP_MAX_BANDS 4
++static pthread_t asp_band_thr[ASP_MAX_BANDS];
++static int asp_band_up;
++static int asp_bands_now = 1;
++static volatile unsigned asp_band_gen;
++static volatile int asp_band_left;
++static int asp_band_edge[ASP_MAX_BANDS + 1];
++static pthread_mutex_t asp_band_mx = PTHREAD_MUTEX_INITIALIZER;
++static pthread_cond_t asp_band_cv = PTHREAD_COND_INITIALIZER;
++
++static void asp_band_draw(int k)
++{
++   Vdp1 regs = vidsoft_vdp1_thread_context.regs;
++   asp_band_y0 = asp_band_edge[k];
++   asp_band_y1 = asp_band_edge[k + 1] - 1;
++   Vdp1DrawCommands(vidsoft_vdp1_thread_context.ram, &regs, vidsoft_vdp1_thread_context.fb_target);
++}
++
++static void *asp_band_main(void *arg)
++{
++   int k = (int)(intptr_t)arg;
++   unsigned seen = 0;
++   for (;;)
++   {
++      pthread_mutex_lock(&asp_band_mx);
++      while (asp_band_gen == seen)
++         pthread_cond_wait(&asp_band_cv, &asp_band_mx);
++      seen = asp_band_gen;
++      pthread_mutex_unlock(&asp_band_mx);
++      if (k < asp_bands_now)
++         asp_band_draw(k);
++      __sync_fetch_and_sub(&asp_band_left, 1);
++   }
++   return NULL;
++}
++
++static void asp_vdp1_draw_banded(void)
++{
++   int n = asp_vdp1_bands, k, h;
++   if (n > ASP_MAX_BANDS) n = ASP_MAX_BANDS;
++   if (n > 1 && asp_band_up < n - 1)
++   {
++      for (k = asp_band_up + 1; k < n; k++)
++         if (pthread_create(&asp_band_thr[k], NULL, asp_band_main, (void *)(intptr_t)k) != 0) break;
++      asp_band_up = k - 1;
++   }
++   if (n > asp_band_up + 1) n = asp_band_up + 1;
++   { static int told; if (!told) { told = 1; fprintf(stderr, "asp: VDP1 drawn in %d band%s\n", n, n == 1 ? "" : "s"); } }
++   if (n <= 1)
++   {
++      asp_band_y0 = -0x7fffffff; asp_band_y1 = 0x7fffffff;
++      Vdp1DrawCommands(vidsoft_vdp1_thread_context.ram, &vidsoft_vdp1_thread_context.regs, vidsoft_vdp1_thread_context.fb_target);
++      return;
++   }
++   h = vdp1height * vdp1interlace;
++   for (k = 0; k <= n; k++) asp_band_edge[k] = h * k / n;
++   asp_band_edge[0] = -0x7fffffff;
++   asp_band_edge[n] = 0x7fffffff;
++   asp_bands_now = n;
++   asp_band_left = asp_band_up;          /* every helper checks in, used or not */
++   __sync_synchronize();
++   pthread_mutex_lock(&asp_band_mx);
++   asp_band_gen++;
++   pthread_cond_broadcast(&asp_band_cv);
++   pthread_mutex_unlock(&asp_band_mx);
++   asp_band_draw(0);
++   while (asp_band_left > 0) sched_yield();
++   __sync_synchronize();
++}
++
+ void VidsoftVdp1Thread(void* data)
+ {
+    for (;;)
+@@ -2113,8 +2217,7 @@ void VidsoftVdp1Thread(void* data)
        if (vidsoft_vdp1_thread_context.need_draw)
        {
           vidsoft_vdp1_thread_context.need_draw = 0;
 -         Vdp1DrawCommands(vidsoft_vdp1_thread_context.ram, &vidsoft_vdp1_thread_context.regs, vidsoft_vdp1_thread_context.back_framebuffer);
 -         memcpy(vdp1backframebuffer, vidsoft_vdp1_thread_context.back_framebuffer, 0x40000);
-+         Vdp1DrawCommands(vidsoft_vdp1_thread_context.ram, &vidsoft_vdp1_thread_context.regs, vidsoft_vdp1_thread_context.fb_target);
++         asp_vdp1_draw_banded();
           vidsoft_vdp1_thread_context.draw_finished = 1;
        }
  
-@@ -2128,7 +2158,7 @@ void VidsoftWaitForVdp1Thread()
+@@ -2128,7 +2231,7 @@ void VidsoftWaitForVdp1Thread()
  {
     if (vidsoft_vdp1_thread_enabled)
     {
@@ -1274,7 +1364,7 @@ index 94bbc7d..202796c 100644
     }
  }
  
-@@ -2329,6 +2359,7 @@ int VIDSoftSetupGL(void)
+@@ -2329,6 +2432,7 @@ int VIDSoftSetupGL(void)
  
  void VIDSoftDeInit(void)
  {
@@ -1282,7 +1372,7 @@ index 94bbc7d..202796c 100644
     if (dispbuffer)
     {
        free(dispbuffer);
-@@ -2437,11 +2468,13 @@ void VIDSoftVdp1DrawStart()
+@@ -2437,11 +2541,13 @@ void VIDSoftVdp1DrawStart()
        VidsoftWaitForVdp1Thread();
  
        //take a snapshot of the vdp1 state, to be used by the thread
@@ -1299,7 +1389,88 @@ index 94bbc7d..202796c 100644
  
        //start thread
        vidsoft_vdp1_thread_context.draw_finished = 0;
-@@ -3520,6 +3553,7 @@ int VIDSoftVdp2Reset(void)
+@@ -2514,14 +2620,16 @@ typedef struct _COLOR_PARAMS
+ 	double r,g,b;
+ } COLOR_PARAMS;
+ 
+-COLOR_PARAMS leftColumnColor;
++__thread COLOR_PARAMS leftColumnColor;
+ 
+ 
+ 
+-int currentPixel;
+-int currentPixelIsVisible;
+-int characterWidth;
+-int characterHeight;
++__thread int currentPixel;
++__thread int currentPixelIsVisible;
++__thread int characterWidth;
++__thread int characterHeight;
++/* ASP: VDP1 drawing is split into horizontal bands, one per thread; each
++   thread only writes lines y0..y1 (unclipped coordinates, before interlace) */
+ 
+ static int getpixel(int linenumber, int currentlineindex, vdp1cmd_struct *cmd, u8 * ram) {
+ 
+@@ -2714,6 +2822,7 @@ int IsClipped(int x, int y, Vdp1* regs, vdp1cmd_struct * cmd)
+ }
+ 
+ static void putpixel8(int x, int y, Vdp1 * regs, vdp1cmd_struct *cmd, u8 * back_framebuffer) {
++    if (y < asp_band_y0 || y > asp_band_y1) return;
+ 
+     int y2 = y / vdp1interlace;
+     u8 * iPix = &back_framebuffer[(y2 * vdp1width) + x];
+@@ -2749,6 +2858,7 @@ static void putpixel8(int x, int y, Vdp1 * regs, vdp1cmd_struct *cmd, u8 * back_
+ }
+ 
+ static void putpixel(int x, int y, Vdp1* regs, vdp1cmd_struct * cmd, u8 * back_framebuffer) {
++   if (y < asp_band_y0 || y > asp_band_y1) return;
+ 
+ 	u16* iPix;
+ 	int mesh = cmd->CMDPMOD & 0x0100;
+@@ -2999,10 +3109,10 @@ typedef union _COLOR { // xbgr x555
+ 	u16 value;
+ } COLOR;
+ 
+-COLOR gouraudA;
+-COLOR gouraudB;
+-COLOR gouraudC;
+-COLOR gouraudD;
++__thread COLOR gouraudA;
++__thread COLOR gouraudB;
++__thread COLOR gouraudC;
++__thread COLOR gouraudD;
+ 
+ static void gouraudTable(u8* ram, Vdp1* regs, vdp1cmd_struct * cmd)
+ {
+@@ -3018,10 +3128,10 @@ static void gouraudTable(u8* ram, Vdp1* regs, vdp1cmd_struct * cmd)
+    gouraudD.value = T1ReadWord(ram, gouraudTableAddress + 6);
+ }
+ 
+-int xleft[1000];
+-int yleft[1000];
+-int xright[1000];
+-int yright[1000];
++__thread int xleft[1000];
++__thread int yleft[1000];
++__thread int xright[1000];
++__thread int yright[1000];
+ 
+ static int
+ storeLineCoords(int x, int y, int i, void *arrays, Vdp1* regs, vdp1cmd_struct * cmd, u8* ram, u8* back_framebuffer) {
+@@ -3150,6 +3260,12 @@ static void drawQuad(s16 tl_x, s16 tl_y, s16 bl_x, s16 bl_y, s16 tr_x, s16 tr_y,
+ 
+ 		COLOR_PARAMS leftToRightStep = {0,0,0};
+ 
++		{
++			int ya = yleft[(int)(i*leftLineStep)], yb = yright[(int)(i*rightLineStep)];
++			if ((ya < asp_band_y0 && yb < asp_band_y0) || (ya > asp_band_y1 && yb > asp_band_y1))
++				continue;
++		}
++
+ 		//get the length of the line we are about to draw
+ 		xlinelength = iterateOverLine(
+ 			xleft[(int)(i*leftLineStep)],
+@@ -3520,6 +3636,7 @@ int VIDSoftVdp2Reset(void)
  
  void VIDSoftVdp2DrawStart(void)
  {
@@ -1307,7 +1478,7 @@ index 94bbc7d..202796c 100644
     int titanblendmode = TITAN_BLEND_TOP;
     if (Vdp2Regs->CCCTL & 0x100) titanblendmode = TITAN_BLEND_ADD;
     else if (Vdp2Regs->CCCTL & 0x200) titanblendmode = TITAN_BLEND_BOTTOM;
-@@ -3549,6 +3583,7 @@ void VIDSoftVdp2DrawStart(void)
+@@ -3549,6 +3666,7 @@ void VIDSoftVdp2DrawStart(void)
  
  void VidsoftDrawSprite(Vdp2 * vdp2_regs, u8 * spr_window_mask, u8* vdp1_front_framebuffer, u8 * vdp2_ram, Vdp1* vdp1_regs, Vdp2* vdp2_lines, u8*color_ram)
  {
@@ -1315,7 +1486,7 @@ index 94bbc7d..202796c 100644
     int i, i2;
     u16 pixel;
     u8 prioritytable[8];
-@@ -3892,21 +3927,135 @@ void VidsoftDrawSprite(Vdp2 * vdp2_regs, u8 * spr_window_mask, u8* vdp1_front_fr
+@@ -3892,21 +4010,135 @@ void VidsoftDrawSprite(Vdp2 * vdp2_regs, u8 * spr_window_mask, u8* vdp1_front_fr
     }
  }
  
@@ -1359,7 +1530,7 @@ index 94bbc7d..202796c 100644
 +      while (!vidsoft_thread_context.draw_finished[TITAN_NBG2]){ sched_yield(); }
 +      while (!vidsoft_thread_context.draw_finished[TITAN_NBG3]){ sched_yield(); }
 +      while (!vidsoft_thread_context.draw_finished[TITAN_RBG0]){ sched_yield(); }
-+   }
+    }
 +}
 +
 +static void asp_finish_picture(int b)
@@ -1370,7 +1541,8 @@ index 94bbc7d..202796c 100644
 +   __sync_synchronize();
 +   asp_pic_ready = b;
 +}
-+
+ 
+-   TitanRender(dispbuffer);
 +static void *asp_fin_main(void *arg)
 +{
 +   (void)arg;
@@ -1383,11 +1555,10 @@ index 94bbc7d..202796c 100644
 +      asp_finish_picture(asp_pic_job);
 +      __sync_synchronize();
 +      asp_fin_busy = 0;
-    }
++   }
 +   return NULL;
 +}
- 
--   TitanRender(dispbuffer);
++
 +void asp_fin_wait(void)
 +{
 +   if (asp_fin_busy)
@@ -1459,7 +1630,7 @@ index 94bbc7d..202796c 100644
  
     if (OSDUseBuffer())
        OSDDisplayMessages(dispbuffer, vdp2width, vdp2height);
-@@ -3982,6 +4131,7 @@ void VIDSoftVdp2DrawScreens(void)
+@@ -3982,6 +4214,7 @@ void VIDSoftVdp2DrawScreens(void)
     int draw_priority_0[6] = { 0 };
     int layer_priority[6] = { 0 };
     int num_threads_dispatched = 0;
@@ -1467,7 +1638,7 @@ index 94bbc7d..202796c 100644
  
     VIDSoftVdp2SetResolution(Vdp2Regs->TVMD);
     layer_priority[TITAN_NBG0] = Vdp2Regs->PRINA & 0x7;
-@@ -4005,7 +4155,7 @@ void VIDSoftVdp2DrawScreens(void)
+@@ -4005,7 +4238,7 @@ void VIDSoftVdp2DrawScreens(void)
     {
        memcpy(vidsoft_thread_context.lines, Vdp2Lines, sizeof(Vdp2) * 270);
        memcpy(&vidsoft_thread_context.regs, Vdp2Regs, sizeof(Vdp2));
@@ -1476,7 +1647,7 @@ index 94bbc7d..202796c 100644
        memcpy(vidsoft_thread_context.color_ram, Vdp2ColorRam, 0x1000);
        memcpy(vidsoft_thread_context.cell_scroll_data, cell_scroll_data, sizeof(struct CellScrollData) * 270);
     }
-@@ -4045,6 +4195,7 @@ void VIDSoftVdp2DrawScreens(void)
+@@ -4045,6 +4278,7 @@ void VIDSoftVdp2DrawScreens(void)
  
  void VIDSoftVdp2DrawScreen(int screen)
  {
@@ -1484,7 +1655,7 @@ index 94bbc7d..202796c 100644
     VIDSoftVdp2SetResolution(Vdp2Regs->TVMD);
  
     switch(screen)
-@@ -4236,5 +4387,6 @@ void VIDSoftGetNativeResolution(int *width, int *height, int* interlace)
+@@ -4236,5 +4470,6 @@ void VIDSoftGetNativeResolution(int *width, int *height, int* interlace)
  
  void VIDSoftVdp2DispOff()
  {
