@@ -26,8 +26,14 @@ which builds make it up.
   - writes to data sharing a page with code no longer throw the page's
     compiled code away after 500 a frame (Guardian Heroes hit it ~15 times
     a frame);
+  - drawing threads are let finish before the core is torn down on exit
+    (`sat_emu_t22`, a crash on leaving Daytona USA, seen once);
   - SH-2 DMA passed an end address where a length was expected when telling
     the recompiler about written memory.
+- Saturn page: 13 games. Added Burning Rangers, Daytona USA, DecAthlete,
+  Die Hard Arcade, Fighters Megamix, NiGHTS into Dreams, Panzer Dragoon II
+  Zwei, Panzer Dragoon Saga (4 discs, one entry), Sega Rally Championship,
+  Shining Force III and Virtua Fighter 2, all as CHD, with covers and years.
 - PlayStation: every disc image is now CHD (same games, about 45% smaller;
   9.1GB free on the card afterwards).
 
