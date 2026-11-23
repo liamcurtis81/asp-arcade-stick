@@ -7,7 +7,7 @@ which builds make it up.
 
 ## 2.3 (in progress) - 22 Nov 2026
 
-- Saturn (test, `sat_emu_t23`): libretro Yabause with Ari64's SH-2
+- Saturn (test, `sat_emu_t24`): libretro Yabause with Ari64's SH-2
   recompiler re-enabled on ARM, on its own launcher page. Main-thread work cut:
   - the drawing threads' snapshot of VDP1/VDP2 RAM copies only the 2KB pages
     written since the last picture (~10KB a frame instead of ~1.3MB);
@@ -31,8 +31,11 @@ which builds make it up.
   - VDP1 (sprites and polygons) is drawn by three threads, each owning a
     horizontal band of the framebuffer; quad lines outside a band are skipped
     (`asp_vdp1_bands 1` turns it off);
-  - picture layer threads run at nice 4 so the sound worker and VDP1 threads,
-    which the emulation waits on, get the CPU first (`asp_render_nice`);
+  - every VDP2 layer gets its own thread; with more than three layers on
+    (Virtua Fighter 2, Sega Rally) the rest used to be drawn on the
+    emulation thread (about 20% of its time in VF2);
+  - `asp_render_nice` (lower the layer threads' priority) stays available but
+    is off: on in t23 it made the emulation wait longer for pictures;
   - SH-2 DMA passed an end address where a length was expected when telling
     the recompiler about written memory.
 - Saturn page: 18 games, alphabetical. Latest five: Daytona USA Championship

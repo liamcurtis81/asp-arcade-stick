@@ -749,7 +749,7 @@ index 2663ffe..9eb8e78 100644
     SSH2->onchip.FTCSR |= 0x80;
  
 diff --git a/yabause/src/thr-rthreads.c b/yabause/src/thr-rthreads.c
-index 45b7068..f0dcc85 100644
+index 45b7068..4571cbf 100644
 --- a/yabause/src/thr-rthreads.c
 +++ b/yabause/src/thr-rthreads.c
 @@ -33,7 +33,13 @@ struct thd_s {
@@ -759,7 +759,7 @@ index 45b7068..f0dcc85 100644
 +	int pending;   /* ASP: a wake that arrived before the thread slept */
  };
 +static __thread int asp_my_id = -1;
-+int asp_render_nice = 4;
++int asp_render_nice = 0;   /* 4 in t23 made the emulation wait longer for pictures */
 +#include <sys/resource.h>
 +#include <sys/syscall.h>
 +#include <unistd.h>
@@ -1662,3 +1662,19 @@ index 94bbc7d..bce113e 100644
 +   asp_fin_wait();
     TitanErase();
  }
+diff --git a/yabause/src/yabause.c b/yabause/src/yabause.c
+index 854bc2e..c68403e 100755
+--- a/yabause/src/yabause.c
++++ b/yabause/src/yabause.c
+@@ -422,7 +422,10 @@ int YabauseInit(yabauseinit_struct *init)
+    {
+       int num = yabsys.NumThreads < 1 ? 1 : yabsys.NumThreads;
+       VIDSoftSetVdp1ThreadEnable(num == 1 ? 0 : 1);
+-      VIDSoftSetNumLayerThreads(num);
++      /* ASP: was num (4), and the sprite layer counts as one, so with more
++         than three layers on (Virtua Fighter 2, Sega Rally) the rest were
++         drawn on the emulation thread. Every layer has its own thread. */
++      VIDSoftSetNumLayerThreads(num > 1 ? 6 : num);
+       VIDSoftSetNumPriorityThreads(num);
+    }
+    else
