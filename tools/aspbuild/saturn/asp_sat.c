@@ -739,6 +739,11 @@ static void load_overrides(void)
 			asp_render_nice = atoi(ovr_v[n_ovr]);
 			continue;
 		}
+		if (strcmp(ovr_k[n_ovr], "asp_vdp1_async") == 0) {
+			extern int asp_vdp1_async;
+			asp_vdp1_async = atoi(ovr_v[n_ovr]);
+			continue;
+		}
 		if (strcmp(ovr_k[n_ovr], "asp_pin") == 0) {
 			asp_pin = atoi(ovr_v[n_ovr]);
 			continue;
@@ -1360,6 +1365,7 @@ int main(int argc, char **argv)
 					}
 				}
 			}
+			{ extern unsigned long asp_vdp1_dropped, asp_vdp1_late; fprintf(stderr, "asp: VDP1 lists dropped %lu, shown late %lu\n", asp_vdp1_dropped, asp_vdp1_late); }
 			{ extern unsigned asp_snap_bytes; fprintf(stderr, "asp: video RAM copied for the picture threads: %u KB per frame\n", asp_snap_bytes / 1024 / 1200); asp_snap_bytes = 0; }
 			{
 				int cpu, k, r;

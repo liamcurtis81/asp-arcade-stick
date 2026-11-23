@@ -1153,7 +1153,7 @@ index db73d00..f7eefd4 100644
     // Read CRAM
     MemStateRead((void *)Vdp2ColorRam, 0x1000, 1, stream);
 diff --git a/yabause/src/vidsoft.c b/yabause/src/vidsoft.c
-index 94bbc7d..bce113e 100644
+index 94bbc7d..282b1a5 100644
 --- a/yabause/src/vidsoft.c
 +++ b/yabause/src/vidsoft.c
 @@ -1,3 +1,7 @@
@@ -1372,8 +1372,34 @@ index 94bbc7d..bce113e 100644
     if (dispbuffer)
     {
        free(dispbuffer);
-@@ -2437,11 +2541,13 @@ void VIDSoftVdp1DrawStart()
+@@ -2430,18 +2534,39 @@ void VIDSoftVdp1DrawStartBody(Vdp1* regs, u8 * back_framebuffer)
+ }
+ //////////////////////////////////////////////////////////////////////////////
+ 
++/* ASP: asynchronous VDP1. The emulation no longer stops for the VDP1 thread
++   (polygons and sprites), which in 3D games takes longer than a frame. A list
++   is only started once the last one has been shown; a list that arrives while
++   one is still being drawn or waiting to be shown is dropped, and a swap with
++   the list unfinished keeps the old picture. So 3D graphics update at the
++   rate the stick can draw them while the game runs at full speed.
++   Status registers are still set at once (Vdp1FakeDrawCommands), and CPU
++   access to the VDP1 framebuffer still waits for the thread. */
++int asp_vdp1_async = 1;                  /* sat_options.txt: asp_vdp1_async */
++static int asp_vdp1_unshown;
++unsigned long asp_vdp1_dropped, asp_vdp1_late;
++
+ void VIDSoftVdp1DrawStart()
+ {
++   if (vidsoft_vdp1_thread_enabled && asp_vdp1_async && asp_vdp1_unshown && (Vdp1Regs->FBCR & 2) == 0)
++   {
++      asp_vdp1_dropped++;
++      Vdp1FakeDrawCommands(Vdp1Ram, Vdp1Regs);
++      return;
++   }
+    if (vidsoft_vdp1_thread_enabled)
+    {
        VidsoftWaitForVdp1Thread();
++      asp_vdp1_unshown = 1;
  
        //take a snapshot of the vdp1 state, to be used by the thread
 -      memcpy(vidsoft_vdp1_thread_context.ram, Vdp1Ram, 0x80000);
@@ -1389,7 +1415,7 @@ index 94bbc7d..bce113e 100644
  
        //start thread
        vidsoft_vdp1_thread_context.draw_finished = 0;
-@@ -2514,14 +2620,16 @@ typedef struct _COLOR_PARAMS
+@@ -2514,14 +2639,16 @@ typedef struct _COLOR_PARAMS
  	double r,g,b;
  } COLOR_PARAMS;
  
@@ -1411,7 +1437,7 @@ index 94bbc7d..bce113e 100644
  
  static int getpixel(int linenumber, int currentlineindex, vdp1cmd_struct *cmd, u8 * ram) {
  
-@@ -2714,6 +2822,7 @@ int IsClipped(int x, int y, Vdp1* regs, vdp1cmd_struct * cmd)
+@@ -2714,6 +2841,7 @@ int IsClipped(int x, int y, Vdp1* regs, vdp1cmd_struct * cmd)
  }
  
  static void putpixel8(int x, int y, Vdp1 * regs, vdp1cmd_struct *cmd, u8 * back_framebuffer) {
@@ -1419,7 +1445,7 @@ index 94bbc7d..bce113e 100644
  
      int y2 = y / vdp1interlace;
      u8 * iPix = &back_framebuffer[(y2 * vdp1width) + x];
-@@ -2749,6 +2858,7 @@ static void putpixel8(int x, int y, Vdp1 * regs, vdp1cmd_struct *cmd, u8 * back_
+@@ -2749,6 +2877,7 @@ static void putpixel8(int x, int y, Vdp1 * regs, vdp1cmd_struct *cmd, u8 * back_
  }
  
  static void putpixel(int x, int y, Vdp1* regs, vdp1cmd_struct * cmd, u8 * back_framebuffer) {
@@ -1427,7 +1453,7 @@ index 94bbc7d..bce113e 100644
  
  	u16* iPix;
  	int mesh = cmd->CMDPMOD & 0x0100;
-@@ -2999,10 +3109,10 @@ typedef union _COLOR { // xbgr x555
+@@ -2999,10 +3128,10 @@ typedef union _COLOR { // xbgr x555
  	u16 value;
  } COLOR;
  
@@ -1442,7 +1468,7 @@ index 94bbc7d..bce113e 100644
  
  static void gouraudTable(u8* ram, Vdp1* regs, vdp1cmd_struct * cmd)
  {
-@@ -3018,10 +3128,10 @@ static void gouraudTable(u8* ram, Vdp1* regs, vdp1cmd_struct * cmd)
+@@ -3018,10 +3147,10 @@ static void gouraudTable(u8* ram, Vdp1* regs, vdp1cmd_struct * cmd)
     gouraudD.value = T1ReadWord(ram, gouraudTableAddress + 6);
  }
  
@@ -1457,7 +1483,7 @@ index 94bbc7d..bce113e 100644
  
  static int
  storeLineCoords(int x, int y, int i, void *arrays, Vdp1* regs, vdp1cmd_struct * cmd, u8* ram, u8* back_framebuffer) {
-@@ -3150,6 +3260,12 @@ static void drawQuad(s16 tl_x, s16 tl_y, s16 bl_x, s16 bl_y, s16 tr_x, s16 tr_y,
+@@ -3150,6 +3279,12 @@ static void drawQuad(s16 tl_x, s16 tl_y, s16 bl_x, s16 bl_y, s16 tr_x, s16 tr_y,
  
  		COLOR_PARAMS leftToRightStep = {0,0,0};
  
@@ -1470,7 +1496,7 @@ index 94bbc7d..bce113e 100644
  		//get the length of the line we are about to draw
  		xlinelength = iterateOverLine(
  			xleft[(int)(i*leftLineStep)],
-@@ -3520,6 +3636,7 @@ int VIDSoftVdp2Reset(void)
+@@ -3520,6 +3655,7 @@ int VIDSoftVdp2Reset(void)
  
  void VIDSoftVdp2DrawStart(void)
  {
@@ -1478,7 +1504,7 @@ index 94bbc7d..bce113e 100644
     int titanblendmode = TITAN_BLEND_TOP;
     if (Vdp2Regs->CCCTL & 0x100) titanblendmode = TITAN_BLEND_ADD;
     else if (Vdp2Regs->CCCTL & 0x200) titanblendmode = TITAN_BLEND_BOTTOM;
-@@ -3549,6 +3666,7 @@ void VIDSoftVdp2DrawStart(void)
+@@ -3549,6 +3685,7 @@ void VIDSoftVdp2DrawStart(void)
  
  void VidsoftDrawSprite(Vdp2 * vdp2_regs, u8 * spr_window_mask, u8* vdp1_front_framebuffer, u8 * vdp2_ram, Vdp1* vdp1_regs, Vdp2* vdp2_lines, u8*color_ram)
  {
@@ -1486,7 +1512,7 @@ index 94bbc7d..bce113e 100644
     int i, i2;
     u16 pixel;
     u8 prioritytable[8];
-@@ -3892,21 +4010,135 @@ void VidsoftDrawSprite(Vdp2 * vdp2_regs, u8 * spr_window_mask, u8* vdp1_front_fr
+@@ -3892,21 +4029,135 @@ void VidsoftDrawSprite(Vdp2 * vdp2_regs, u8 * spr_window_mask, u8* vdp1_front_fr
     }
  }
  
@@ -1530,7 +1556,7 @@ index 94bbc7d..bce113e 100644
 +      while (!vidsoft_thread_context.draw_finished[TITAN_NBG2]){ sched_yield(); }
 +      while (!vidsoft_thread_context.draw_finished[TITAN_NBG3]){ sched_yield(); }
 +      while (!vidsoft_thread_context.draw_finished[TITAN_RBG0]){ sched_yield(); }
-    }
++   }
 +}
 +
 +static void asp_finish_picture(int b)
@@ -1541,8 +1567,7 @@ index 94bbc7d..bce113e 100644
 +   __sync_synchronize();
 +   asp_pic_ready = b;
 +}
- 
--   TitanRender(dispbuffer);
++
 +static void *asp_fin_main(void *arg)
 +{
 +   (void)arg;
@@ -1555,10 +1580,11 @@ index 94bbc7d..bce113e 100644
 +      asp_finish_picture(asp_pic_job);
 +      __sync_synchronize();
 +      asp_fin_busy = 0;
-+   }
+    }
 +   return NULL;
 +}
-+
+ 
+-   TitanRender(dispbuffer);
 +void asp_fin_wait(void)
 +{
 +   if (asp_fin_busy)
@@ -1630,7 +1656,7 @@ index 94bbc7d..bce113e 100644
  
     if (OSDUseBuffer())
        OSDDisplayMessages(dispbuffer, vdp2width, vdp2height);
-@@ -3982,6 +4214,7 @@ void VIDSoftVdp2DrawScreens(void)
+@@ -3982,6 +4233,7 @@ void VIDSoftVdp2DrawScreens(void)
     int draw_priority_0[6] = { 0 };
     int layer_priority[6] = { 0 };
     int num_threads_dispatched = 0;
@@ -1638,7 +1664,7 @@ index 94bbc7d..bce113e 100644
  
     VIDSoftVdp2SetResolution(Vdp2Regs->TVMD);
     layer_priority[TITAN_NBG0] = Vdp2Regs->PRINA & 0x7;
-@@ -4005,7 +4238,7 @@ void VIDSoftVdp2DrawScreens(void)
+@@ -4005,7 +4257,7 @@ void VIDSoftVdp2DrawScreens(void)
     {
        memcpy(vidsoft_thread_context.lines, Vdp2Lines, sizeof(Vdp2) * 270);
        memcpy(&vidsoft_thread_context.regs, Vdp2Regs, sizeof(Vdp2));
@@ -1647,7 +1673,7 @@ index 94bbc7d..bce113e 100644
        memcpy(vidsoft_thread_context.color_ram, Vdp2ColorRam, 0x1000);
        memcpy(vidsoft_thread_context.cell_scroll_data, cell_scroll_data, sizeof(struct CellScrollData) * 270);
     }
-@@ -4045,6 +4278,7 @@ void VIDSoftVdp2DrawScreens(void)
+@@ -4045,6 +4297,7 @@ void VIDSoftVdp2DrawScreens(void)
  
  void VIDSoftVdp2DrawScreen(int screen)
  {
@@ -1655,7 +1681,22 @@ index 94bbc7d..bce113e 100644
     VIDSoftVdp2SetResolution(Vdp2Regs->TVMD);
  
     switch(screen)
-@@ -4236,5 +4470,6 @@ void VIDSoftGetNativeResolution(int *width, int *height, int* interlace)
+@@ -4152,8 +4405,14 @@ void VIDSoftVdp1SwapFrameBuffer(void)
+ 		u8 *temp;
+       if (vidsoft_vdp1_thread_enabled)
+       {
++         if (asp_vdp1_async && (Vdp1Regs->FBCR & 2) == 0 && !vidsoft_vdp1_thread_context.draw_finished)
++         {
++            asp_vdp1_late++;
++            return;                      /* keep showing the last finished list */
++         }
+          VidsoftWaitForVdp1Thread();
+       }
++      asp_vdp1_unshown = 0;
+ 
+       temp = vdp1frontframebuffer;
+       vdp1frontframebuffer = vdp1backframebuffer;
+@@ -4236,5 +4495,6 @@ void VIDSoftGetNativeResolution(int *width, int *height, int* interlace)
  
  void VIDSoftVdp2DispOff()
  {
