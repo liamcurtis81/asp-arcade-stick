@@ -7,7 +7,7 @@ which builds make it up.
 
 ## 2.3 (in progress) - 22 Nov 2026
 
-- Saturn (test, `sat_emu_t21`): libretro Yabause with Ari64's SH-2
+- Saturn (test, `sat_emu_t22`): libretro Yabause with Ari64's SH-2
   recompiler re-enabled on ARM, on its own launcher page. Main-thread work cut:
   - the drawing threads' snapshot of VDP1/VDP2 RAM copies only the 2KB pages
     written since the last picture (~10KB a frame instead of ~1.3MB);
@@ -30,7 +30,9 @@ which builds make it up.
     (`sat_emu_t22`, a crash on leaving Daytona USA, seen once);
   - SH-2 DMA passed an end address where a length was expected when telling
     the recompiler about written memory.
-- Saturn page: 13 games. Added Burning Rangers, Daytona USA, DecAthlete,
+- Saturn page: 18 games, alphabetical. Latest five: Daytona USA Championship
+  Circuit Edition, Fighting Vipers, The House of the Dead, Virtua Cop 2 and
+  Virtual On - Cyber Troopers. Earlier: 13 games. Added Burning Rangers, Daytona USA, DecAthlete,
   Die Hard Arcade, Fighters Megamix, NiGHTS into Dreams, Panzer Dragoon II
   Zwei, Panzer Dragoon Saga (4 discs, one entry), Sega Rally Championship,
   Shining Force III and Virtua Fighter 2, all as CHD, with covers and years.
