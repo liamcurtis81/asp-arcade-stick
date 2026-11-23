@@ -7,7 +7,7 @@ which builds make it up.
 
 ## 2.3 (in progress) - 22 Nov 2026
 
-- Saturn (test, `sat_emu_t19`): libretro Yabause with Ari64's SH-2
+- Saturn (test, `sat_emu_t20`): libretro Yabause with Ari64's SH-2
   recompiler re-enabled on ARM, on its own launcher page. Main-thread work cut:
   - the drawing threads' snapshot of VDP1/VDP2 RAM copies only the 2KB pages
     written since the last picture (~10KB a frame instead of ~1.3MB);
@@ -20,9 +20,11 @@ which builds make it up.
     wakes at once when its timer flags change;
   - fixed a lost wake-up in Yabause's thread sleep that could freeze a game
     with a drawing thread asleep and the emulation waiting for it;
+  - layers skip the per-pixel window tests when no window is on;
   - SH-2 DMA passed an end address where a length was expected when telling
     the recompiler about written memory.
-- PlayStation discs being converted to CHD (same games, about 45% smaller).
+- PlayStation: every disc image is now CHD (same games, about 45% smaller;
+  9.1GB free on the card afterwards).
 
 
 - Arcade (fba_v57): arcade cheats now take effect. The frontend had the
