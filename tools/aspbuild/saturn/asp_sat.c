@@ -42,6 +42,8 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <sched.h>
+#include <sys/syscall.h>
 #include <SDL.h>
 #include "libretro.h"
 
@@ -665,6 +667,7 @@ extern int asp_slave_idle_enable;          /* sh2_dynarec.c (ASP patch) */
 extern unsigned long asp_onchip_reads[2][512], asp_slave_skips;
 extern double asp_render_wait_us, asp_drawend_us, asp_m68k_wait_us;
 static int cpu_boost_on = 1;   /* sat_options.txt: asp_cpu_boost */
+static int asp_pin = 1;         /* sat_options.txt: asp_pin */
 static int max_skip = 3, skip_below = 50;   /* sat_options.txt: asp_max_skip, asp_skip_below */
 static retro_audio_buffer_status_callback_t buf_status_cb;
 static unsigned long frames_skipped_hint;
@@ -724,6 +727,15 @@ static void load_overrides(void)
 		if (strcmp(ovr_k[n_ovr], "asp_slave_timer_wake") == 0) {
 			extern int asp_slave_timer_wake;
 			asp_slave_timer_wake = atoi(ovr_v[n_ovr]);
+			continue;
+		}
+		if (strcmp(ovr_k[n_ovr], "asp_pin") == 0) {
+			asp_pin = atoi(ovr_v[n_ovr]);
+			continue;
+		}
+		if (strcmp(ovr_k[n_ovr], "asp_inv_limit") == 0) {
+			extern int asp_inv_limit;
+			asp_inv_limit = atoi(ovr_v[n_ovr]);
 			continue;
 		}
 		if (strcmp(ovr_k[n_ovr], "asp_finisher") == 0) {
@@ -1014,6 +1026,31 @@ static void cpu_threads_report(void)
 	}
 	closedir(dp);
 }
+/* ASP: give the emulation thread CPU 0 to itself and keep every other thread
+ * (picture layers, compositing, VDP1, sound, scaler) on CPUs 1-3. On t20 the
+ * emulation thread was off its CPU about 40% of the time while ~14 threads
+ * shared four cores. Run again every few seconds for threads made later. */
+static void asp_pin_threads(int report)
+{
+	DIR *dp;
+	struct dirent *e;
+	pid_t me = (pid_t)syscall(SYS_gettid);
+	cpu_set_t one, rest;
+	int n = 0, bad = 0;
+	if (!asp_pin || sysconf(_SC_NPROCESSORS_ONLN) < 4) return;
+	CPU_ZERO(&one); CPU_SET(0, &one);
+	CPU_ZERO(&rest); CPU_SET(1, &rest); CPU_SET(2, &rest); CPU_SET(3, &rest);
+	if ((dp = opendir("/proc/self/task")) == NULL) return;
+	while ((e = readdir(dp)) != NULL) {
+		pid_t t;
+		if (e->d_name[0] == '.') continue;
+		t = (pid_t)atoi(e->d_name);
+		if (sched_setaffinity(t, sizeof(cpu_set_t), t == me ? &one : &rest) != 0) bad++;
+		n++;
+	}
+	closedir(dp);
+	if (report) fprintf(stderr, "asp: emulation thread on cpu0, %d other threads on cpu1-3 (%d refused)\n", n - 1, bad);
+}
 static void cpu_restore(void)
 {
 	char p[128];
@@ -1257,6 +1294,7 @@ int main(int argc, char **argv)
 		}
 		frame++;
 		cur_frame = frame;
+		if (frame == 30 || frame % 600 == 0) asp_pin_threads(frame == 30);
 		if (swap_wanted) { swap_wanted = 0; swap_disc(); }
 		if (manual_wanted) { manual_wanted = 0; manual_show(); }
 		if (asp_cheats_poll(pad_mode ? (jb(PAD_SELECT) || jb(PAD_MINUS)) : jb(STK_SELECT), pad_mode ? joy : NULL))

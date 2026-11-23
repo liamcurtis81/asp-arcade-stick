@@ -543,10 +543,10 @@ index 6fee45a..cce500d 100644
  	add	r6, r6, #2
  	lsl	r12, r0, #16
 diff --git a/yabause/src/sh2_dynarec/sh2_dynarec.c b/yabause/src/sh2_dynarec/sh2_dynarec.c
-index 6148c3e..943c597 100644
+index 6148c3e..44144ba 100644
 --- a/yabause/src/sh2_dynarec/sh2_dynarec.c
 +++ b/yabause/src/sh2_dynarec/sh2_dynarec.c
-@@ -30,6 +30,100 @@
+@@ -30,6 +30,101 @@
  #include "../sh2core.h"
  #include "../yabause.h"
  #include "sh2_dynarec.h"
@@ -574,6 +574,7 @@ index 6148c3e..943c597 100644
 +void asp_slave_wake(void) { slave_idle = 0; slave_skip_run = 0; same_n = 0; }
 +unsigned long asp_acc[6][256], asp_inv_calls, asp_inv_pages, asp_recompiles, asp_inv_cpu, asp_inv_cpu500, asp_inv_dma, asp_inv_trap;
 +u32 asp_inv_last[8]; int asp_inv_li;
++int asp_inv_limit = 0x7fffffff;
 +struct asp_hot { u32 addr; unsigned long n; } asp_hot[6][1024];
 +static inline void asp_acc_hit(int t, u32 a)
 +{
@@ -647,7 +648,7 @@ index 6148c3e..943c597 100644
  
  #ifdef __i386__
  #include "assem_x86.h"
-@@ -931,6 +1025,7 @@ void invalidate_blocks(u32 firstblock,u32 lastblock)
+@@ -931,6 +1026,7 @@ void invalidate_blocks(u32 firstblock,u32 lastblock)
      }
    }
    //printf("first=%d last=%d\n",first,last);
@@ -655,15 +656,21 @@ index 6148c3e..943c597 100644
    while(first<=last) {
      invalidate_page(first);
      first++;
-@@ -979,6 +1074,7 @@ void invalidate_addr(u32 addr)
+@@ -979,7 +1075,12 @@ void invalidate_addr(u32 addr)
    if(!((cached_code_words[index>>5]>>((index>>2)&7))&1)) {
      // If we get an excessive number of these,
      // then we probably do want to invalidate the page
+-    if(invalidate_count++<500) {
++    /* ASP: was 500. Past that many writes a frame to data that shares a page
++       with code, every further write threw the page's compiled code away and
++       it was rebuilt moments later (Guardian Heroes: ~15 times a frame).
++       Writes to words that are not code never need it. */
 +    asp_inv_trap++;
-     if(invalidate_count++<500) {
++    if(invalidate_count++<asp_inv_limit) {
        if((restore_candidate[index>>15]>>((index>>12)&7))&1) {
          recent_writes[recent_write_index]=addr;
-@@ -987,8 +1083,8 @@ void invalidate_addr(u32 addr)
+         recent_write_index=(recent_write_index+1)&7;
+@@ -987,8 +1088,8 @@ void invalidate_addr(u32 addr)
        return;
      }
    }
@@ -674,7 +681,7 @@ index 6148c3e..943c597 100644
    //invalidate_block(addr>>12);
    invalidate_blocks(addr>>12,addr>>12);
    assert(!((cached_code_words[index>>5]>>((index>>2)&7))&1));
-@@ -5335,6 +5431,7 @@ int sh2_recompile_block(int addr)
+@@ -5335,6 +5436,7 @@ int sh2_recompile_block(int addr)
    u32 p_constmap[SH2_REGS];
    u32 p_isconst=0;
    int cached_addr;
@@ -682,7 +689,7 @@ index 6148c3e..943c597 100644
  
    //if(Count==365117028) tracedebug=1;
    assem_debug("NOTCOMPILED: addr = %x -> %x\n", (int)addr, (int)out);
-@@ -8205,6 +8302,7 @@ void DynarecSlaveHandleInterrupts()
+@@ -8205,6 +8307,7 @@ void DynarecSlaveHandleInterrupts()
      SSH2->NumberOfInterrupts--;
      SSH2->isIdle = 0;
      SSH2->isSleeping = 0;
@@ -690,7 +697,7 @@ index 6148c3e..943c597 100644
    }
    //printf("DynarecSlaveHandleInterrupts pc=%x ip=%x\n",slave_pc,(int)slave_ip);
    //printf("master_cc=%d slave_cc=%d\n",master_cc,slave_cc);
-@@ -8386,7 +8484,7 @@ void SH2DynarecWriteNotify(u32 start, u32 length) {
+@@ -8386,7 +8489,7 @@ void SH2DynarecWriteNotify(u32 start, u32 length) {
    for(block=start>>12;block<=(start+length-1)>>12;block++)
      wp|=((cached_code[block>>3]>>(block&7))&1);
    if(!wp) return;

@@ -7,7 +7,7 @@ which builds make it up.
 
 ## 2.3 (in progress) - 22 Nov 2026
 
-- Saturn (test, `sat_emu_t20`): libretro Yabause with Ari64's SH-2
+- Saturn (test, `sat_emu_t21`): libretro Yabause with Ari64's SH-2
   recompiler re-enabled on ARM, on its own launcher page. Main-thread work cut:
   - the drawing threads' snapshot of VDP1/VDP2 RAM copies only the 2KB pages
     written since the last picture (~10KB a frame instead of ~1.3MB);
@@ -21,6 +21,11 @@ which builds make it up.
   - fixed a lost wake-up in Yabause's thread sleep that could freeze a game
     with a drawing thread asleep and the emulation waiting for it;
   - layers skip the per-pixel window tests when no window is on;
+  - the emulation thread gets CPU 0 to itself; all other threads share
+    CPUs 1-3 (`asp_pin 0` turns it off);
+  - writes to data sharing a page with code no longer throw the page's
+    compiled code away after 500 a frame (Guardian Heroes hit it ~15 times
+    a frame);
   - SH-2 DMA passed an end address where a length was expected when telling
     the recompiler about written memory.
 - PlayStation: every disc image is now CHD (same games, about 45% smaller;
