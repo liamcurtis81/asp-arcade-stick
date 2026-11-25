@@ -7,7 +7,7 @@ which builds make it up.
 
 ## 2.3 (in progress) - 22 Nov 2026
 
-- Saturn (test, `sat_emu_t32`): libretro Yabause with Ari64's SH-2
+- Saturn (test, `sat_emu_t33`): libretro Yabause with Ari64's SH-2
   recompiler re-enabled on ARM, on its own launcher page. Main-thread work cut:
   - the drawing threads' snapshot of VDP1/VDP2 RAM copies only the 2KB pages
     written since the last picture (~10KB a frame instead of ~1.3MB);
@@ -61,7 +61,7 @@ which builds make it up.
     mixed with the emulated sound there, instead of through the emulated
     sound chip, so it no longer stutters when a game runs below full speed;
     the CD block reads ahead when that queue runs low (`asp_cdda_direct 0`
-    to undo). Virtua Fighter 2's fight music is still cut by the data reads
+    to undo; t33 reads up to 4x ahead when the queue runs low). Virtua Fighter 2's fight music is still cut by the data reads
     the game issues straight after starting it (known Yabause CD block issue);
   - `asp_pin 0` (all four cores shared) froze the stick in a Sega Rally
     race; the card's `sat_options.txt` keeps `asp_pin 1`;

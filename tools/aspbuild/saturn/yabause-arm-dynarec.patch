@@ -109,7 +109,7 @@ index a5c771f..2585c4b 100644
  
  #ifdef ANDROID
 diff --git a/yabause/src/scsp.c b/yabause/src/scsp.c
-index d46d52e..b5da416 100644
+index d46d52e..0458346 100644
 --- a/yabause/src/scsp.c
 +++ b/yabause/src/scsp.c
 @@ -4697,6 +4697,7 @@ Sh2ScspReadByte(SH2_struct *sh, u32 addr)
@@ -361,7 +361,7 @@ index d46d52e..b5da416 100644
  //////////////////////////////////////////////////////////////////////////////
  
  void
-@@ -5110,9 +5291,48 @@ ScspConvert32uto16s (s32 *srcL, s32 *srcR, s16 *dst, u32 len)
+@@ -5110,9 +5291,47 @@ ScspConvert32uto16s (s32 *srcL, s32 *srcR, s16 *dst, u32 len)
  
  //////////////////////////////////////////////////////////////////////////////
  
@@ -382,19 +382,18 @@ index d46d52e..b5da416 100644
 +  if (asp_cdda_direct)
 +    {
 +      unsigned fill = asp_cd_w - asp_cd_r;
-+      if (fill < ASP_CD_SECTORS / 2)
-+        {
-+          Cs2Area->isaudio = 0;        /* read ahead at data speed */
-+          Cs2SetTiming(1);
-+          Cs2Area->isaudio = 1;
-+        }
++      /* read ahead hard when the queue runs low: at 40 fps (Sega Rally's
++         race) the music needs 1.5 CD sectors per emulated sector time, and
++         data speed (2x) alone left it short. 4x below a quarter full. */
++      Cs2Area->isaudio = 1;
++      if (fill < ASP_CD_SECTORS / 4)
++        Cs2Area->_periodictiming = 10000;
++      else if (fill < ASP_CD_SECTORS / 2)
++        Cs2Area->_periodictiming = 20000;
 +      else if (fill > ASP_CD_SECTORS * 3 / 4)
-+        Cs2SetTiming(0);
++        Cs2Area->_periodictiming = 50000;
 +      else
-+        {
-+          Cs2Area->isaudio = 1;
-+          Cs2SetTiming(1);
-+        }
++        Cs2Area->_periodictiming = 40000;
 +      if (fill >= ASP_CD_SECTORS)
 +        {
 +          asp_cd_dropped++;
@@ -410,7 +409,7 @@ index d46d52e..b5da416 100644
     // If buffer is half empty or less, boost timing for a bit until we've buffered a few sectors
     if (cdda_out_left < (sizeof(cddabuf.data) / 2))
     {
-@@ -5181,7 +5401,7 @@ void new_scsp_update_samples(s32 *bufL, s32 *bufR, int scspsoundlen)
+@@ -5181,7 +5400,7 @@ void new_scsp_update_samples(s32 *bufL, s32 *bufR, int scspsoundlen)
  }
  
  void
