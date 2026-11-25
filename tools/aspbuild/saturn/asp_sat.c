@@ -668,6 +668,7 @@ extern unsigned long asp_onchip_reads[2][512], asp_slave_skips;
 extern double asp_render_wait_us, asp_drawend_us, asp_m68k_wait_us;
 static int cpu_boost_on = 1;   /* sat_options.txt: asp_cpu_boost */
 static int asp_pin = 1;         /* sat_options.txt: asp_pin */
+static int asp_pin_sound = 1;   /* sat_options.txt: asp_pin_sound */
 static int picture_half;        /* sat_options.txt: asp_picture_rate 30 */
 static int max_skip = 3, skip_below = 50;   /* sat_options.txt: asp_max_skip, asp_skip_below */
 static retro_audio_buffer_status_callback_t buf_status_cb;
@@ -753,6 +754,10 @@ static void load_overrides_from(const char *path)
 		if (strcmp(ovr_k[n_ovr], "asp_sound_nowait") == 0) {
 			extern int asp_sound_nowait;
 			asp_sound_nowait = atoi(ovr_v[n_ovr]);
+			continue;
+		}
+		if (strcmp(ovr_k[n_ovr], "asp_pin_sound") == 0) {
+			asp_pin_sound = atoi(ovr_v[n_ovr]);
 			continue;
 		}
 		if (strcmp(ovr_k[n_ovr], "asp_pin") == 0) {
@@ -1089,11 +1094,19 @@ static void asp_pin_threads(int report)
 		pid_t t;
 		if (e->d_name[0] == '.') continue;
 		t = (pid_t)atoi(e->d_name);
-		if (sched_setaffinity(t, sizeof(cpu_set_t), t == me ? &one : &rest) != 0) bad++;
+		{
+			/* the sound worker shares cpu0 with the emulation thread: the
+			 * emulation waits for it (2-4 ms a frame in VF2 while it queued
+			 * behind the drawing threads on cpu1-3), and when it waits it
+			 * yields, so the worker runs at once */
+			extern int asp_sound_tid;
+			cpu_set_t *m = (t == me || (asp_pin_sound && t == asp_sound_tid)) ? &one : &rest;
+			if (sched_setaffinity(t, sizeof(cpu_set_t), m) != 0) bad++;
+		}
 		n++;
 	}
 	closedir(dp);
-	if (report) fprintf(stderr, "asp: emulation thread on cpu0, %d other threads on cpu1-3 (%d refused)\n", n - 1, bad);
+	if (report) fprintf(stderr, "asp: emulation thread%s on cpu0, the other threads on cpu1-3 (%d threads, %d refused)\n", asp_pin_sound ? " and sound worker" : "", n, bad);
 }
 static void cpu_restore(void)
 {

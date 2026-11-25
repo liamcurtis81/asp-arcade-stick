@@ -7,7 +7,7 @@ which builds make it up.
 
 ## 2.3 (in progress) - 22 Nov 2026
 
-- Saturn (test, `sat_emu_t26`): libretro Yabause with Ari64's SH-2
+- Saturn (test, `sat_emu_t28`): libretro Yabause with Ari64's SH-2
   recompiler re-enabled on ARM, on its own launcher page. Main-thread work cut:
   - the drawing threads' snapshot of VDP1/VDP2 RAM copies only the 2KB pages
     written since the last picture (~10KB a frame instead of ~1.3MB);
@@ -47,6 +47,11 @@ which builds make it up.
     the time to emulation and sound; a `sat_options.txt` in a game's own
     folder overrides the global one; with asynchronous VDP1 the polygon
     lists are also drawn on frames whose picture is skipped;
+  - t28: the sound worker shares cpu0 with the emulation thread instead of
+    queuing behind the drawing threads (`asp_pin_sound 0` to undo); MAC.L
+    and MAC.W read work RAM directly (about 6,500 reads a frame in VF2);
+  - `asp_sound_nowait` (t26) is off on the card: it left VF2 silent;
+  - 16 3D games carry `asp_picture_rate 30` in their own folder;
   - `asp_pin 0` (all four cores shared) froze the stick in a Sega Rally
     race; the card's `sat_options.txt` keeps `asp_pin 1`;
   - SH-2 DMA passed an end address where a length was expected when telling

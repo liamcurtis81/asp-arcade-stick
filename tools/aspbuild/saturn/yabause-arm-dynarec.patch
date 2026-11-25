@@ -109,7 +109,7 @@ index a5c771f..2585c4b 100644
  
  #ifdef ANDROID
 diff --git a/yabause/src/scsp.c b/yabause/src/scsp.c
-index d46d52e..988e74c 100644
+index d46d52e..6e78da1 100644
 --- a/yabause/src/scsp.c
 +++ b/yabause/src/scsp.c
 @@ -4697,6 +4697,7 @@ Sh2ScspReadByte(SH2_struct *sh, u32 addr)
@@ -168,7 +168,7 @@ index d46d52e..988e74c 100644
    scsp_reset();
  }
  
-@@ -4964,8 +4971,161 @@ __attribute__((noinline))
+@@ -4964,8 +4971,165 @@ __attribute__((noinline))
  #endif
  static s32 FASTCALL M68KExecBP (s32 cycles);
  
@@ -182,6 +182,8 @@ index d46d52e..988e74c 100644
 + * are held and delivered on the main thread at the next handover. Sound RAM
 + * is shared unsynchronised. "asp_m68k_thread 0" restores the old timing. */
 +#include <pthread.h>
++#include <sys/syscall.h>
++#include <unistd.h>
 +#include <time.h>
 +int asp_m68k_thread = 1;
 +int asp_m68k_batch = 16;
@@ -217,8 +219,10 @@ index d46d52e..988e74c 100644
 +        asp_real_mintf();
 +    }
 +}
++int asp_sound_tid;   /* the frontend pins it beside the emulation thread */
 +static void *asp_worker_main(void *arg)
 +{
++  asp_sound_tid = (int)syscall(SYS_gettid);
 +  (void)arg;
 +  for (;;)
 +    {
@@ -330,7 +334,7 @@ index d46d52e..988e74c 100644
  {
    s32 newcycles = savedcycles - cycles;
    if (LIKELY(IsM68KRunning))
-@@ -5072,9 +5232,26 @@ M68KStep (void)
+@@ -5072,9 +5236,26 @@ M68KStep (void)
  void
  M68KSync (void)
  {
@@ -357,7 +361,7 @@ index d46d52e..988e74c 100644
  //////////////////////////////////////////////////////////////////////////////
  
  void
-@@ -5181,7 +5358,7 @@ void new_scsp_update_samples(s32 *bufL, s32 *bufR, int scspsoundlen)
+@@ -5181,7 +5362,7 @@ void new_scsp_update_samples(s32 *bufL, s32 *bufR, int scspsoundlen)
  }
  
  void
@@ -559,10 +563,10 @@ index 6fee45a..cce500d 100644
  	add	r6, r6, #2
  	lsl	r12, r0, #16
 diff --git a/yabause/src/sh2_dynarec/sh2_dynarec.c b/yabause/src/sh2_dynarec/sh2_dynarec.c
-index 6148c3e..44144ba 100644
+index 6148c3e..dec4fcf 100644
 --- a/yabause/src/sh2_dynarec/sh2_dynarec.c
 +++ b/yabause/src/sh2_dynarec/sh2_dynarec.c
-@@ -30,6 +30,101 @@
+@@ -30,6 +30,116 @@
  #include "../sh2core.h"
  #include "../yabause.h"
  #include "sh2_dynarec.h"
@@ -654,8 +658,23 @@ index 6148c3e..44144ba 100644
 +   asp_slave_skips++;
 +   return 1;
 +}
-+u16 DynReadWord(u32 a) { ACC(1, a); return MappedMemoryReadWordNocache(CurrentSH2, a); }
-+u32 DynReadLong(u32 a) { ACC(2, a); return MappedMemoryReadLongNocache(CurrentSH2, a); }
++/* ASP: work RAM straight from the C helpers. MAC.L/MAC.W read both operands
++   through here (about 6,500 reads a frame in Virtua Fighter 2), and each went
++   through three more calls. Reads only: writes keep the full path. */
++#define ASP_HWRAM(a) ((((a) >> 29) <= 1) && (((a) & 0x0E000000) == 0x06000000))
++#define ASP_LWRAM(a) ((((a) >> 29) <= 1) && (((a) & 0x0FF00000) == 0x00200000))
++u16 DynReadWord(u32 a) {
++   ACC(1, a);
++   if (ASP_HWRAM(a)) return T2ReadWord(HighWram, a & 0xFFFFF);
++   if (ASP_LWRAM(a)) return T2ReadWord(LowWram, a & 0xFFFFF);
++   return MappedMemoryReadWordNocache(CurrentSH2, a);
++}
++u32 DynReadLong(u32 a) {
++   ACC(2, a);
++   if (ASP_HWRAM(a)) return T2ReadLong(HighWram, a & 0xFFFFF);
++   if (ASP_LWRAM(a)) return T2ReadLong(LowWram, a & 0xFFFFF);
++   return MappedMemoryReadLongNocache(CurrentSH2, a);
++}
 +void DynWriteByte(u32 a, u8 v)  { ACC(3, a); MappedMemoryWriteByteNocache(CurrentSH2, a, v); }
 +void DynWriteWord(u32 a, u16 v) { ACC(4, a); MappedMemoryWriteWordNocache(CurrentSH2, a, v); }
 +void DynWriteLong(u32 a, u32 v) { ACC(5, a); MappedMemoryWriteLongNocache(CurrentSH2, a, v); }
@@ -664,7 +683,7 @@ index 6148c3e..44144ba 100644
  
  #ifdef __i386__
  #include "assem_x86.h"
-@@ -931,6 +1026,7 @@ void invalidate_blocks(u32 firstblock,u32 lastblock)
+@@ -931,6 +1041,7 @@ void invalidate_blocks(u32 firstblock,u32 lastblock)
      }
    }
    //printf("first=%d last=%d\n",first,last);
@@ -672,7 +691,7 @@ index 6148c3e..44144ba 100644
    while(first<=last) {
      invalidate_page(first);
      first++;
-@@ -979,7 +1075,12 @@ void invalidate_addr(u32 addr)
+@@ -979,7 +1090,12 @@ void invalidate_addr(u32 addr)
    if(!((cached_code_words[index>>5]>>((index>>2)&7))&1)) {
      // If we get an excessive number of these,
      // then we probably do want to invalidate the page
@@ -686,7 +705,7 @@ index 6148c3e..44144ba 100644
        if((restore_candidate[index>>15]>>((index>>12)&7))&1) {
          recent_writes[recent_write_index]=addr;
          recent_write_index=(recent_write_index+1)&7;
-@@ -987,8 +1088,8 @@ void invalidate_addr(u32 addr)
+@@ -987,8 +1103,8 @@ void invalidate_addr(u32 addr)
        return;
      }
    }
@@ -697,7 +716,7 @@ index 6148c3e..44144ba 100644
    //invalidate_block(addr>>12);
    invalidate_blocks(addr>>12,addr>>12);
    assert(!((cached_code_words[index>>5]>>((index>>2)&7))&1));
-@@ -5335,6 +5436,7 @@ int sh2_recompile_block(int addr)
+@@ -5335,6 +5451,7 @@ int sh2_recompile_block(int addr)
    u32 p_constmap[SH2_REGS];
    u32 p_isconst=0;
    int cached_addr;
@@ -705,7 +724,7 @@ index 6148c3e..44144ba 100644
  
    //if(Count==365117028) tracedebug=1;
    assem_debug("NOTCOMPILED: addr = %x -> %x\n", (int)addr, (int)out);
-@@ -8205,6 +8307,7 @@ void DynarecSlaveHandleInterrupts()
+@@ -8205,6 +8322,7 @@ void DynarecSlaveHandleInterrupts()
      SSH2->NumberOfInterrupts--;
      SSH2->isIdle = 0;
      SSH2->isSleeping = 0;
@@ -713,7 +732,7 @@ index 6148c3e..44144ba 100644
    }
    //printf("DynarecSlaveHandleInterrupts pc=%x ip=%x\n",slave_pc,(int)slave_ip);
    //printf("master_cc=%d slave_cc=%d\n",master_cc,slave_cc);
-@@ -8386,7 +8489,7 @@ void SH2DynarecWriteNotify(u32 start, u32 length) {
+@@ -8386,7 +8504,7 @@ void SH2DynarecWriteNotify(u32 start, u32 length) {
    for(block=start>>12;block<=(start+length-1)>>12;block++)
      wp|=((cached_code[block>>3]>>(block&7))&1);
    if(!wp) return;
