@@ -43,6 +43,10 @@ which builds make it up.
   - the emulation no longer waits for the sound worker at each 16-line
     handover; it keeps queuing (up to ~a frame) while the worker catches up
     (`asp_sound_nowait 0` turns it off);
+  - t27: `asp_picture_rate 30` draws every other picture as a rule, giving
+    the time to emulation and sound; a `sat_options.txt` in a game's own
+    folder overrides the global one; with asynchronous VDP1 the polygon
+    lists are also drawn on frames whose picture is skipped;
   - `asp_pin 0` (all four cores shared) froze the stick in a Sega Rally
     race; the card's `sat_options.txt` keeps `asp_pin 1`;
   - SH-2 DMA passed an end address where a length was expected when telling

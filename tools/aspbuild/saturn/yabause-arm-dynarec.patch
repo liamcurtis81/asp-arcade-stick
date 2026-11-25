@@ -1038,7 +1038,7 @@ index a368448..2ce420f 100644
  void TitanSetResolution(int width, int height);
  void TitanGetResolution(int * width, int * height);
 diff --git a/yabause/src/vdp1.c b/yabause/src/vdp1.c
-index 009225e..b83b2b3 100644
+index 009225e..6470958 100644
 --- a/yabause/src/vdp1.c
 +++ b/yabause/src/vdp1.c
 @@ -34,6 +34,8 @@
@@ -1074,7 +1074,37 @@ index 009225e..b83b2b3 100644
     T1WriteLong(Vdp1Ram, addr, val);
  }
  
-@@ -716,6 +721,7 @@ int Vdp1LoadState(const void * stream, UNUSED int version, int size)
+@@ -628,13 +633,22 @@ void Vdp1Draw(void)
+    /* this should be done after a frame change or a plot trigger */
+    Vdp1Regs->COPR = 0;
+ 
+-   VIDCore->Vdp1DrawStart();
+-
+-   // we set two bits to 1
+-   Vdp1Regs->EDSR |= 2;
+-   Vdp1Regs->COPR = Vdp1Regs->addr >> 3;
+-   ScuSendDrawEnd();
+-   VIDCore->Vdp1DrawEnd();
++   {
++      /* ASP: with asynchronous VDP1 the polygon lists are still drawn on
++         frames whose picture is skipped (the emulation does not wait for
++         them), so a game that draws every other frame keeps its 3D graphics
++         whichever frames are skipped. */
++      extern VideoInterface_struct *asp_vid_saved;
++      extern int asp_vdp1_async;
++      VideoInterface_struct *vc = (asp_vid_saved && asp_vdp1_async) ? asp_vid_saved : VIDCore;
++      vc->Vdp1DrawStart();
++
++      // we set two bits to 1
++      Vdp1Regs->EDSR |= 2;
++      Vdp1Regs->COPR = Vdp1Regs->addr >> 3;
++      ScuSendDrawEnd();
++      vc->Vdp1DrawEnd();
++   }
+ }
+ 
+ //////////////////////////////////////////////////////////////////////////////
+@@ -716,6 +730,7 @@ int Vdp1LoadState(const void * stream, UNUSED int version, int size)
  
     // Read VDP1 ram
     MemStateRead((void *)Vdp1Ram, 0x80000, 1, stream);
@@ -1083,7 +1113,7 @@ index 009225e..b83b2b3 100644
  #ifdef IMPROVED_SAVESTATES
     MemStateRead((void *)back_framebuffer, 0x40000, 1, stream);
 diff --git a/yabause/src/vdp2.c b/yabause/src/vdp2.c
-index db73d00..f7eefd4 100644
+index db73d00..f80af58 100644
 --- a/yabause/src/vdp2.c
 +++ b/yabause/src/vdp2.c
 @@ -35,6 +35,8 @@
@@ -1119,10 +1149,11 @@ index db73d00..f7eefd4 100644
     T1WriteLong(Vdp2Ram, addr, val);
  }
  
-@@ -410,6 +415,10 @@ void SpeedThrottleDisable(void) {
+@@ -410,6 +415,11 @@ void SpeedThrottleDisable(void) {
  
  //////////////////////////////////////////////////////////////////////////////
  
++VideoInterface_struct *asp_vid_saved;   /* the real renderer while a picture is skipped */
 +int asp_frameskip_req;   /* ASP: set by the frontend when its sound queue runs low */
 +int asp_frame_dummy;              /* ASP: this frame is not being drawn */
 +unsigned long asp_frames_skipped;
@@ -1130,7 +1161,7 @@ index db73d00..f7eefd4 100644
  void Vdp2VBlankOUT(void) {
     static int framestoskip = 0;
     static int framesskipped = 0;
-@@ -427,6 +436,12 @@ void Vdp2VBlankOUT(void) {
+@@ -427,6 +437,12 @@ void Vdp2VBlankOUT(void) {
  
     Vdp2Regs->TVSTAT = ((Vdp2Regs->TVSTAT & ~0x0008) & ~0x0002) | (vdp2_is_odd_frame << 1);
  
@@ -1143,16 +1174,18 @@ index db73d00..f7eefd4 100644
     if (skipnextframe && (! saved))
     {
        saved = VIDCore;
-@@ -438,6 +453,8 @@ void Vdp2VBlankOUT(void) {
+@@ -437,7 +453,10 @@ void Vdp2VBlankOUT(void) {
+       VIDCore = saved;
        saved = NULL;
     }
++   asp_vid_saved = saved;
  
 +   asp_frame_dummy = (saved != NULL);
 +   if (asp_frame_dummy) asp_frames_skipped++;
     VIDCore->Vdp2DrawStart();
  
     if (Vdp2Regs->TVMD & 0x8000) {
-@@ -1135,6 +1152,7 @@ int Vdp2LoadState(const void * stream, UNUSED int version, int size)
+@@ -1135,6 +1154,7 @@ int Vdp2LoadState(const void * stream, UNUSED int version, int size)
  
     // Read VDP2 ram
     MemStateRead((void *)Vdp2Ram, 0x80000, 1, stream);

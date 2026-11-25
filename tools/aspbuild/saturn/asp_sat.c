@@ -668,6 +668,7 @@ extern unsigned long asp_onchip_reads[2][512], asp_slave_skips;
 extern double asp_render_wait_us, asp_drawend_us, asp_m68k_wait_us;
 static int cpu_boost_on = 1;   /* sat_options.txt: asp_cpu_boost */
 static int asp_pin = 1;         /* sat_options.txt: asp_pin */
+static int picture_half;        /* sat_options.txt: asp_picture_rate 30 */
 static int max_skip = 3, skip_below = 50;   /* sat_options.txt: asp_max_skip, asp_skip_below */
 static retro_audio_buffer_status_callback_t buf_status_cb;
 static unsigned long frames_skipped_hint;
@@ -676,6 +677,11 @@ static unsigned long frames_waited;
 static void report_audio_buffer(void)
 {
 	unsigned fill, occ;
+	static int ph;
+	/* asp_picture_rate 30: every other picture is skipped as a rule, the
+	 * time going to the emulation and sound instead; the sound queue can
+	 * still skip the ones in between */
+	if (picture_half && (ph ^= 1)) { asp_frameskip_req = 1; frames_skipped_hint++; return; }
 	if (!audio_ok) return;
 	fill = ring_w - ring_r;
 	occ = fill >= TARGET_FR ? 100 : fill * 100 / TARGET_FR;
@@ -700,13 +706,13 @@ static char save_dir[512] = "/mnt/data/save/saturn";
  * on the stick without a rebuild. */
 static char ovr_k[32][64], ovr_v[32][48];
 static int n_ovr;
-static void load_overrides(void)
+static void load_overrides_from(const char *path)
 {
-	char path[600], line[160];
+	char line[160];
 	FILE *f;
-	snprintf(path, sizeof(path), "%ssat_options.txt", bin_dir);
 	f = fopen(path, "r");
 	if (f == NULL) return;
+	fprintf(stderr, "asp: options from %s\n", path);
 	while (n_ovr < 32 && fgets(line, sizeof(line), f)) {
 		if (line[0] == '#' || sscanf(line, "%63s %47s", ovr_k[n_ovr], ovr_v[n_ovr]) != 2)
 			continue;
@@ -783,6 +789,11 @@ static void load_overrides(void)
 			fprintf(stderr, "asp: skip a picture when the sound queue is below %d%%\n", skip_below);
 			continue;
 		}
+		if (strcmp(ovr_k[n_ovr], "asp_picture_rate") == 0) {
+			picture_half = atoi(ovr_v[n_ovr]) <= 30;
+			fprintf(stderr, "asp: pictures at %s\n", picture_half ? "30 a second (every other frame)" : "up to 60 a second");
+			continue;
+		}
 		if (strcmp(ovr_k[n_ovr], "asp_sound_queue_ms") == 0) {
 			int ms = atoi(ovr_v[n_ovr]);
 			if (ms >= 10 && ms <= 200) TARGET_FR = (unsigned)(ms * 441 / 10);
@@ -793,6 +804,19 @@ static void load_overrides(void)
 		n_ovr++;
 	}
 	fclose(f);
+}
+/* sat_options.txt beside the emulator, then one in the game's own folder,
+ * whose lines win: per-game settings such as "asp_picture_rate 30". */
+static void load_overrides(const char *game)
+{
+	char path[600];
+	const char *sl;
+	snprintf(path, sizeof(path), "%ssat_options.txt", bin_dir);
+	load_overrides_from(path);
+	if (game && (sl = strrchr(game, '/')) != NULL) {
+		snprintf(path, sizeof(path), "%.*s/sat_options.txt", (int)(sl - game), game);
+		load_overrides_from(path);
+	}
 }
 
 static bool environment(unsigned cmd, void *data)
@@ -1251,7 +1275,7 @@ int main(int argc, char **argv)
 	retro_set_audio_sample_batch(audio_batch);
 	retro_set_input_poll(input_poll);
 	retro_set_input_state(input_state);
-	load_overrides();
+	load_overrides(src);
 	manual_find(src);
 	cheats_find(src);
 	asp_stats_begin(bin_dir, "saturn", src);
