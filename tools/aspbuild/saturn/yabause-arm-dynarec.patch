@@ -109,7 +109,7 @@ index a5c771f..2585c4b 100644
  
  #ifdef ANDROID
 diff --git a/yabause/src/scsp.c b/yabause/src/scsp.c
-index d46d52e..6e78da1 100644
+index d46d52e..b5da416 100644
 --- a/yabause/src/scsp.c
 +++ b/yabause/src/scsp.c
 @@ -4697,6 +4697,7 @@ Sh2ScspReadByte(SH2_struct *sh, u32 addr)
@@ -361,7 +361,56 @@ index d46d52e..6e78da1 100644
  //////////////////////////////////////////////////////////////////////////////
  
  void
-@@ -5181,7 +5362,7 @@ void new_scsp_update_samples(s32 *bufL, s32 *bufR, int scspsoundlen)
+@@ -5110,9 +5291,48 @@ ScspConvert32uto16s (s32 *srcL, s32 *srcR, s16 *dst, u32 len)
+ 
+ //////////////////////////////////////////////////////////////////////////////
+ 
++/* ASP: CD music played straight by the frontend's sound callback at the
++   real 44.1 kHz instead of being mixed into the emulated sound output, which
++   only flows as fast as the emulation runs. Below full speed (3D games) the
++   CD track stuttered with every shortfall; now the CD block reads ahead (it
++   speeds up when this queue runs low) and the music plays on undisturbed. */
++int asp_cdda_direct = 1;               /* sat_options.txt: asp_cdda_direct */
++#define ASP_CD_SECTORS 64              /* about 0.85 s of CD audio */
++u8 asp_cd_ring[ASP_CD_SECTORS * 2352];
++volatile unsigned asp_cd_w, asp_cd_r;  /* sectors, free-running */
++unsigned long asp_cd_dropped;
++
+ void
+ ScspReceiveCDDA (const u8 *sector)
+ {
++  if (asp_cdda_direct)
++    {
++      unsigned fill = asp_cd_w - asp_cd_r;
++      if (fill < ASP_CD_SECTORS / 2)
++        {
++          Cs2Area->isaudio = 0;        /* read ahead at data speed */
++          Cs2SetTiming(1);
++          Cs2Area->isaudio = 1;
++        }
++      else if (fill > ASP_CD_SECTORS * 3 / 4)
++        Cs2SetTiming(0);
++      else
++        {
++          Cs2Area->isaudio = 1;
++          Cs2SetTiming(1);
++        }
++      if (fill >= ASP_CD_SECTORS)
++        {
++          asp_cd_dropped++;
++          return;
++        }
++      memcpy(asp_cd_ring + (asp_cd_w % ASP_CD_SECTORS) * 2352, sector, 2352);
++      { static FILE *df; static int t; if (!t) { t = 1; if (getenv("ASP_CD_DUMP")) df = fopen(getenv("ASP_CD_DUMP"), "wb"); } if (df) fwrite(sector, 1, 2352, df); }
++      __sync_synchronize();
++      asp_cd_w++;
++      return;
++    }
++
+    // If buffer is half empty or less, boost timing for a bit until we've buffered a few sectors
+    if (cdda_out_left < (sizeof(cddabuf.data) / 2))
+    {
+@@ -5181,7 +5401,7 @@ void new_scsp_update_samples(s32 *bufL, s32 *bufR, int scspsoundlen)
  }
  
  void

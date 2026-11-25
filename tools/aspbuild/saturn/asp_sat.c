@@ -171,6 +171,23 @@ static void audio_cb(void *ud, Uint8 *stream, int len)
 		out[2 * i + 1] = ring[(ring_r & (RING_FR - 1)) * 2 + 1];
 		ring_r++;
 	}
+	{
+		/* CD music, at the real rate whatever the emulation's speed (scsp.c) */
+		extern uint8_t asp_cd_ring[]; extern volatile unsigned asp_cd_w, asp_cd_r;
+		static unsigned off;   /* bytes into the current sector */
+		for (i = 0; i < frames && asp_cd_r != asp_cd_w; i++) {
+			const uint8_t *p = asp_cd_ring + (asp_cd_r % 64) * 2352 + off;
+			int l = out[2 * i] + (int16_t)(p[0] | p[1] << 8);
+			int r = out[2 * i + 1] + (int16_t)(p[2] | p[3] << 8);
+			out[2 * i]     = l > 32767 ? 32767 : l < -32768 ? -32768 : l;
+			out[2 * i + 1] = r > 32767 ? 32767 : r < -32768 ? -32768 : r;
+			if ((off += 4) == 2352) { off = 0; __sync_synchronize(); asp_cd_r++; }
+		}
+	}	{
+		static FILE *of; static int tried;
+		if (!tried) { tried = 1; if (getenv("ASP_OUT_AUDIO")) of = fopen(getenv("ASP_OUT_AUDIO"), "wb"); }
+		if (of) fwrite(out, 4, frames, of);
+	}
 }
 
 static void ring_put(int16_t l, int16_t r)
@@ -184,6 +201,12 @@ static void ring_put(int16_t l, int16_t r)
 /* Linear resample from in_rate to OUT_RATE. */
 static size_t audio_batch(const int16_t *data, size_t frames)
 {
+	{
+		/* test harness: ASP_RAW_AUDIO=path keeps the core's raw sound (s16 stereo 44.1k) */
+		static FILE *rf; static int tried;
+		if (!tried) { tried = 1; if (getenv("ASP_RAW_AUDIO")) rf = fopen(getenv("ASP_RAW_AUDIO"), "wb"); }
+		if (rf) fwrite(data, 4, frames, rf);
+	}
 	/* Rate control: when the queue is below its target the sound is
 	 * stretched slightly (up to 1.5%, about a quarter of a semitone at the
 	 * extreme) instead of running dry, which is what crackles; above it, it
@@ -763,6 +786,11 @@ static void load_overrides_from(const char *path)
 		}
 		if (strcmp(ovr_k[n_ovr], "asp_pin_sound") == 0) {
 			asp_pin_sound = atoi(ovr_v[n_ovr]);
+			continue;
+		}
+		if (strcmp(ovr_k[n_ovr], "asp_cdda_direct") == 0) {
+			extern int asp_cdda_direct;
+			asp_cdda_direct = atoi(ovr_v[n_ovr]);
 			continue;
 		}
 		if (strcmp(ovr_k[n_ovr], "asp_pin") == 0) {
@@ -1382,7 +1410,7 @@ int main(int argc, char **argv)
 		}
 		if (exit_after && frame >= exit_after)
 			break;
-		if (frame % 1200 == 0) {
+		if (frame % (getenv("ASP_STATS_EVERY") ? atoi(getenv("ASP_STATS_EVERY")) : 1200) == 0) {
 			Uint32 el = SDL_GetTicks() - t_start;
 			fprintf(stderr, "asp: per frame: waiting for the picture threads %.2f ms, finishing the picture %.2f ms, waiting for the sound thread %.2f ms\n",
 				asp_render_wait_us / 1000.0 / 1200, asp_drawend_us / 1000.0 / 1200, asp_m68k_wait_us / 1000.0 / 1200);
@@ -1413,6 +1441,7 @@ int main(int argc, char **argv)
 				}
 			}
 			{ extern unsigned long asp_vdp1_dropped, asp_vdp1_late; fprintf(stderr, "asp: VDP1 lists dropped %lu, shown late %lu\n", asp_vdp1_dropped, asp_vdp1_late); }
+			{ extern volatile unsigned asp_cd_w, asp_cd_r; extern unsigned long asp_cd_dropped; static unsigned last_w; fprintf(stderr, "asp: CD music sectors %u (queue %u, dropped %lu)\n", asp_cd_w - last_w, asp_cd_w - asp_cd_r, asp_cd_dropped); last_w = asp_cd_w; }
 			{ extern unsigned asp_snap_bytes; fprintf(stderr, "asp: video RAM copied for the picture threads: %u KB per frame\n", asp_snap_bytes / 1024 / 1200); asp_snap_bytes = 0; }
 			{
 				int cpu, k, r;
