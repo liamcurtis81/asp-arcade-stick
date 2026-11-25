@@ -41,6 +41,8 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <sched.h>
 #include <sys/syscall.h>
@@ -1268,6 +1270,29 @@ int main(int argc, char **argv)
 		strcpy(bin_dir, "./");
 	open_log();
 	fprintf(stderr, "\n===== launch: %s =====\n", argc > 1 ? argv[1] : "(no rom)");
+	{
+		/* One-off survey of the graphics stack: runs gpu_probe.sh once if
+		 * it sits next to the binary and gpu_probe.txt is not there yet. */
+		char sh[700], out[700], cmd[1500]; struct stat st;
+		snprintf(sh, sizeof(sh), "%sgpu_probe.sh", bin_dir);
+		snprintf(out, sizeof(out), "%sgpu_probe.txt", bin_dir);
+		if (stat(sh, &st) == 0 && stat(out, &st) != 0) {
+			pid_t pid; int status = -1;
+			snprintf(cmd, sizeof(cmd), "%s.tmp", out);
+			fprintf(stderr, "asp: running gpu probe\n");
+			pid = fork();
+			if (pid == 0) {
+				int fd = open(cmd, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+				if (fd >= 0) { dup2(fd, 1); dup2(fd, 2); }
+				execl("/system/bin/sh", "sh", sh, (char *)NULL);
+				execl("/bin/sh", "sh", sh, (char *)NULL);
+				_exit(127);
+			}
+			if (pid > 0) waitpid(pid, &status, 0);
+			rename(cmd, out); sync();
+			fprintf(stderr, "asp: gpu probe exit %d\n", status);
+		}
+	}
 	if (argc < 2) return 1;
 	if (argc > 2 && argv[2][0] == '/') {
 		mkdir(argv[2], 0777);
