@@ -746,6 +746,11 @@ static void load_overrides_from(const char *path)
 			asp_render_nice = atoi(ovr_v[n_ovr]);
 			continue;
 		}
+		if (strcmp(ovr_k[n_ovr], "asp_vdp1_on_skipped") == 0) {
+			extern int asp_vdp1_on_skipped;
+			asp_vdp1_on_skipped = atoi(ovr_v[n_ovr]);
+			continue;
+		}
 		if (strcmp(ovr_k[n_ovr], "asp_vdp1_async") == 0) {
 			extern int asp_vdp1_async;
 			asp_vdp1_async = atoi(ovr_v[n_ovr]);

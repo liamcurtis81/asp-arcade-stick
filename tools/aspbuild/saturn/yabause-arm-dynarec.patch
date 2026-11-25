@@ -563,7 +563,7 @@ index 6fee45a..cce500d 100644
  	add	r6, r6, #2
  	lsl	r12, r0, #16
 diff --git a/yabause/src/sh2_dynarec/sh2_dynarec.c b/yabause/src/sh2_dynarec/sh2_dynarec.c
-index 6148c3e..dec4fcf 100644
+index 6148c3e..bff3fe2 100644
 --- a/yabause/src/sh2_dynarec/sh2_dynarec.c
 +++ b/yabause/src/sh2_dynarec/sh2_dynarec.c
 @@ -30,6 +30,116 @@
@@ -716,7 +716,20 @@ index 6148c3e..dec4fcf 100644
    //invalidate_block(addr>>12);
    invalidate_blocks(addr>>12,addr>>12);
    assert(!((cached_code_words[index>>5]>>((index>>2)&7))&1));
-@@ -5335,6 +5451,7 @@ int sh2_recompile_block(int addr)
+@@ -2441,6 +2557,12 @@ void store_assemble(int i,struct regstat *i_regs)
+   if(addrmode[i]==REGIND&&!c&&rs1[i]==rs2[i]) {// Swapped value is written, so unswapped value must be used as the address
+     emit_mov(addr,temp);addr=temp;
+   }
++  /* ASP: the same for any mode where the address register is the value
++     register (e.g. MOV.L Rn,@(0,Rn)): MOV.L swaps the value in place, which
++     also scrambled the address. Virtua Cop 2 crashed on it. */
++  else if(size==2&&!c&&addr==t&&addr!=temp) {
++    emit_mov(addr,temp);addr=temp;
++  }
+   if(!c||memtarget)
+   {
+     int x=0;
+@@ -5335,6 +5457,7 @@ int sh2_recompile_block(int addr)
    u32 p_constmap[SH2_REGS];
    u32 p_isconst=0;
    int cached_addr;
@@ -724,7 +737,7 @@ index 6148c3e..dec4fcf 100644
  
    //if(Count==365117028) tracedebug=1;
    assem_debug("NOTCOMPILED: addr = %x -> %x\n", (int)addr, (int)out);
-@@ -8205,6 +8322,7 @@ void DynarecSlaveHandleInterrupts()
+@@ -8205,6 +8328,7 @@ void DynarecSlaveHandleInterrupts()
      SSH2->NumberOfInterrupts--;
      SSH2->isIdle = 0;
      SSH2->isSleeping = 0;
@@ -732,7 +745,7 @@ index 6148c3e..dec4fcf 100644
    }
    //printf("DynarecSlaveHandleInterrupts pc=%x ip=%x\n",slave_pc,(int)slave_ip);
    //printf("master_cc=%d slave_cc=%d\n",master_cc,slave_cc);
-@@ -8386,7 +8504,7 @@ void SH2DynarecWriteNotify(u32 start, u32 length) {
+@@ -8386,7 +8510,7 @@ void SH2DynarecWriteNotify(u32 start, u32 length) {
    for(block=start>>12;block<=(start+length-1)>>12;block++)
      wp|=((cached_code[block>>3]>>(block&7))&1);
    if(!wp) return;
@@ -1057,7 +1070,7 @@ index a368448..2ce420f 100644
  void TitanSetResolution(int width, int height);
  void TitanGetResolution(int * width, int * height);
 diff --git a/yabause/src/vdp1.c b/yabause/src/vdp1.c
-index 009225e..6470958 100644
+index 009225e..cb762fe 100644
 --- a/yabause/src/vdp1.c
 +++ b/yabause/src/vdp1.c
 @@ -34,6 +34,8 @@
@@ -1093,7 +1106,15 @@ index 009225e..6470958 100644
     T1WriteLong(Vdp1Ram, addr, val);
  }
  
-@@ -628,13 +633,22 @@ void Vdp1Draw(void)
+@@ -611,6 +616,7 @@ void Vdp1FakeDrawCommands(u8 * ram, Vdp1 * regs)
+    }
+ }
+ 
++int asp_vdp1_on_skipped = 1;   /* sat_options.txt: asp_vdp1_on_skipped */
+ void Vdp1Draw(void) 
+ {
+    if (!Vdp1External.disptoggle)
+@@ -628,13 +634,23 @@ void Vdp1Draw(void)
     /* this should be done after a frame change or a plot trigger */
     Vdp1Regs->COPR = 0;
  
@@ -1111,7 +1132,8 @@ index 009225e..6470958 100644
 +         whichever frames are skipped. */
 +      extern VideoInterface_struct *asp_vid_saved;
 +      extern int asp_vdp1_async;
-+      VideoInterface_struct *vc = (asp_vid_saved && asp_vdp1_async) ? asp_vid_saved : VIDCore;
++      extern int asp_vdp1_on_skipped;
++      VideoInterface_struct *vc = (asp_vid_saved && asp_vdp1_async && asp_vdp1_on_skipped) ? asp_vid_saved : VIDCore;
 +      vc->Vdp1DrawStart();
 +
 +      // we set two bits to 1
@@ -1123,7 +1145,7 @@ index 009225e..6470958 100644
  }
  
  //////////////////////////////////////////////////////////////////////////////
-@@ -716,6 +730,7 @@ int Vdp1LoadState(const void * stream, UNUSED int version, int size)
+@@ -716,6 +732,7 @@ int Vdp1LoadState(const void * stream, UNUSED int version, int size)
  
     // Read VDP1 ram
     MemStateRead((void *)Vdp1Ram, 0x80000, 1, stream);
@@ -1213,7 +1235,7 @@ index db73d00..f80af58 100644
     // Read CRAM
     MemStateRead((void *)Vdp2ColorRam, 0x1000, 1, stream);
 diff --git a/yabause/src/vidsoft.c b/yabause/src/vidsoft.c
-index 94bbc7d..282b1a5 100644
+index 94bbc7d..c335400 100644
 --- a/yabause/src/vidsoft.c
 +++ b/yabause/src/vidsoft.c
 @@ -1,3 +1,7 @@
@@ -1444,7 +1466,7 @@ index 94bbc7d..282b1a5 100644
 +   rate the stick can draw them while the game runs at full speed.
 +   Status registers are still set at once (Vdp1FakeDrawCommands), and CPU
 +   access to the VDP1 framebuffer still waits for the thread. */
-+int asp_vdp1_async = 1;                  /* sat_options.txt: asp_vdp1_async */
++int asp_vdp1_async = 0;                  /* sat_options.txt: asp_vdp1_async (on in t25-t29: with pictures skipped it broke Virtua Fighter 2's fighters) */
 +static int asp_vdp1_unshown;
 +unsigned long asp_vdp1_dropped, asp_vdp1_late;
 +
