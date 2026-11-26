@@ -1,0 +1,149 @@
+From 37281127ead6564b0b6f229425a5632d517ba920 Mon Sep 17 00:00:00 2001
+From: Liam Curtis <liamcurtis81@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 19:50:01 +0000
+Subject: [PATCH] ASP: TMNT picture drawn on a second core (fba_v58)
+
+Emulation alone is 13.8 ms a frame on the stick and drawing added 8.4 ms,
+so TMNT ran at 57 fps and its sound crackled. Same async path as Sunset
+Riders: K051960 sprite RAM and controls are now per-thread with a
+capture/bind pair. Harness frame hashes are identical to the sync path.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JCu91LrG764XV67j6TkDrQ
+---
+ src/burn/drv/konami/d_tmnt.cpp  | 39 +++++++++++++++++++++++++++++++--
+ src/burn/drv/konami/k051960.cpp | 24 +++++++++++++++++---
+ src/burn/drv/konami/konamiic.h  |  3 ++-
+ 3 files changed, 60 insertions(+), 6 deletions(-)
+
+diff --git a/src/burn/drv/konami/d_tmnt.cpp b/src/burn/drv/konami/d_tmnt.cpp
+index 4b1a56e63..e753c6c0d 100644
+--- a/src/burn/drv/konami/d_tmnt.cpp
++++ b/src/burn/drv/konami/d_tmnt.cpp
+@@ -71,7 +71,7 @@ static ASP_TLS INT32 LayerColourBase[3];
+ static ASP_TLS INT32 SpriteColourBase;
+ static ASP_TLS INT32 LayerPri[3];
+ static UINT8 DrvSoundLatch;
+-static INT32 PriorityFlag;
++static ASP_TLS INT32 PriorityFlag;
+ 
+ static INT32 LastCntrl;
+ static INT32 Toggle;
+@@ -5955,6 +5955,36 @@ static void RenderTitleSample(INT16 *pSoundBuf, INT32 nLength)
+ 	TitleSamplePos = Addr;
+ }
+ 
++#ifdef BUILD_ASP
++// ASP: picture drawn on a second core for TMNT (burner/pi/asp_async.cpp), as
++// Sunset Riders. TmntDraw reads palette RAM, the K052109 tilemaps, the
++// K051960 sprite RAM and controls, the layer and sprite colour bases, and the
++// sprite/tile priority flag the game sets through a register write.
++extern int asp_async_draw(void (*capture)(void), void (*bind)(void), INT32 (*draw)(void), INT32 height);
++static UINT8 asp_tm_palram[0x1000];
++static UINT32 *asp_tm_palette = NULL;
++static INT32 asp_tm_pri, asp_tm_layerbase[3], asp_tm_spritebase;
++
++static void asp_tm_capture()
++{
++	memcpy(asp_tm_palram, DrvPaletteRam, sizeof(asp_tm_palram));
++	asp_tm_pri = PriorityFlag;
++	memcpy(asp_tm_layerbase, LayerColourBase, sizeof(asp_tm_layerbase)); asp_tm_spritebase = SpriteColourBase;
++	K052109AspCapture(); K051960AspCapture();
++}
++
++static void asp_tm_bind()
++{
++	if (asp_tm_palette == NULL) asp_tm_palette = (UINT32*)calloc(0x400, sizeof(UINT32));
++	DrvPaletteRam = asp_tm_palram;
++	DrvPalette = konami_palette32 = asp_tm_palette;
++	PriorityFlag = asp_tm_pri;
++	memcpy(LayerColourBase, asp_tm_layerbase, sizeof(asp_tm_layerbase)); SpriteColourBase = asp_tm_spritebase;
++	K052109AspBind(); K051960AspBind();
++	KonamiAspBindBitmaps();
++}
++#endif
++
+ static INT32 TmntFrame()
+ {
+ 	INT32 nInterleave = nBurnSoundLen;
+@@ -6017,7 +6047,12 @@ static INT32 TmntFrame()
+ 		BurnSoundLimiter(pBurnSoundOut, nBurnSoundLen, 0.55, 1.80);
+ 	}
+ 	
+-	if (pBurnDraw) TmntDraw();
++	if (pBurnDraw) {
++#ifdef BUILD_ASP
++		if (!asp_async_draw(asp_tm_capture, asp_tm_bind, TmntDraw, nScreenHeight))
++#endif
++		TmntDraw();
++	}
+ 
+ 	return 0;
+ }
+diff --git a/src/burn/drv/konami/k051960.cpp b/src/burn/drv/konami/k051960.cpp
+index 25d97c407..b1f84152c 100644
+--- a/src/burn/drv/konami/k051960.cpp
++++ b/src/burn/drv/konami/k051960.cpp
+@@ -8,10 +8,10 @@
+ 
+ INT32 K051960_irq_enabled;
+ INT32 K051960_nmi_enabled;
+-INT32 K051960_spriteflip;
+-INT32 K051960_shadow_config;
++ASP_TLS INT32 K051960_spriteflip;
++ASP_TLS INT32 K051960_shadow_config;
+ 
+-static UINT8 *K051960Ram = NULL;
++static ASP_TLS UINT8 *K051960Ram = NULL;
+ static UINT8 K051960SpriteRomBank[3];
+ INT32 K051960ReadRoms;
+ static INT32 K051960RomOffset;
+@@ -28,6 +28,24 @@ static INT32 nSpriteYOffset;
+ typedef void (*K051960_Callback)(INT32 *Code, INT32 *Colour, INT32 *Priority, INT32 *Shadow);
+ static K051960_Callback K051960Callback;
+ 
++#ifdef BUILD_ASP
++// Async draw (asp_async.cpp): the sprite renderer reads the sprite RAM and the
++// flip and shadow controls, all per-thread above. The render thread is bound
++// to a copy taken where the frame would have been drawn.
++static UINT8 k051960_snap_ram[0x400];
++static INT32 k051960_snap_flip, k051960_snap_shadow;
++void K051960AspCapture()
++{
++	memcpy(k051960_snap_ram, K051960Ram, 0x400);
++	k051960_snap_flip = K051960_spriteflip; k051960_snap_shadow = K051960_shadow_config;
++}
++void K051960AspBind()
++{
++	K051960Ram = k051960_snap_ram;
++	K051960_spriteflip = k051960_snap_flip; K051960_shadow_config = k051960_snap_shadow;
++}
++#endif
++
+ void K051960SpritesRender(INT32 min_priority, INT32 max_priority)
+ {
+ #define NUM_SPRITES 128
+diff --git a/src/burn/drv/konami/konamiic.h b/src/burn/drv/konami/konamiic.h
+index 1f8e21724..5bcf2e82b 100644
+--- a/src/burn/drv/konami/konamiic.h
++++ b/src/burn/drv/konami/konamiic.h
+@@ -81,7 +81,7 @@ UINT8 K051937Read(UINT32 Offset);
+ extern INT32 K052109RMRDLine;
+ extern INT32 K051960_irq_enabled;
+ extern INT32 K051960_nmi_enabled;
+-extern INT32 K051960_spriteflip;
++extern ASP_TLS INT32 K051960_spriteflip;
+ 
+ void K052109UpdateScroll();
+ void K052109AdjustScroll(INT32 x, INT32 y);
+@@ -479,6 +479,7 @@ void K054338AspCapture(); void K054338AspBind();
+ void K053251AspCapture(); void K053251AspBind();
+ void K053245AspCapture(); void K053245AspBind();
+ void K052109AspCapture(); void K052109AspBind();
++void K051960AspCapture(); void K051960AspBind();
+ void KonamiAspBindBitmaps();
+ void K055555AspCapture(); void K055555AspBind();
+ void KonamiGXAspCapture(); void KonamiGXAspBind();
+-- 
+2.43.0
+

@@ -7,6 +7,15 @@ which builds make it up.
 
 ## 2.3 (in progress) - 22 Nov 2026
 
+- Saturn retired (26 Nov): page, game list entries and ROMs removed. The
+  stick's PowerVR chip has a kernel driver on the system but no OpenGL ES
+  libraries, so hardware drawing is not an option; software drawing cannot
+  reach playable speed in the 3D games.
+- Arcade `fba_v58`: TMNT draws its picture on a second core (`[tmnt]
+  async_draw 1`). It was running at 57 fps with crackly sound. Patch 0033 was
+  dropped from the series: it reverted a patch no longer in it, so it no
+  longer applied.
+
 - Saturn (test, `sat_emu_t33`): libretro Yabause with Ari64's SH-2
   recompiler re-enabled on ARM, on its own launcher page. Main-thread work cut:
   - the drawing threads' snapshot of VDP1/VDP2 RAM copies only the 2KB pages
